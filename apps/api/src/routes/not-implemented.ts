@@ -1,0 +1,2 @@
+import { Router } from 'express';
+export function createNotImplementedRouter(capability: string): Router { const router = Router({ mergeParams: true }); router.all('{*path}', (_request, response) => response.status(501).json({ error: { code: 'NOT_IMPLEMENTED', message: `${capability} is scaffolded but not implemented in the MVP foundation` } })); router.all('/', (_request, response) => response.status(501).json({ error: { code: 'NOT_IMPLEMENTED', message: `${capability} is scaffolded but not implemented in the MVP foundation` } })); return router; }

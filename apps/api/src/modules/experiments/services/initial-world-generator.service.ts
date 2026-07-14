@@ -1,0 +1,1 @@
+import type { ExperimentPlan, WorldConfig } from '@taskos/shared-types'; export interface InitialWorldGenerator { generate(plan: ExperimentPlan): WorldConfig[] } export class PlanInitialWorldGenerator implements InitialWorldGenerator { generate(plan: ExperimentPlan) { return plan.worlds.slice(0, plan.initialWorldCount); } }

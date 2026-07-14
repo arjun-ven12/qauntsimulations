@@ -1,0 +1,40 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/taskos
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/taskos
+      JWT_ACCESS_SECRET: ci-access-secret-at-least-thirty-two-characters
+      JWT_REFRESH_SECRET: ci-refresh-secret-at-least-thirty-two-characters
+      AI_PROVIDER: mock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 11.7.0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Validate Prisma schema
+        run: pnpm --filter @taskos/database db:validate
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Unit and integration tests
+        run: pnpm test
+      - name: Build web
+        run: pnpm --filter @taskos/web build
+      - name: Build API
+        run: pnpm --filter @taskos/api build
+      - name: Build Playwright worker
+        run: pnpm --filter @taskos/playwright-runner build
+      - name: Build all workspaces
+        run: pnpm build

@@ -1,0 +1,3 @@
+import type { Finding, Investigation, Project } from '@taskos/shared-types';
+export interface CreateInvestigationRequest { projectId: string; name: string; environmentId: string; journeyId: string; scenarioId: string; objective: string; invariantIds: string[]; worldPack: string }
+export interface InvestigationApi { listProjects(): Promise<Project[]>; createProject(input: { name: string; description: string | null; repositoryUrl: string | null }): Promise<Project>; createInvestigation(input: CreateInvestigationRequest): Promise<Investigation>; getInvestigation(id: string): Promise<Investigation>; listFindings(id: string): Promise<Finding[]> }

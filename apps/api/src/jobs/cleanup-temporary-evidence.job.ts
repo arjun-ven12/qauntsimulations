@@ -1,0 +1,1 @@
+import type { EvidenceStorage } from '../integrations/storage/evidence-storage.interface.js'; export class CleanupTemporaryEvidenceJob { constructor(private readonly storage: EvidenceStorage) {} async run(keys: string[]): Promise<void> { await Promise.all(keys.map((key) => this.storage.delete(key))); } }

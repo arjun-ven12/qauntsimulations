@@ -1,0 +1,4 @@
+#!/usr/bin/env node
+import { readFile } from 'node:fs/promises'; import { resolve } from 'node:path'; import { workerJobSchema } from '@taskos/execution-contracts'; import { runWorker } from './runner.js'; import { writeWorkerResult } from './reporting/result-writer.js';
+async function main(): Promise<number> { const jobPath = process.argv[2]; const resultPath = process.argv[3] ?? 'worker-result.json'; if (!jobPath) { console.error('Usage: taskos-worker <worker-job.json> [worker-result.json]'); return 64; } try { const job = workerJobSchema.parse(JSON.parse(await readFile(resolve(jobPath), 'utf8'))); const result = await runWorker(job); await writeWorkerResult(resolve(resultPath), result); return result.status === 'PASSED' ? 0 : result.status === 'FAILED' ? 2 : 1; } catch (error) { console.error(error instanceof Error ? error.message : error); return 1; } }
+process.exitCode = await main();

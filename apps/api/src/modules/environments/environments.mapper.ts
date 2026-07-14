@@ -1,0 +1,1 @@
+export function mapEnvironment(record: { id: string; projectId: string; name: string; type: 'DEVELOPMENT' | 'STAGING' | 'PRODUCTION' | 'DEMO'; baseUrl: string; manifest: unknown; createdAt: Date; updatedAt: Date }) { return { ...record, manifest: record.manifest as Record<string, unknown>, createdAt: record.createdAt.toISOString(), updatedAt: record.updatedAt.toISOString() }; }

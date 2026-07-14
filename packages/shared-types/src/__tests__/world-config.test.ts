@@ -1,0 +1,3 @@
+import { describe,expect,it } from 'vitest'; import { worldConfigSchema } from '../index.js';
+const valid={worldId:'world-1',browser:'CHROMIUM',viewport:'DESKTOP',networkProfile:'NORMAL',userProfile:'NORMAL',concurrency:1,latencyMs:0,bandwidthKbps:null,packetLossPercent:0,offlineDurationMs:0,inventoryState:{sku:1},sessionState:{},paymentDelayMs:0,retryIntervalMs:0,doubleSubmit:false,webhookOrder:[],injectedFaults:[],randomSeed:42,reason:'baseline'};
+describe('worldConfigSchema',()=>{it('accepts bounded execution configuration',()=>expect(worldConfigSchema.parse(valid).worldId).toBe('world-1'));it('rejects unsafe packet loss and concurrency',()=>expect(()=>worldConfigSchema.parse({...valid,concurrency:0,packetLossPercent:101})).toThrow())});

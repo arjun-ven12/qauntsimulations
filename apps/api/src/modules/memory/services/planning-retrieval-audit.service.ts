@@ -1,0 +1,1 @@
+export interface RetrievalAudit { investigationId: string; memoryRecordId: string; rank: number; trustScore: number; used: boolean; rationale: string } export interface PlanningRetrievalAuditService { record(audit: RetrievalAudit): Promise<void> }

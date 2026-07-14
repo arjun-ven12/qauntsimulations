@@ -1,0 +1,1 @@
+import { z } from 'zod'; export const createEnvironmentSchema = z.object({ name: z.string().min(1), type: z.enum(['DEVELOPMENT', 'STAGING', 'PRODUCTION', 'DEMO']), baseUrl: z.string().url(), manifest: z.record(z.unknown()).default({}) });

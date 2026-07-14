@@ -1,0 +1,1 @@
+import { writeFile } from 'node:fs/promises'; import type { WorkerResult } from '@taskos/execution-contracts'; import { workerResultSchema } from '@taskos/execution-contracts'; export async function writeWorkerResult(path: string, result: WorkerResult): Promise<void> { await writeFile(path, JSON.stringify(workerResultSchema.parse(result), null, 2)); }

@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@taskos/shared-types": ["packages/shared-types/src/index.ts"],
+      "@taskos/shared-config": ["packages/shared-config/src/index.ts"],
+      "@taskos/database": ["packages/database/src/index.ts"],
+      "@taskos/ai-providers": ["packages/ai-providers/src/index.ts"],
+      "@taskos/execution-contracts": ["packages/execution-contracts/src/index.ts"],
+      "@taskos/world-pack-sdk": ["packages/world-pack-sdk/src/index.ts"],
+      "@taskos/ui": ["packages/ui/src/index.ts"]
+    }
+  }
+}

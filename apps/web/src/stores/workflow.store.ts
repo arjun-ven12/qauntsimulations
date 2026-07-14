@@ -1,0 +1,1 @@
+import { create } from 'zustand'; interface WorkflowState { projectId?: string; environmentId?: string; journeyId?: string; scenarioId?: string; setContext(values: Partial<WorkflowState>): void } export const useWorkflowStore = create<WorkflowState>((set) => ({ setContext: (values) => set(values) }));

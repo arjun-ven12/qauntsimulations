@@ -1,0 +1,1 @@
+export function mapScenario(record: { id: string; projectId: string; name: string; prompt: string; controls: unknown; createdAt: Date; updatedAt: Date }) { return { ...record, controls: record.controls as Record<string, unknown>, createdAt: record.createdAt.toISOString(), updatedAt: record.updatedAt.toISOString() }; }

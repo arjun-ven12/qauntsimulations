@@ -1,0 +1,2 @@
+import { describe,expect,it } from 'vitest'; import { workerResultSchema } from '../index.js';
+describe('workerResultSchema',()=>{it('validates a standalone worker result',()=>{const now=new Date().toISOString();const parsed=workerResultSchema.parse({workerId:'worker',worldId:'world',experimentId:'experiment',status:'PASSED',startedAt:now,completedAt:now,invariantViolations:[],evidence:{outputDirectory:'/tmp/evidence',artifacts:[]},metrics:{durationMs:10},firstDivergence:null,error:null});expect(parsed.status).toBe('PASSED')})});

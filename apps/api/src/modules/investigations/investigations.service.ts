@@ -1,0 +1,11 @@
+import type { AIProvider } from '@taskos/ai-providers'; import { ApplicationError } from '../../core/errors/application-error.js'; import { mapFindings, mapInvestigation, mapWorlds } from './investigations.mapper.js'; import type { InvestigationRepository } from './investigations.repository.js'; import type { CreateInvestigationInput } from './investigations.types.js';
+export class InvestigationService {
+  constructor(private readonly repository: InvestigationRepository, private readonly ai: AIProvider) {}
+  async create(organisationId: string, projectId: string, input: CreateInvestigationInput) { if (!(await this.repository.validateScope(organisationId, projectId, input))) throw new ApplicationError('INVALID_INVESTIGATION_SCOPE', 'Project, environment, journey, or scenario was not found in this organisation', 404); const plan = await this.ai.generateExperimentPlan({ objective: input.objective, journeyId: input.journeyId, scenarioId: input.scenarioId, worldPack: input.worldPack, invariantIds: input.invariantIds, safetyConstraints: [{ type: 'domain-allowlist', value: true, description: 'Only the configured target domain may be accessed.' }, { type: 'no-production-mutations', value: true, description: 'Destructive production actions are blocked.' }] }); const id = await this.repository.createWithPlan({ organisationId, projectId, ...input, plan }); return this.get(organisationId, id); }
+  async get(org: string, id: string) { const record = await this.require(org, id); return mapInvestigation(record); }
+  async plan(org: string, id: string) { return (await this.get(org, id)).plan; }
+  async worlds(org: string, id: string) { return mapWorlds(await this.require(org, id)); }
+  async findings(org: string, id: string) { return mapFindings(await this.require(org, id)); }
+  async cancel(org: string, id: string) { if (!(await this.repository.cancel(org, id))) throw new ApplicationError('INVESTIGATION_NOT_CANCELLABLE', 'Investigation was not found or is already terminal', 409); return this.get(org, id); }
+  private async require(org: string, id: string) { const record = await this.repository.find(org, id); if (!record) throw new ApplicationError('INVESTIGATION_NOT_FOUND', 'Investigation was not found', 404); return record; }
+}

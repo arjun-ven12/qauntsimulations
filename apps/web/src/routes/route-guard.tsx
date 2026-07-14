@@ -1,0 +1,1 @@
+import type { ReactNode } from 'react'; import { Navigate } from 'react-router-dom'; import { useAuthStore } from '../stores/auth.store.js'; export function RouteGuard({ children }: { children: ReactNode }) { return useAuthStore((state) => state.authenticated) ? children : <Navigate to="/login" replace/>; }

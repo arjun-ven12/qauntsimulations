@@ -1,0 +1,1 @@
+export class ConfidenceService { score(reproduced: number, attempts: number): { score: number; label: 'POSSIBLE' | 'PROBABLE' | 'CONFIRMED' } { const score = attempts === 0 ? 0 : reproduced / attempts; return { score, label: reproduced >= 3 && score >= 0.75 ? 'CONFIRMED' : reproduced >= 2 && score >= 0.5 ? 'PROBABLE' : 'POSSIBLE' }; } }

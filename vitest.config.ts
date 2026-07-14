@@ -1,0 +1,2 @@
+import { defineConfig } from 'vitest/config'; import { resolve } from 'node:path';
+export default defineConfig({test:{exclude:['**/node_modules/**','**/dist/**','apps/demo-store/tests/**']},resolve:{alias:{'@taskos/shared-types':resolve('packages/shared-types/src/index.ts'),'@taskos/execution-contracts':resolve('packages/execution-contracts/src/index.ts'),'@taskos/database':resolve('packages/database/src/index.ts'),'@taskos/ai-providers':resolve('packages/ai-providers/src/index.ts')}}});

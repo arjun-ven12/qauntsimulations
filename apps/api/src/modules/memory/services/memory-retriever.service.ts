@@ -1,0 +1,1 @@
+export interface RetrievedMemory { id: string; summary: string; trustScore: number; metadata: Record<string, unknown> } export interface MemoryRetriever { retrieve(query: { organisationId: string; domain: string; limit: number }): Promise<RetrievedMemory[]> }

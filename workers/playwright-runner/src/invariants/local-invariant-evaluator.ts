@@ -1,0 +1,4 @@
+import type { Page } from '@playwright/test'; import type { InvariantEvaluationResult } from '@taskos/execution-contracts';
+export async function evaluateInvariants(page: Page, invariants: Array<{ id: string; name: string; assertion: Record<string, unknown> }>): Promise<InvariantEvaluationResult[]> {
+  return Promise.all(invariants.map(async (invariant) => { const selector = typeof invariant.assertion.selector === 'string' ? invariant.assertion.selector : undefined; const observed = selector ? await page.locator(selector).count() : 1; const expected = invariant.assertion.expected ?? 1; return { invariantId: invariant.id, name: invariant.name, passed: observed === expected, expected, observed, explanation: selector ? `Counted nodes matching ${selector}` : 'No browser-local assertion configured; deferred to API evaluation.' }; }));
+}

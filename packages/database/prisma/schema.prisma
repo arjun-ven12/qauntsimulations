@@ -1,0 +1,760 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Identity is global, while all product and execution records are anchored to an organisation.
+model User {
+  id            String               @id @default(cuid())
+  email         String               @unique
+  displayName   String
+  passwordHash  String
+  tokenVersion  Int                  @default(0)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  deletedAt     DateTime?
+  memberships   OrganisationMember[]
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]            @relation("AuditActor")
+}
+
+model Organisation {
+  id          String               @id @default(cuid())
+  name        String
+  slug        String               @unique
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  deletedAt   DateTime?
+  members     OrganisationMember[]
+  projects    Project[]
+  auditLogs   AuditLog[]
+  memory      MemoryRecord[]
+  secrets     ProjectSecretReference[]
+  safety      SafetyPolicy[]
+  templates   ScenarioTemplate[]
+  invariants  Invariant[]
+  investigations Investigation[]
+  workers     Worker[]
+  findings    Finding[]
+  repairs     Repair[]
+}
+
+model OrganisationMember {
+  id             String       @id @default(cuid())
+  organisationId String
+  userId         String
+  role           UserRole     @default(MEMBER)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([organisationId, userId])
+  @@index([userId])
+}
+
+model RefreshToken {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt])
+}
+
+model AuditLog {
+  id             String        @id @default(cuid())
+  organisationId String
+  actorUserId    String?
+  action         String
+  entityType     String
+  entityId       String?
+  metadata       Json          @default("{}")
+  createdAt      DateTime      @default(now())
+  organisation   Organisation  @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  actor          User?         @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  @@index([organisationId, createdAt])
+}
+
+model Project {
+  id             String          @id @default(cuid())
+  organisationId String
+  name           String
+  description    String?
+  repositoryUrl  String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  organisation   Organisation    @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  environments   Environment[]
+  secrets        ProjectSecretReference[]
+  safetyPolicies SafetyPolicy[]
+  journeys       Journey[]
+  scenarios      Scenario[]
+  invariants     Invariant[]
+  investigations Investigation[]
+  findings       Finding[]
+  memory         MemoryRecord[]
+  @@unique([organisationId, name])
+  @@index([organisationId, createdAt])
+}
+
+model Environment {
+  id             String          @id @default(cuid())
+  projectId      String
+  name           String
+  type           EnvironmentType
+  baseUrl        String
+  manifest       Json            @default("{}")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  investigations Investigation[]
+  @@unique([projectId, name])
+  @@index([projectId, type])
+}
+
+// Only vault references or encrypted envelopes belong here; raw credentials must never be persisted.
+model ProjectSecretReference {
+  id               String       @id @default(cuid())
+  organisationId   String
+  projectId        String
+  name             String
+  provider         String
+  externalReference String?
+  encryptedPayload String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organisation     Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  @@unique([projectId, name])
+}
+
+model SafetyPolicy {
+  id               String       @id @default(cuid())
+  organisationId   String
+  projectId        String
+  name             String
+  domainAllowlist  String[]
+  blockedActions   String[]
+  maxConcurrency   Int          @default(4)
+  maxComputeUnits  Int          @default(100)
+  configuration    Json         @default("{}")
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organisation     Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  investigations   Investigation[]
+  @@index([projectId])
+}
+
+model Journey {
+  id          String        @id @default(cuid())
+  projectId   String
+  name        String
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  steps       JourneyStep[]
+  investigations Investigation[]
+  plans       ExperimentPlan[]
+  @@unique([projectId, name])
+}
+
+model JourneyStep {
+  id        String   @id @default(cuid())
+  journeyId String
+  order     Int
+  action    String
+  selector  String?
+  value     String?
+  metadata  Json     @default("{}")
+  journey   Journey  @relation(fields: [journeyId], references: [id], onDelete: Cascade)
+  @@unique([journeyId, order])
+}
+
+model Scenario {
+  id          String        @id @default(cuid())
+  projectId   String
+  name        String
+  prompt      String
+  controls    Json          @default("{}")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
+  project     Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  investigations Investigation[]
+  plans       ExperimentPlan[]
+  @@unique([projectId, name])
+}
+
+model ScenarioTemplate {
+  id             String       @id @default(cuid())
+  organisationId String?
+  worldPackId    String?
+  identifier     String
+  name           String
+  promptTemplate String
+  controls       Json         @default("{}")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organisation   Organisation? @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  worldPack      WorldPack?   @relation(fields: [worldPackId], references: [id], onDelete: Cascade)
+  @@unique([worldPackId, identifier])
+}
+
+model Invariant {
+  id             String       @id @default(cuid())
+  organisationId String
+  projectId      String
+  name           String
+  description    String
+  assertion      Json
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  project        Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  evaluations    InvariantEvaluation[]
+  @@unique([projectId, name])
+}
+
+model WorldPack {
+  id          String             @id @default(cuid())
+  identifier  String             @unique
+  name        String
+  description String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  versions    WorldPackVersion[]
+  templates   ScenarioTemplate[]
+}
+
+model WorldPackVersion {
+  id          String    @id @default(cuid())
+  worldPackId String
+  version     String
+  manifest    Json
+  active      Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  worldPack   WorldPack @relation(fields: [worldPackId], references: [id], onDelete: Cascade)
+  plans       ExperimentPlan[]
+  @@unique([worldPackId, version])
+}
+
+model Investigation {
+  id             String              @id @default(cuid())
+  organisationId String
+  projectId      String
+  environmentId  String
+  journeyId      String
+  scenarioId     String
+  safetyPolicyId String?
+  name           String
+  status         InvestigationStatus @default(DRAFT)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  organisation   Organisation        @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  project        Project             @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  environment    Environment         @relation(fields: [environmentId], references: [id], onDelete: Restrict)
+  journey        Journey             @relation(fields: [journeyId], references: [id], onDelete: Restrict)
+  scenario       Scenario            @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
+  safetyPolicy   SafetyPolicy?       @relation(fields: [safetyPolicyId], references: [id], onDelete: SetNull)
+  plans          ExperimentPlan[]
+  worlds         World[]
+  experiments    Experiment[]
+  events         InvestigationEvent[]
+  findings       Finding[]
+  memory         MemoryRecord[]
+  retrievalAudits PlanningRetrievalAudit[]
+  @@index([projectId, createdAt])
+  @@index([organisationId, status])
+}
+
+// Versioned plan JSON preserves the validated AI output while important links remain relational.
+model ExperimentPlan {
+  id                 String           @id @default(cuid())
+  investigationId    String
+  journeyId           String
+  scenarioId          String
+  worldPackVersionId  String?
+  version             Int              @default(1)
+  provider             AIProvider
+  plan                 Json
+  planningExplanation  String
+  estimatedComputeUnits Float
+  createdAt            DateTime         @default(now())
+  investigation        Investigation    @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  journey              Journey          @relation(fields: [journeyId], references: [id], onDelete: Restrict)
+  scenario             Scenario         @relation(fields: [scenarioId], references: [id], onDelete: Restrict)
+  worldPackVersion     WorldPackVersion? @relation(fields: [worldPackVersionId], references: [id], onDelete: SetNull)
+  worlds               World[]
+  @@unique([investigationId, version])
+}
+
+model World {
+  id              String      @id @default(cuid())
+  investigationId String
+  experimentPlanId String
+  status          WorldStatus @default(GENERATED)
+  configuration   Json
+  reason          String
+  randomSeed      Int
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  plan            ExperimentPlan @relation(fields: [experimentPlanId], references: [id], onDelete: Cascade)
+  experiments     Experiment[]
+  @@index([investigationId, status])
+}
+
+model Experiment {
+  id              String           @id @default(cuid())
+  investigationId String
+  worldId         String
+  status          ExperimentStatus @default(QUEUED)
+  kind            String           @default("INITIAL")
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  investigation   Investigation    @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  world           World            @relation(fields: [worldId], references: [id], onDelete: Cascade)
+  attempts        ExecutionAttempt[]
+  faults          InjectedFault[]
+  artifacts       EvidenceArtifact[]
+  evaluations     InvariantEvaluation[]
+  reproductionRuns ReproductionRun[]
+  verificationExperiments VerificationExperiment[]
+  @@index([investigationId, status])
+}
+
+model Worker {
+  id             String       @id @default(cuid())
+  organisationId String
+  providerId     String?
+  status         WorkerStatus @default(IDLE)
+  lastHeartbeatAt DateTime?
+  metadata       Json         @default("{}")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  attempts       ExecutionAttempt[]
+  @@index([organisationId, status])
+}
+
+model ExecutionAttempt {
+  id           String           @id @default(cuid())
+  experimentId String
+  workerId     String?
+  attempt      Int
+  status       ExperimentStatus @default(QUEUED)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  error        Json?
+  metrics      Json             @default("{}")
+  createdAt    DateTime         @default(now())
+  experiment   Experiment       @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  worker       Worker?          @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  artifacts    EvidenceArtifact[]
+  @@unique([experimentId, attempt])
+}
+
+model InjectedFault {
+  id           String    @id @default(cuid())
+  experimentId String
+  type         FaultType
+  parameters   Json
+  injectedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  @@index([experimentId, type])
+}
+
+// Binaries live in object/local storage; this table stores searchable, redacted metadata only.
+model EvidenceArtifact {
+  id                 String       @id @default(cuid())
+  experimentId       String
+  executionAttemptId String?
+  type               EvidenceType
+  storageProvider    String
+  storageKey         String
+  mimeType           String
+  sizeBytes          BigInt
+  checksum           String?
+  redacted           Boolean      @default(false)
+  metadata           Json         @default("{}")
+  createdAt          DateTime     @default(now())
+  experiment         Experiment   @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  attempt            ExecutionAttempt? @relation(fields: [executionAttemptId], references: [id], onDelete: SetNull)
+  findingLinks       FindingEvidence[]
+  minimalReproductions MinimalReproduction[]
+  @@index([experimentId, type])
+}
+
+model InvariantEvaluation {
+  id           String    @id @default(cuid())
+  experimentId String
+  invariantId  String
+  passed       Boolean
+  expected     Json
+  observed     Json
+  explanation  String?
+  createdAt    DateTime  @default(now())
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  invariant    Invariant @relation(fields: [invariantId], references: [id], onDelete: Restrict)
+  @@index([experimentId, passed])
+}
+
+model Finding {
+  id              String            @id @default(cuid())
+  organisationId  String
+  projectId       String
+  investigationId String
+  title           String
+  summary         String
+  severity        FindingSeverity
+  confidence      FindingConfidence
+  causalConditions Json             @default("{}")
+  reproductionCount Int             @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  deletedAt       DateTime?
+  organisation    Organisation      @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  project         Project           @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  investigation   Investigation     @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  conditions      FindingCondition[]
+  evidence        FindingEvidence[]
+  reproductions   ReproductionRun[]
+  minimalReproduction MinimalReproduction?
+  causalAsCause   CausalRelationship[] @relation("CausalCause")
+  causalAsEffect  CausalRelationship[] @relation("CausalEffect")
+  repairs         Repair[]
+  memory          MemoryRecord[]
+  @@index([investigationId, severity])
+}
+
+model FindingCondition {
+  id        String  @id @default(cuid())
+  findingId String
+  kind      String
+  condition Json
+  finding   Finding @relation(fields: [findingId], references: [id], onDelete: Cascade)
+}
+
+model FindingEvidence {
+  findingId String
+  artifactId String
+  finding   Finding          @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  artifact  EvidenceArtifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+  @@id([findingId, artifactId])
+}
+
+model ReproductionRun {
+  id           String   @id @default(cuid())
+  findingId    String
+  experimentId String
+  reproduced   Boolean
+  createdAt    DateTime @default(now())
+  finding      Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+}
+
+model MinimalReproduction {
+  id               String   @id @default(cuid())
+  findingId        String   @unique
+  scriptArtifactId String?
+  journeySteps     Json
+  worldConfiguration Json
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  finding          Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  scriptArtifact   EvidenceArtifact? @relation(fields: [scriptArtifactId], references: [id], onDelete: SetNull)
+}
+
+model CausalRelationship {
+  id              String   @id @default(cuid())
+  causeFindingId  String
+  effectFindingId String
+  confidence      Float
+  evidence        Json     @default("{}")
+  createdAt       DateTime @default(now())
+  cause           Finding  @relation("CausalCause", fields: [causeFindingId], references: [id], onDelete: Cascade)
+  effect          Finding  @relation("CausalEffect", fields: [effectFindingId], references: [id], onDelete: Cascade)
+  @@unique([causeFindingId, effectFindingId])
+}
+
+model Repair {
+  id             String       @id @default(cuid())
+  organisationId String
+  findingId      String
+  status         RepairStatus @default(PROPOSED)
+  reference      String?
+  description    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organisation   Organisation @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  finding        Finding      @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  verificationRuns VerificationRun[]
+}
+
+model VerificationRun {
+  id          String             @id @default(cuid())
+  repairId    String
+  status      VerificationStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime           @default(now())
+  repair      Repair             @relation(fields: [repairId], references: [id], onDelete: Cascade)
+  experiments VerificationExperiment[]
+}
+
+model VerificationExperiment {
+  verificationRunId String
+  experimentId      String
+  role              String
+  verificationRun   VerificationRun @relation(fields: [verificationRunId], references: [id], onDelete: Cascade)
+  experiment        Experiment      @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  @@id([verificationRunId, experimentId])
+}
+
+// Retrieval is advisory: current execution evidence always outranks historical memory.
+model MemoryRecord {
+  id                     String           @id @default(cuid())
+  organisationId         String
+  projectId              String?
+  investigationId        String?
+  findingId              String?
+  type                    MemoryRecordType
+  summary                 String
+  evidenceStrength        Float
+  reproductionCount       Int              @default(0)
+  repairVerificationStatus VerificationStatus?
+  applicationVersion      String?
+  domain                  String
+  metadata                Json             @default("{}")
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  organisation            Organisation     @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  project                 Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  investigation           Investigation?   @relation(fields: [investigationId], references: [id], onDelete: SetNull)
+  finding                 Finding?         @relation(fields: [findingId], references: [id], onDelete: SetNull)
+  embedding               MemoryEmbedding?
+  retrievalAudits         PlanningRetrievalAudit[]
+  @@index([organisationId, type, domain])
+}
+
+model MemoryEmbedding {
+  id             String       @id @default(cuid())
+  memoryRecordId String       @unique
+  model          String
+  dimensions     Int
+  embedding      Json
+  createdAt      DateTime     @default(now())
+  memoryRecord   MemoryRecord @relation(fields: [memoryRecordId], references: [id], onDelete: Cascade)
+}
+
+model PlanningRetrievalAudit {
+  id              String        @id @default(cuid())
+  investigationId String
+  memoryRecordId  String
+  rank             Int
+  trustScore       Float
+  used             Boolean
+  rationale        String
+  createdAt        DateTime      @default(now())
+  investigation    Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  memoryRecord     MemoryRecord  @relation(fields: [memoryRecordId], references: [id], onDelete: Cascade)
+  @@unique([investigationId, memoryRecordId])
+}
+
+model InvestigationEvent {
+  id              String                 @id @default(cuid())
+  investigationId String
+  type            InvestigationEventType
+  data            Json                   @default("{}")
+  occurredAt      DateTime               @default(now())
+  investigation   Investigation          @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  @@index([investigationId, occurredAt])
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum EnvironmentType {
+  DEVELOPMENT
+  STAGING
+  PRODUCTION
+  DEMO
+}
+
+enum InvestigationStatus {
+  DRAFT
+  PLANNING
+  PLAN_READY
+  QUEUED
+  PROVISIONING
+  RUNNING
+  OBSERVING
+  ADAPTING
+  REPRODUCING
+  MINIMISING
+  COMPLETED
+  PARTIALLY_COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ExperimentStatus {
+  QUEUED
+  RUNNING
+  PASSED
+  FAILED
+  ERROR
+  CANCELLED
+}
+
+enum WorkerStatus {
+  IDLE
+  QUEUED
+  PROVISIONING
+  READY
+  RUNNING
+  COMPLETED
+  FAILED
+  TERMINATED
+}
+
+enum WorldStatus {
+  GENERATED
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum FindingSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FindingConfidence {
+  POSSIBLE
+  PROBABLE
+  CONFIRMED
+}
+
+enum EvidenceType {
+  SCREENSHOT
+  VIDEO
+  TRACE
+  CONSOLE_LOG
+  NETWORK_LOG
+  DOM_SNAPSHOT
+  WORKER_RESULT
+  ENVIRONMENT_MANIFEST
+  MINIMAL_REPRODUCTION
+}
+
+enum FaultType {
+  NETWORK_LATENCY
+  PACKET_LOSS
+  OFFLINE
+  DOUBLE_SUBMIT
+  PAYMENT_DELAY
+  WEBHOOK_REORDER
+  INVENTORY_RACE
+  CUSTOM
+}
+
+enum BrowserEngine {
+  CHROMIUM
+  FIREFOX
+  WEBKIT
+}
+
+enum ViewportProfile {
+  DESKTOP
+  MOBILE
+  TABLET
+  CUSTOM
+}
+
+enum UserProfile {
+  NORMAL
+  IMPATIENT
+  CONCURRENT
+  CUSTOM
+}
+
+enum NetworkProfile {
+  NORMAL
+  SLOW_3G
+  FAST_3G
+  OFFLINE
+  CUSTOM
+}
+
+enum RepairStatus {
+  PROPOSED
+  IN_PROGRESS
+  READY_FOR_VERIFICATION
+  VERIFIED
+  REJECTED
+}
+
+enum VerificationStatus {
+  PENDING
+  RUNNING
+  PASSED
+  FAILED
+  INCONCLUSIVE
+}
+
+enum MemoryRecordType {
+  FINDING
+  REPRODUCTION
+  REPAIR_VERIFICATION
+  EXPERIMENT_PATTERN
+  DOMAIN_KNOWLEDGE
+}
+
+enum AIProvider {
+  OPENAI
+  KIMI
+  MOCK
+}
+
+enum InvestigationEventType {
+  plan_created
+  world_generated
+  worker_queued
+  sandbox_provisioning
+  sandbox_ready
+  experiment_started
+  evidence_captured
+  invariant_violated
+  follow_up_generated
+  reproduction_started
+  finding_confirmed
+  minimisation_started
+  investigation_completed
+  investigation_failed
+}

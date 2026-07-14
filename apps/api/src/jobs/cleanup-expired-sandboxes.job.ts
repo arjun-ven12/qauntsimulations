@@ -1,0 +1,1 @@
+import type { SandboxProvider } from '../integrations/daytona/daytona.types.js'; export class CleanupExpiredSandboxesJob { constructor(private readonly sandbox: SandboxProvider) {} async run(expiredIds: string[]): Promise<void> { await Promise.all(expiredIds.map((id) => this.sandbox.deleteSandbox(id))); } }

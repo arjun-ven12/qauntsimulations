@@ -1,0 +1,1 @@
+export interface MemoryWrite { type: string; summary: string; evidenceStrength: number; reproductionCount: number; domain: string; metadata: Record<string, unknown> } export interface MemoryWriter { write(record: MemoryWrite): Promise<string> }

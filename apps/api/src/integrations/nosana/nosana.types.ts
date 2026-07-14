@@ -1,0 +1,3 @@
+export interface VisualAnalysisJob { id: string; status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'; result?: VisualAnalysisResult }
+export interface VisualAnalysisResult { summary: string; observations: Array<{ image: string; description: string; confidence: number }> }
+export interface NosanaVisualAnalysisProvider { submitVisualAnalysisJob(images: string[], prompt: string): Promise<VisualAnalysisJob>; getVisualAnalysisJob(id: string): Promise<VisualAnalysisJob>; cancelVisualAnalysisJob(id: string): Promise<void>; analyseScreenshotBatch(images: string[]): Promise<VisualAnalysisResult>; compareSuccessfulAndFailedRuns(successful: string[], failed: string[]): Promise<VisualAnalysisResult> }
