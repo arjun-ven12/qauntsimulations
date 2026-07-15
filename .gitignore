@@ -17,3 +17,6 @@ storage/temp/*
 !storage/temp/.gitkeep
 apps/demo-store/.data/
 .venv/
+
+# npm lockfile; this workspace uses pnpm
+/package-lock.json

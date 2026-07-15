@@ -1,4 +1,11 @@
-import { defineConfig, type Plugin } from 'vite'; import react from '@vitejs/plugin-react';
-interface DemoState { inventory: number; payments: Array<{ id: string; orderId: string }> }
-function demoApi(): Plugin { const state: DemoState={inventory:5,payments:[]}; const inventoryRaceBug=process.env.DEMO_INVENTORY_RACE_BUG==='true'; return { name:'demo-api',configureServer(server){server.middlewares.use(async(req,res,next)=>{if(req.url?.startsWith('/test/reset')&&req.method==='POST'){const inventory=new URL(req.url,'http://demo.local').searchParams.get('inventory');state.inventory=inventory?Number(inventory):5;state.payments=[];res.statusCode=204;res.end();return}if(req.url==='/test/state'){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(state));return}if(req.url==='/api/payments'&&req.method==='POST'){const chunks:Buffer[]=[];for await(const chunk of req)chunks.push(chunk as Buffer);const body=JSON.parse(Buffer.concat(chunks).toString()) as {orderId:string;delayMs?:number};const inventoryWasAvailable=state.inventory>0;await new Promise(r=>setTimeout(r,body.delayMs??0));if((inventoryRaceBug&&inventoryWasAvailable)||(!inventoryRaceBug&&state.inventory>0)){state.inventory--;const payment={id:crypto.randomUUID(),orderId:body.orderId};state.payments.push(payment);res.setHeader('Content-Type','application/json');res.end(JSON.stringify(payment));return}res.statusCode=409;res.setHeader('Content-Type','application/json');res.end(JSON.stringify({error:'OUT_OF_STOCK'}));return}next()})}} }
-export default defineConfig({plugins:[react(),demoApi()],define:{__DUPLICATE_PAYMENT_BUG__:JSON.stringify(process.env.DEMO_DUPLICATE_PAYMENT_BUG!=='false'),__INVENTORY_RACE_BUG__:JSON.stringify(process.env.DEMO_INVENTORY_RACE_BUG==='true')}});
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
+import { demoApi } from './src/demo-api.js';
+
+export default defineConfig({
+  plugins: [react(), demoApi()],
+  server: {
+    port: 5174,
+    strictPort: true,
+  },
+});
