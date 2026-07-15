@@ -2,25 +2,35 @@
   "workerId": "local-worker-normal",
   "experimentId": "normal-checkout-experiment",
   "worldId": "normal-checkout-world",
-  "target": { "baseUrl": "http://127.0.0.1:5174", "journeyPath": "/products/sku-1" },
+  "target": { "baseUrl": "http://localhost:5174", "journeyPath": "/products/test-product" },
+  "testSetup": {
+    "reset": { "method": "POST", "path": "/api/test/reset" },
+    "configuration": { "method": "POST", "path": "/api/test/config", "body": { "duplicateSubmissionBug": false, "paymentDelayMs": 0 } }
+  },
   "browser": { "engine": "chromium", "viewport": "desktop", "headless": true },
   "journey": {
-    "id": "commerce-checkout", "name": "Normal checkout",
+    "id": "commerce-checkout",
+    "name": "Complete test checkout",
     "steps": [
-      { "type": "goto", "path": "/products/sku-1", "name": "product" },
-      { "type": "click", "selector": "[data-testid=\"add-to-cart\"]", "name": "add-to-cart", "screenshotCheckpoint": true },
-      { "type": "click", "selector": "[data-testid=\"checkout\"]", "name": "checkout" },
-      { "type": "fill", "selector": "[data-testid=\"email\"]", "value": "worker@example.test", "name": "email" },
-      { "type": "click", "selector": "[data-testid=\"place-order\"]", "name": "payment-submit", "screenshotCheckpoint": true },
-      { "type": "waitFor", "selector": "[data-testid=\"order-confirmation\"]", "timeoutMs": 10000, "name": "confirmation" }
+      { "type": "goto", "path": "/products/test-product", "name": "Open product" },
+      { "type": "waitFor", "selector": "[data-testid=\"product-page\"]" },
+      { "type": "click", "selector": "[data-testid=\"add-to-cart\"]", "name": "Add product to cart", "screenshotCheckpoint": true },
+      { "type": "click", "selector": "[data-testid=\"open-cart\"]", "name": "Open cart" },
+      { "type": "waitFor", "selector": "[data-testid=\"cart-item\"]" },
+      { "type": "click", "selector": "[data-testid=\"checkout-button\"]", "name": "Open checkout" },
+      { "type": "waitFor", "selector": "[data-testid=\"checkout-form\"]" },
+      { "type": "fill", "selector": "[data-testid=\"email-input\"]", "value": "test@taskos.dev", "name": "Enter email" },
+      { "type": "submitPayment", "selector": "[data-testid=\"pay-button\"]", "name": "Submit payment", "screenshotCheckpoint": true },
+      { "type": "waitFor", "selector": "[data-testid=\"order-confirmation\"]", "timeoutMs": 10000, "name": "Wait for confirmation" },
+      { "type": "assertVisible", "selector": "[data-testid=\"order-id\"]" }
     ],
     "successCondition": { "type": "visible", "selector": "[data-testid=\"order-confirmation\"]" }
   },
-  "world": { "userProfile": "normal", "networkProfile": "normal", "latencyMs": 0, "doubleSubmit": false, "clearStorageBeforeRun": true, "submitSelector": "[data-testid=\"place-order\"]", "randomSeed": 101, "reason": "Healthy deterministic checkout baseline." },
+  "world": { "userProfile": "normal", "networkProfile": "normal", "latencyMs": 0, "doubleSubmit": false, "doubleSubmitIntervalMs": 100, "clearStorageBeforeRun": true, "paymentUrlPatterns": ["/api/payments"], "orderUrlPatterns": ["/api/orders"], "randomSeed": 101, "reason": "Healthy deterministic checkout baseline." },
   "invariants": [
-    { "id": "no-duplicate-payment", "type": "NO_DUPLICATE_PAYMENT", "severity": "CRITICAL" },
-    { "id": "no-duplicate-order", "type": "NO_DUPLICATE_ORDER", "severity": "HIGH" }
+    { "id": "no-duplicate-payment", "type": "NO_DUPLICATE_PAYMENT", "severity": "CRITICAL", "config": { "requestPatterns": ["/api/payments"], "methods": ["POST"] } },
+    { "id": "no-duplicate-order", "type": "NO_DUPLICATE_ORDER", "severity": "HIGH", "config": { "requestPatterns": ["/api/orders"], "methods": ["POST"], "orderIdSelector": "[data-testid=\"order-id\"]" } }
   ],
-  "evidence": { "outputDirectory": "./artifacts/normal-checkout", "screenshots": true, "trace": true, "console": true, "network": true, "video": false },
-  "limits": { "timeoutMs": 30000 }
+  "evidence": { "outputDirectory": "./artifacts/demo-store/normal-checkout", "screenshots": true, "trace": true, "console": true, "network": true, "video": false },
+  "limits": { "timeoutMs": 45000 }
 }

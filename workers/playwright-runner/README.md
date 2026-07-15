@@ -18,7 +18,7 @@ Start the target application, then run from `workers/playwright-runner`:
 
 ```bash
 pnpm start -- --job ./fixtures/normal-checkout.job.json
-pnpm start -- --job ./fixtures/delayed-payment.job.json --output ./artifacts/delayed/result.json
+pnpm start -- --job ./fixtures/healthy-double-submit.job.json
 pnpm start -- --job ./fixtures/duplicate-submission.job.json --headed --debug
 ```
 
@@ -32,7 +32,9 @@ TASKOS_TARGET_BASE_URL=http://127.0.0.1:5174 pnpm start -- --job ./fixtures/norm
 
 `WorkerJob`, journey steps, network events, invariant results, manifests, and `WorkerResult` are defined and Zod-validated in `@taskos/execution-contracts`. Jobs contain only known selector-based actions; arbitrary JavaScript and shell commands are not accepted.
 
-Supported journey actions: `goto`, `click`, `doubleClick`, `fill`, `waitFor`, `wait`, `reload`, `assertVisible`, and `assertText`. Desktop resolves to 1440×900; mobile resolves to 390×844. Chromium, Firefox, and WebKit are supported.
+Supported journey actions: `goto`, `click`, `submitPayment`, `doubleClick`, `fill`, `waitFor`, `wait`, `reload`, `assertVisible`, and `assertText`. `submitPayment` performs one click normally and a bounded repeated click only for an impatient, double-submit world. Desktop resolves to 1440×900; mobile resolves to 390×844. Chromium, Firefox, and WebKit are supported.
+
+Demo-store fixtures can declare only two test setup operations: `POST /api/test/reset` and `POST /api/test/config`. Both stay on the target origin (or an explicit trusted `target.apiBaseUrl`), are validated before browser launch, and are recorded in the evidence manifest. No arbitrary setup URL, script, JavaScript, or shell command is accepted.
 
 ## Evidence
 
@@ -47,7 +49,7 @@ Supported journey actions: `goto`, `click`, `doubleClick`, `fill`, `waitFor`, `w
 └── video/                 # when enabled
 ```
 
-Network evidence records timing, status/failure, resource type, and payment/order classification. Authorization, cookie, API-key, password, secret, credential, and token-like values are redacted. Request bodies and cookies are never stored. Evidence collector failure is reported in the manifest and does not erase the main result.
+Network evidence records timing, status/failure, resource type, payment/order classification, safe commerce fields, response identifiers, and safe correlation or idempotency keys. Authorization, cookie, API-key, password, secret, credential, and token-like values are redacted. Raw headers, cookies, and unrestricted request bodies are never stored. Evidence collector failure is reported in the manifest and does not erase the main result.
 
 ## Faults and invariants
 

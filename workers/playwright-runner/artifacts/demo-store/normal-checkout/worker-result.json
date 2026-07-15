@@ -1,0 +1,102 @@
+{
+  "workerId": "local-worker-normal",
+  "experimentId": "normal-checkout-experiment",
+  "worldId": "normal-checkout-world",
+  "status": "PASSED",
+  "startedAt": "2026-07-15T06:57:51.229Z",
+  "completedAt": "2026-07-15T06:57:52.591Z",
+  "durationMs": 1362,
+  "journey": {
+    "completed": true,
+    "completedSteps": 11,
+    "totalSteps": 11
+  },
+  "invariantEvaluations": [
+    {
+      "invariantId": "no-duplicate-payment",
+      "type": "NO_DUPLICATE_PAYMENT",
+      "passed": true,
+      "expected": {
+        "maximumPaymentRequests": 1
+      },
+      "observed": {
+        "paymentRequests": 1,
+        "requestIds": [
+          "6d5ec8b8-086a-4050-9fb5-36904b64c90b"
+        ],
+        "timestamps": [
+          "2026-07-15T06:57:52.474Z"
+        ],
+        "correlations": [
+          "checkout_attempt_001"
+        ],
+        "actionTimestamps": [
+          "2026-07-15T06:57:52.449Z"
+        ]
+      },
+      "confidence": 0.9,
+      "evidenceReferences": [
+        "network-event:6d5ec8b8-086a-4050-9fb5-36904b64c90b",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/network/network.json"
+      ],
+      "explanation": "Observed 1 qualifying payment request for this checkout attempt."
+    },
+    {
+      "invariantId": "no-duplicate-order",
+      "type": "NO_DUPLICATE_ORDER",
+      "passed": true,
+      "expected": {
+        "maximumOrders": 1
+      },
+      "observed": {
+        "orderRequests": 1,
+        "requestIds": [
+          "750e9ab7-c8d6-4e44-8fc9-d1dfcfe10852"
+        ],
+        "orderIds": [
+          "ord_001"
+        ],
+        "timestamps": [
+          "2026-07-15T06:57:52.487Z"
+        ],
+        "correlations": [
+          "pay_001"
+        ]
+      },
+      "confidence": 0.88,
+      "evidenceReferences": [
+        "network-event:750e9ab7-c8d6-4e44-8fc9-d1dfcfe10852",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/001-initial.png",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/004-add-product-to-cart.png",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/010-submit-payment-before.png",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/010-submit-payment-after.png",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/998-final.png"
+      ],
+      "explanation": "Observed at most one qualifying order-creation request and one order identifier."
+    }
+  ],
+  "metrics": {
+    "requestCount": 30,
+    "failedRequestCount": 0,
+    "checkoutInteractionCount": 1,
+    "paymentRequestCount": 1,
+    "successfulPaymentResponseCount": 1,
+    "orderRequestCount": 1,
+    "successfulOrderResponseCount": 1,
+    "consoleErrorCount": 0
+  },
+  "evidence": {
+    "manifestPath": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/manifest.json",
+    "tracePath": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/trace/trace.zip",
+    "screenshotPaths": [
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/001-initial.png",
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/004-add-product-to-cart.png",
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/010-submit-payment-before.png",
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/010-submit-payment-after.png",
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/998-final.png"
+    ],
+    "consoleLogPath": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/console/console.json",
+    "networkLogPath": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/network/network.json"
+  },
+  "appliedFaults": []
+}

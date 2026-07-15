@@ -1,0 +1,74 @@
+[
+  {
+    "timestamp": "2026-07-15T06:57:51.836Z",
+    "type": "log",
+    "text": "[vite] connecting...",
+    "location": {
+      "url": "http://localhost:5174/@vite/client",
+      "line": 788,
+      "column": 8,
+      "lineNumber": 788,
+      "columnNumber": 8
+    }
+  },
+  {
+    "timestamp": "2026-07-15T06:57:51.885Z",
+    "type": "log",
+    "text": "[vite] connected.",
+    "location": {
+      "url": "http://localhost:5174/@vite/client",
+      "line": 911,
+      "column": 14,
+      "lineNumber": 911,
+      "columnNumber": 14
+    }
+  },
+  {
+    "timestamp": "2026-07-15T06:57:51.894Z",
+    "type": "log",
+    "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+    "location": {
+      "url": "http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=57bee0f5",
+      "line": 20100,
+      "column": 53,
+      "lineNumber": 20100,
+      "columnNumber": 53
+    }
+  },
+  {
+    "timestamp": "2026-07-15T06:57:52.099Z",
+    "type": "log",
+    "text": "[vite] connecting...",
+    "location": {
+      "url": "http://localhost:5174/@vite/client",
+      "line": 788,
+      "column": 8,
+      "lineNumber": 788,
+      "columnNumber": 8
+    }
+  },
+  {
+    "timestamp": "2026-07-15T06:57:52.104Z",
+    "type": "log",
+    "text": "[vite] connected.",
+    "location": {
+      "url": "http://localhost:5174/@vite/client",
+      "line": 911,
+      "column": 14,
+      "lineNumber": 911,
+      "columnNumber": 14
+    }
+  },
+  {
+    "timestamp": "2026-07-15T06:57:52.144Z",
+    "type": "log",
+    "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+    "location": {
+      "url": "http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=57bee0f5",
+      "line": 20100,
+      "column": 53,
+      "lineNumber": 20100,
+      "columnNumber": 53
+    }
+  }
+]

@@ -1,0 +1,244 @@
+{
+  "workerId": "local-worker-duplicate",
+  "worldId": "duplicate-submission-world",
+  "experimentId": "duplicate-submission-experiment",
+  "startedAt": "2026-07-15T06:58:43.661Z",
+  "completedAt": "2026-07-15T06:58:45.911Z",
+  "browser": {
+    "playwrightVersion": "1.61.1",
+    "engine": "chromium",
+    "version": "149.0.7827.55",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "headless": true
+  },
+  "world": {
+    "userProfile": "impatient",
+    "networkProfile": "normal",
+    "latencyMs": 0,
+    "doubleSubmit": true,
+    "doubleSubmitIntervalMs": 100,
+    "clearStorageBeforeRun": true,
+    "paymentUrlPatterns": [
+      "/api/payments"
+    ],
+    "orderUrlPatterns": [
+      "/api/orders"
+    ],
+    "randomSeed": 303,
+    "reason": "Expose duplicate payment and order creation while the first request is pending."
+  },
+  "randomSeed": 303,
+  "appliedFaults": [
+    {
+      "type": "REPEATED_SUBMISSION",
+      "parameters": {
+        "selector": "[data-testid=\"pay-button\"]",
+        "firstClickAt": "2026-07-15T06:58:44.358Z",
+        "secondClickAt": "2026-07-15T06:58:44.492Z",
+        "configuredIntervalMs": 100,
+        "actualIntervalMs": 134
+      },
+      "appliedAt": "2026-07-15T06:58:44.492Z"
+    }
+  ],
+  "setupOperations": [
+    {
+      "type": "RESET",
+      "method": "POST",
+      "path": "/api/test/reset",
+      "url": "http://localhost:5174/api/test/reset",
+      "startedAt": "2026-07-15T06:58:43.663Z",
+      "completedAt": "2026-07-15T06:58:43.677Z",
+      "statusCode": 200,
+      "succeeded": true,
+      "response": {
+        "ok": true,
+        "resetAt": "2026-07-15T06:58:43.674Z"
+      }
+    },
+    {
+      "type": "CONFIGURATION",
+      "method": "POST",
+      "path": "/api/test/config",
+      "url": "http://localhost:5174/api/test/config",
+      "startedAt": "2026-07-15T06:58:43.677Z",
+      "completedAt": "2026-07-15T06:58:43.681Z",
+      "statusCode": 200,
+      "succeeded": true,
+      "response": {
+        "duplicateSubmissionBug": true,
+        "paymentDelayMs": 1200
+      }
+    }
+  ],
+  "journeyStepsAttempted": [
+    {
+      "stepIndex": 0,
+      "type": "goto",
+      "name": "Open product",
+      "startedAt": "2026-07-15T06:58:44.041Z",
+      "completedAt": "2026-07-15T06:58:44.136Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 1,
+      "type": "waitFor",
+      "selector": "[data-testid=\"product-page\"]",
+      "startedAt": "2026-07-15T06:58:44.136Z",
+      "completedAt": "2026-07-15T06:58:44.145Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 2,
+      "type": "click",
+      "name": "Add product to cart",
+      "selector": "[data-testid=\"add-to-cart\"]",
+      "startedAt": "2026-07-15T06:58:44.145Z",
+      "completedAt": "2026-07-15T06:58:44.177Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:58:44.145Z"
+      ]
+    },
+    {
+      "stepIndex": 3,
+      "type": "click",
+      "name": "Open cart",
+      "selector": "[data-testid=\"open-cart\"]",
+      "startedAt": "2026-07-15T06:58:44.230Z",
+      "completedAt": "2026-07-15T06:58:44.254Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:58:44.230Z"
+      ]
+    },
+    {
+      "stepIndex": 4,
+      "type": "waitFor",
+      "selector": "[data-testid=\"cart-item\"]",
+      "startedAt": "2026-07-15T06:58:44.254Z",
+      "completedAt": "2026-07-15T06:58:44.279Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 5,
+      "type": "click",
+      "name": "Open checkout",
+      "selector": "[data-testid=\"checkout-button\"]",
+      "startedAt": "2026-07-15T06:58:44.279Z",
+      "completedAt": "2026-07-15T06:58:44.304Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:58:44.279Z"
+      ]
+    },
+    {
+      "stepIndex": 6,
+      "type": "waitFor",
+      "selector": "[data-testid=\"checkout-form\"]",
+      "startedAt": "2026-07-15T06:58:44.304Z",
+      "completedAt": "2026-07-15T06:58:44.328Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 7,
+      "type": "fill",
+      "name": "Enter email",
+      "selector": "[data-testid=\"email-input\"]",
+      "startedAt": "2026-07-15T06:58:44.328Z",
+      "completedAt": "2026-07-15T06:58:44.332Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 8,
+      "type": "submitPayment",
+      "name": "Submit payment",
+      "selector": "[data-testid=\"pay-button\"]",
+      "startedAt": "2026-07-15T06:58:44.358Z",
+      "completedAt": "2026-07-15T06:58:44.500Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:58:44.358Z",
+        "2026-07-15T06:58:44.492Z"
+      ],
+      "interactionIntervalMs": 134
+    },
+    {
+      "stepIndex": 9,
+      "type": "waitFor",
+      "name": "Wait for confirmation",
+      "selector": "[data-testid=\"order-confirmation\"]",
+      "startedAt": "2026-07-15T06:58:44.527Z",
+      "completedAt": "2026-07-15T06:58:45.826Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 10,
+      "type": "assertVisible",
+      "selector": "[data-testid=\"order-id\"]",
+      "startedAt": "2026-07-15T06:58:45.826Z",
+      "completedAt": "2026-07-15T06:58:45.832Z",
+      "status": "COMPLETED"
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/001-initial.png",
+      "mimeType": "image/png",
+      "sizeBytes": 82220
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/004-add-product-to-cart.png",
+      "mimeType": "image/png",
+      "sizeBytes": 82041
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/010-submit-payment-before.png",
+      "mimeType": "image/png",
+      "sizeBytes": 29791
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/010-submit-payment-after.png",
+      "mimeType": "image/png",
+      "sizeBytes": 30314
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/998-final.png",
+      "mimeType": "image/png",
+      "sizeBytes": 19664
+    },
+    {
+      "type": "TRACE",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/trace/trace.zip",
+      "mimeType": "application/zip",
+      "sizeBytes": 326039
+    },
+    {
+      "type": "CONSOLE_LOG",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/console/console.json",
+      "mimeType": "application/json",
+      "sizeBytes": 1925
+    },
+    {
+      "type": "NETWORK_LOG",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/network/network.json",
+      "mimeType": "application/json",
+      "sizeBytes": 13890
+    },
+    {
+      "type": "WORKER_RESULT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/worker-result.json",
+      "mimeType": "application/json"
+    }
+  ],
+  "outcome": "INVARIANT_VIOLATION",
+  "evidenceErrors": []
+}

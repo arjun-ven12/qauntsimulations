@@ -10,3 +10,4 @@ export class EvidenceWriteError extends WorkerError { constructor(message: strin
 export class InvariantEvaluationError extends WorkerError { constructor(message: string, options?: ErrorOptions) { super('INVARIANT_EVALUATION_FAILED', message, options); } }
 export class WorkerTimeoutError extends WorkerError { constructor(timeoutMs: number) { super('WORKER_TIMED_OUT', `Worker exceeded its ${timeoutMs} ms timeout`); } }
 export class ResultValidationError extends WorkerError { constructor(message: string, options?: ErrorOptions) { super('RESULT_VALIDATION_FAILED', message, options); } }
+export class TestSetupError extends WorkerError { constructor(message: string, options?: ErrorOptions) { super('TEST_SETUP_FAILED', message, options); } }

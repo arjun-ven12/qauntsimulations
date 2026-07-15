@@ -1,0 +1,244 @@
+{
+  "workerId": "local-worker-healthy-double-submit",
+  "worldId": "healthy-double-submit-world",
+  "experimentId": "healthy-double-submit-experiment",
+  "startedAt": "2026-07-15T06:58:34.330Z",
+  "completedAt": "2026-07-15T06:58:37.344Z",
+  "browser": {
+    "playwrightVersion": "1.61.1",
+    "engine": "chromium",
+    "version": "149.0.7827.55",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "headless": true
+  },
+  "world": {
+    "userProfile": "impatient",
+    "networkProfile": "normal",
+    "latencyMs": 0,
+    "doubleSubmit": true,
+    "doubleSubmitIntervalMs": 100,
+    "clearStorageBeforeRun": true,
+    "paymentUrlPatterns": [
+      "/api/payments"
+    ],
+    "orderUrlPatterns": [
+      "/api/orders"
+    ],
+    "randomSeed": 202,
+    "reason": "Verify that the healthy store suppresses repeated payment submission."
+  },
+  "randomSeed": 202,
+  "appliedFaults": [
+    {
+      "type": "REPEATED_SUBMISSION",
+      "parameters": {
+        "selector": "[data-testid=\"pay-button\"]",
+        "firstClickAt": "2026-07-15T06:58:35.783Z",
+        "secondClickAt": "2026-07-15T06:58:35.927Z",
+        "configuredIntervalMs": 100,
+        "actualIntervalMs": 144
+      },
+      "appliedAt": "2026-07-15T06:58:35.927Z"
+    }
+  ],
+  "setupOperations": [
+    {
+      "type": "RESET",
+      "method": "POST",
+      "path": "/api/test/reset",
+      "url": "http://localhost:5174/api/test/reset",
+      "startedAt": "2026-07-15T06:58:34.336Z",
+      "completedAt": "2026-07-15T06:58:34.354Z",
+      "statusCode": 200,
+      "succeeded": true,
+      "response": {
+        "ok": true,
+        "resetAt": "2026-07-15T06:58:34.348Z"
+      }
+    },
+    {
+      "type": "CONFIGURATION",
+      "method": "POST",
+      "path": "/api/test/config",
+      "url": "http://localhost:5174/api/test/config",
+      "startedAt": "2026-07-15T06:58:34.354Z",
+      "completedAt": "2026-07-15T06:58:34.359Z",
+      "statusCode": 200,
+      "succeeded": true,
+      "response": {
+        "duplicateSubmissionBug": false,
+        "paymentDelayMs": 1200
+      }
+    }
+  ],
+  "journeyStepsAttempted": [
+    {
+      "stepIndex": 0,
+      "type": "goto",
+      "name": "Open product",
+      "startedAt": "2026-07-15T06:58:35.397Z",
+      "completedAt": "2026-07-15T06:58:35.498Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 1,
+      "type": "waitFor",
+      "selector": "[data-testid=\"product-page\"]",
+      "startedAt": "2026-07-15T06:58:35.498Z",
+      "completedAt": "2026-07-15T06:58:35.507Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 2,
+      "type": "click",
+      "name": "Add product to cart",
+      "selector": "[data-testid=\"add-to-cart\"]",
+      "startedAt": "2026-07-15T06:58:35.507Z",
+      "completedAt": "2026-07-15T06:58:35.577Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:58:35.507Z"
+      ]
+    },
+    {
+      "stepIndex": 3,
+      "type": "click",
+      "name": "Open cart",
+      "selector": "[data-testid=\"open-cart\"]",
+      "startedAt": "2026-07-15T06:58:35.646Z",
+      "completedAt": "2026-07-15T06:58:35.656Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:58:35.646Z"
+      ]
+    },
+    {
+      "stepIndex": 4,
+      "type": "waitFor",
+      "selector": "[data-testid=\"cart-item\"]",
+      "startedAt": "2026-07-15T06:58:35.656Z",
+      "completedAt": "2026-07-15T06:58:35.683Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 5,
+      "type": "click",
+      "name": "Open checkout",
+      "selector": "[data-testid=\"checkout-button\"]",
+      "startedAt": "2026-07-15T06:58:35.683Z",
+      "completedAt": "2026-07-15T06:58:35.721Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:58:35.683Z"
+      ]
+    },
+    {
+      "stepIndex": 6,
+      "type": "waitFor",
+      "selector": "[data-testid=\"checkout-form\"]",
+      "startedAt": "2026-07-15T06:58:35.721Z",
+      "completedAt": "2026-07-15T06:58:35.745Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 7,
+      "type": "fill",
+      "name": "Enter email",
+      "selector": "[data-testid=\"email-input\"]",
+      "startedAt": "2026-07-15T06:58:35.745Z",
+      "completedAt": "2026-07-15T06:58:35.756Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 8,
+      "type": "submitPayment",
+      "name": "Submit payment",
+      "selector": "[data-testid=\"pay-button\"]",
+      "startedAt": "2026-07-15T06:58:35.783Z",
+      "completedAt": "2026-07-15T06:58:35.932Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:58:35.783Z",
+        "2026-07-15T06:58:35.927Z"
+      ],
+      "interactionIntervalMs": 144
+    },
+    {
+      "stepIndex": 9,
+      "type": "waitFor",
+      "name": "Wait for confirmation",
+      "selector": "[data-testid=\"order-confirmation\"]",
+      "startedAt": "2026-07-15T06:58:35.954Z",
+      "completedAt": "2026-07-15T06:58:37.246Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 10,
+      "type": "assertVisible",
+      "selector": "[data-testid=\"order-id\"]",
+      "startedAt": "2026-07-15T06:58:37.246Z",
+      "completedAt": "2026-07-15T06:58:37.251Z",
+      "status": "COMPLETED"
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/healthy-double-submit/screenshots/001-initial.png",
+      "mimeType": "image/png",
+      "sizeBytes": 175501
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/healthy-double-submit/screenshots/004-add-product-to-cart.png",
+      "mimeType": "image/png",
+      "sizeBytes": 175358
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/healthy-double-submit/screenshots/010-submit-payment-before.png",
+      "mimeType": "image/png",
+      "sizeBytes": 34932
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/healthy-double-submit/screenshots/010-submit-payment-after.png",
+      "mimeType": "image/png",
+      "sizeBytes": 35431
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/healthy-double-submit/screenshots/998-final.png",
+      "mimeType": "image/png",
+      "sizeBytes": 23800
+    },
+    {
+      "type": "TRACE",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/healthy-double-submit/trace/trace.zip",
+      "mimeType": "application/zip",
+      "sizeBytes": 201057
+    },
+    {
+      "type": "CONSOLE_LOG",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/healthy-double-submit/console/console.json",
+      "mimeType": "application/json",
+      "sizeBytes": 1925
+    },
+    {
+      "type": "NETWORK_LOG",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/healthy-double-submit/network/network.json",
+      "mimeType": "application/json",
+      "sizeBytes": 12577
+    },
+    {
+      "type": "WORKER_RESULT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/healthy-double-submit/worker-result.json",
+      "mimeType": "application/json"
+    }
+  ],
+  "outcome": "PASSED",
+  "evidenceErrors": []
+}
