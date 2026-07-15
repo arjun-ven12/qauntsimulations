@@ -14,7 +14,42 @@ const session = {
     slug: 'world-reliability',
     role: 'OWNER',
   },
+  permissions: ['VIEW_ORGANISATION', 'VIEW_MEMBERS'],
 };
+
+const currentOrganisation = {
+  organisation: { id: 'organisation_demo', name: 'World Reliability', slug: 'world-reliability' },
+  membership: { id: 'membership_owner', role: 'OWNER', joinedAt: '2026-01-01T00:00:00.000Z' },
+  permissions: ['VIEW_ORGANISATION', 'VIEW_MEMBERS'],
+};
+
+const members = [
+  {
+    id: 'membership_owner',
+    role: 'OWNER',
+    joinedAt: '2026-01-01T00:00:00.000Z',
+    user: { id: 'user_demo', displayName: 'Sam Rivera', email: 'person@taskos.dev' },
+  },
+  {
+    id: 'membership_member',
+    role: 'MEMBER',
+    joinedAt: '2026-02-01T00:00:00.000Z',
+    user: { id: 'user_member', displayName: 'Alex Chen', email: 'alex@taskos.dev' },
+  },
+];
+
+test.beforeEach(async ({ page }) => {
+  await page.route('**/api/auth/me', async (route) => {
+    await route.fulfill({ status: 401, contentType: 'application/json', body: unauthorizedBody });
+  });
+  await page.route('**/api/auth/refresh', async (route) => {
+    await route.fulfill({ status: 401, contentType: 'application/json', body: unauthorizedBody });
+  });
+});
+
+const unauthorizedBody = JSON.stringify({
+  error: { code: 'INVALID_CREDENTIALS', message: 'Email or password is incorrect' },
+});
 
 async function fillLogin(page: Page) {
   await page.getByLabel('Email address').fill('person@taskos.dev');
@@ -252,6 +287,144 @@ test('a protected-route refresh restores the cookie session', async ({ page }) =
   await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
 });
 
+test('protected routes wait for restoration and redirect without protected-content flash', async ({
+  page,
+}) => {
+  let resolveMe!: () => void;
+  const releaseMe = new Promise<void>((resolve) => {
+    resolveMe = resolve;
+  });
+  await page.route('**/api/auth/me', async (route) => {
+    await releaseMe;
+    await route.fulfill({ status: 401, contentType: 'application/json', body: unauthorizedBody });
+  });
+
+  const navigation = page.goto('/projects');
+  await expect(page.getByText('Restoring WorldLab…')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Projects' })).toHaveCount(0);
+  resolveMe();
+  await navigation;
+  await expect(page).toHaveURL(/\/login$/);
+});
+
+test('an authenticated session cannot navigate back to a guest auth route', async ({ page }) => {
+  await page.route('**/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
+  });
+  await page.goto('/login');
+  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
+});
+
+test('login returns to the originally requested protected route', async ({ page }) => {
+  await page.route('**/api/auth/login', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
+  });
+  await mockOrganisation(page);
+  await page.goto('/settings/organisation');
+  await expect(page).toHaveURL(/\/login$/);
+  await fillLogin(page);
+  await page.getByRole('button', { name: 'Continue to WorldLab' }).click();
+  await expect(page).toHaveURL(/\/settings\/organisation$/);
+  await expect(page.getByRole('heading', { name: 'World Reliability' }).first()).toBeVisible();
+});
+
+test('logout clears the client session and browser back cannot restore protected content', async ({
+  page,
+}) => {
+  await page.route('**/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
+  });
+  await page.route('**/api/auth/logout', async (route) => route.fulfill({ status: 204 }));
+  await mockOrganisation(page);
+  await page.goto('/projects');
+  await page.getByRole('link', { name: 'Team' }).click();
+  await expect(page).toHaveURL(/\/settings\/organisation$/);
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('heading', { name: 'Projects' })).toHaveCount(0);
+});
+
+test('organisation owners can inspect their role and tenant member directory', async ({ page }) => {
+  await mockAuthenticatedSession(page);
+  await mockOrganisation(page);
+  await page.goto('/settings/organisation');
+
+  await expect(page.getByTestId('current-role')).toHaveText('OWNER');
+  await expect(page.getByTestId('member-row')).toHaveCount(2);
+  await expect(page.getByText('Alex Chen')).toBeVisible();
+  await expect(page.getByText('alex@taskos.dev')).toBeVisible();
+});
+
+test('viewer permissions show a clear access-denied state and skip the member request', async ({
+  page,
+}) => {
+  let memberRequests = 0;
+  const viewerSession = {
+    ...session,
+    organisation: { ...session.organisation, role: 'VIEWER' },
+    permissions: ['VIEW_ORGANISATION'],
+  };
+  const viewerOrganisation = {
+    ...currentOrganisation,
+    membership: { ...currentOrganisation.membership, role: 'VIEWER' },
+    permissions: ['VIEW_ORGANISATION'],
+  };
+  await page.route('**/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(viewerSession),
+    });
+  });
+  await page.route('**/api/organisations/current', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(viewerOrganisation),
+    });
+  });
+  await page.route('**/api/organisations/current/members', async (route) => {
+    memberRequests += 1;
+    await route.fulfill({ status: 403, contentType: 'application/json', body: unauthorizedBody });
+  });
+  await page.goto('/settings/organisation');
+
+  await expect(page.getByTestId('current-role')).toHaveText('VIEWER');
+  await expect(page.getByTestId('members-access-denied')).toBeVisible();
+  expect(memberRequests).toBe(0);
+});
+
+test('an API permission denial is rendered as access denied', async ({ page }) => {
+  await mockAuthenticatedSession(page);
+  await page.route('**/api/organisations/current', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(currentOrganisation),
+    });
+  });
+  await page.route('**/api/organisations/current/members', async (route) => {
+    await route.fulfill({ status: 403, contentType: 'application/json', body: unauthorizedBody });
+  });
+  await page.goto('/settings/organisation');
+  await expect(page.getByTestId('members-access-denied')).toBeVisible();
+});
+
 test('registration submits the existing backend payload', async ({ page }) => {
   let payload: unknown;
   await page.route('**/api/auth/register', async (route) => {
@@ -370,5 +543,56 @@ for (const viewport of [
     expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport);
     await expect(page.getByRole('tab', { name: 'Log in' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
+  });
+}
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 1280, height: 800 },
+  { width: 1024, height: 768 },
+  { width: 768, height: 1024 },
+  { width: 390, height: 844 },
+]) {
+  test(`organisation membership stays readable at ${viewport.width}x${viewport.height}`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    await mockAuthenticatedSession(page);
+    await mockOrganisation(page);
+    await page.goto('/settings/organisation');
+    await expect(page.getByTestId('member-row')).toHaveCount(2);
+    const dimensions = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      content: document.documentElement.scrollWidth,
+    }));
+    expect(dimensions.content).toBeLessThanOrEqual(dimensions.viewport);
+    await expect(page.getByText('alex@taskos.dev')).toBeVisible();
+  });
+}
+
+async function mockAuthenticatedSession(page: Page) {
+  await page.route('**/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(session),
+    });
+  });
+}
+
+async function mockOrganisation(page: Page) {
+  await page.route('**/api/organisations/current', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(currentOrganisation),
+    });
+  });
+  await page.route('**/api/organisations/current/members', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(members),
+    });
   });
 }
