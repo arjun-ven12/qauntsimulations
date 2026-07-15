@@ -1,0 +1,6 @@
+import type { Page } from '@playwright/test'; import type { InvariantEvaluationResult, JourneyAction, WorkerJob } from '@taskos/execution-contracts'; import type { CapturedNetworkEvent } from '../evidence/network-collector.js';
+export type InvariantDefinition = WorkerJob['invariants'][number];
+export interface InvariantEvaluationContext { networkEvents: CapturedNetworkEvent[]; journeyActions: JourneyAction[]; page: Page; job: WorkerJob; networkEvidencePath?: string; screenshotPaths: string[] }
+export interface InvariantEvaluator { readonly type: InvariantDefinition['type']; evaluate(invariant: InvariantDefinition, context: InvariantEvaluationContext): Promise<InvariantEvaluationResult> }
+export function configuredPatterns(config: Record<string, unknown> | undefined, fallback: string[]): string[] { const value = config?.requestPatterns; return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value : fallback; }
+export function configuredMethods(config: Record<string, unknown> | undefined): string[] { const value = config?.methods; return Array.isArray(value) && value.every((item) => typeof item === 'string') ? value.map((item) => item.toUpperCase()) : ['POST', 'PUT', 'PATCH']; }

@@ -1,0 +1,21 @@
+{
+  "workerId": "local-worker-duplicate", "experimentId": "duplicate-submission-experiment", "worldId": "duplicate-submission-world",
+  "target": { "baseUrl": "http://127.0.0.1:5174", "journeyPath": "/products/sku-1" },
+  "browser": { "engine": "chromium", "viewport": "mobile", "headless": true },
+  "journey": {
+    "id": "commerce-checkout", "name": "Impatient duplicate submission",
+    "steps": [
+      { "type": "goto", "path": "/products/sku-1", "name": "product" },
+      { "type": "click", "selector": "[data-testid=\"add-to-cart\"]", "name": "add-to-cart" },
+      { "type": "click", "selector": "[data-testid=\"checkout\"]", "name": "checkout" },
+      { "type": "fill", "selector": "[data-testid=\"email\"]", "value": "impatient@example.test" },
+      { "type": "click", "selector": "[data-testid=\"place-order\"]", "name": "payment-submit", "screenshotCheckpoint": true },
+      { "type": "waitFor", "selector": "[data-testid=\"order-confirmation\"]", "timeoutMs": 15000 }
+    ],
+    "successCondition": { "type": "visible", "selector": "[data-testid=\"order-confirmation\"]" }
+  },
+  "world": { "userProfile": "impatient", "networkProfile": "high-latency", "latencyMs": 150, "paymentDelayMs": 1200, "retryIntervalMs": 250, "doubleSubmit": true, "clearStorageBeforeRun": true, "submitSelector": "[data-testid=\"place-order\"]", "paymentUrlPatterns": ["/api/payment", "/api/payments", "/api/checkout"], "randomSeed": 303, "reason": "Expose duplicate payment behaviour while the first payment response is pending." },
+  "invariants": [{ "id": "no-duplicate-payment", "type": "NO_DUPLICATE_PAYMENT", "severity": "CRITICAL" }],
+  "evidence": { "outputDirectory": "./artifacts/duplicate-submission", "screenshots": true, "trace": true, "console": true, "network": true, "video": false },
+  "limits": { "timeoutMs": 45000 }
+}
