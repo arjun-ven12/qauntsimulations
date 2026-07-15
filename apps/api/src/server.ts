@@ -5,6 +5,13 @@ import { InvestigationController } from './modules/investigations/investigations
 import { JourneyController } from './modules/journeys/journeys.controller.js'; import { JourneyRepository } from './modules/journeys/journeys.repository.js'; import { JourneyService } from './modules/journeys/journeys.service.js';
 import { ProjectController } from './modules/projects/projects.controller.js'; import { PrismaProjectRepository } from './modules/projects/projects.repository.js'; import { ProjectService } from './modules/projects/projects.service.js';
 import { ScenarioController } from './modules/scenarios/scenarios.controller.js'; import { ScenarioRepository } from './modules/scenarios/scenarios.repository.js'; import { ScenarioService } from './modules/scenarios/scenarios.service.js'; import { logger } from './core/logging/logger.js';
+import { loadEnvFile } from 'node:process';
+import { fileURLToPath } from 'node:url';
+const rootEnvPath = fileURLToPath(
+  new URL('../../../.env', import.meta.url),
+);
+
+loadEnvFile(rootEnvPath);
 
 const env = loadEnvironment(); const database = createDatabaseClient();
 const tokens = new JwtAuthTokenService({ accessSecret: env.JWT_ACCESS_SECRET, refreshSecret: env.JWT_REFRESH_SECRET, accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN, refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN });

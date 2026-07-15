@@ -1,10 +1,14 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 interface DemoState {
+  cart: { id: string; items: number };
+  checkout: { status: string };
   payments: unknown[];
   orders: unknown[];
+  inventory: Record<string, number>;
   config: { duplicateSubmissionBug: boolean; paymentDelayMs: number };
   requestCounters: { payments: number; orders: number };
+  idCounters: { payments: number; orders: number };
 }
 
 async function reset(request: APIRequestContext): Promise<void> {
@@ -30,13 +34,16 @@ async function state(request: APIRequestContext): Promise<DemoState> {
 async function openCheckout(page: Page): Promise<void> {
   await page.goto('/products/test-product');
   await expect(page.getByTestId('product-page')).toBeVisible();
+  await expect(page.getByTestId('add-to-cart')).toBeVisible();
   await page.getByTestId('add-to-cart').click();
+  await expect(page.getByTestId('open-cart')).toBeVisible();
   await page.getByTestId('open-cart').click();
   await expect(page.getByTestId('cart-item')).toBeVisible();
   const configLoaded = page.waitForResponse(
     (response) =>
       response.url().endsWith('/api/test/config') && response.request().method() === 'GET',
   );
+  await expect(page.getByTestId('checkout-button')).toBeVisible();
   await page.getByTestId('checkout-button').click();
   await configLoaded;
   await expect(page.getByTestId('checkout-form')).toBeVisible();
@@ -66,6 +73,10 @@ test('reset clears payments and orders and restores defaults', async ({ request 
   expect(clean.orders).toHaveLength(0);
   expect(clean.config).toEqual({ duplicateSubmissionBug: false, paymentDelayMs: 0 });
   expect(clean.requestCounters).toEqual({ payments: 0, orders: 0 });
+  expect(clean.idCounters).toEqual({ payments: 0, orders: 0 });
+  expect(clean.inventory).toEqual({ 'test-product': 5 });
+  expect(clean.cart).toEqual({ id: 'cart_demo_001', items: 0 });
+  expect(clean.checkout).toEqual({ status: 'idle' });
 });
 
 test('configuration updates active flags and rejects invalid input', async ({ request }) => {
@@ -89,6 +100,29 @@ test('configuration updates active flags and rejects invalid input', async ({ re
   }
 });
 
+test('reset prevents delayed work from contaminating the new fixture generation', async ({
+  request,
+}) => {
+  await configure(request, true, 1200);
+  const delayedPayment = request.post('/api/payments', {
+    data: {
+      cartId: 'cart_demo_001',
+      amount: 12_900,
+      currency: 'SGD',
+      idempotencyKey: 'pre_reset_attempt',
+    },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await reset(request);
+  expect((await delayedPayment).status()).toBe(409);
+
+  const clean = await state(request);
+  expect(clean.payments).toHaveLength(0);
+  expect(clean.orders).toHaveLength(0);
+  expect(clean.requestCounters).toEqual({ payments: 0, orders: 0 });
+  expect(clean.idCounters).toEqual({ payments: 0, orders: 0 });
+});
+
 test('healthy checkout exposes the stable selectors and creates one payment and order', async ({
   page,
   request,
@@ -109,12 +143,11 @@ test('healthy rapid double-click creates exactly one payment and order', async (
   page,
   request,
 }) => {
-  await configure(request, false, 200);
+  await configure(request, false, 1200);
   await openCheckout(page);
-  await page.getByTestId('pay-button').evaluate((button: HTMLButtonElement) => {
-    button.click();
-    button.click();
-  });
+  await page.getByTestId('pay-button').evaluate((button: HTMLButtonElement) => button.click());
+  await page.waitForTimeout(50);
+  await page.getByTestId('pay-button').evaluate((button: HTMLButtonElement) => button.click());
   await expect(page.getByTestId('order-confirmation')).toBeVisible();
 
   const result = await state(request);
@@ -129,10 +162,9 @@ test('buggy delayed double-click creates two payments and two orders', async ({
 }) => {
   await configure(request, true, 1200);
   await openCheckout(page);
-  await page.getByTestId('pay-button').evaluate((button: HTMLButtonElement) => {
-    button.click();
-    button.click();
-  });
+  await page.getByTestId('pay-button').evaluate((button: HTMLButtonElement) => button.click());
+  await page.waitForTimeout(50);
+  await page.getByTestId('pay-button').evaluate((button: HTMLButtonElement) => button.click());
   await expect(page.getByTestId('pay-button')).toBeEnabled();
   await expect(page.getByTestId('order-confirmation')).toBeVisible();
   await expect
@@ -145,4 +177,42 @@ test('buggy delayed double-click creates two payments and two orders', async ({
       };
     })
     .toEqual({ payments: 2, orders: 2, paymentRequests: 2 });
+});
+
+test('reset isolates a healthy checkout in a completely fresh browser context', async ({
+  browser,
+  request,
+}) => {
+  await configure(request, true, 1200);
+  const buggyContext = await browser.newContext();
+  const buggyPage = await buggyContext.newPage();
+  await openCheckout(buggyPage);
+  await buggyPage.getByTestId('pay-button').evaluate((button: HTMLButtonElement) => button.click());
+  await buggyPage.waitForTimeout(50);
+  await buggyPage.getByTestId('pay-button').evaluate((button: HTMLButtonElement) => button.click());
+  await expect(buggyPage.getByTestId('order-confirmation')).toBeVisible();
+  await expect.poll(async () => (await state(request)).orders.length).toBe(2);
+  await buggyContext.close();
+
+  await reset(request);
+  await configure(request, false, 0);
+  const freshContext = await browser.newContext();
+  expect(await freshContext.cookies()).toEqual([]);
+  const freshPage = await freshContext.newPage();
+  await openCheckout(freshPage);
+  expect(
+    await freshPage.evaluate(() => ({
+      localStorage: localStorage.length,
+      sessionStorage: sessionStorage.length,
+    })),
+  ).toEqual({ localStorage: 0, sessionStorage: 0 });
+  await freshPage.getByTestId('pay-button').click();
+  await expect(freshPage.getByTestId('order-confirmation')).toBeVisible();
+  await expect(freshPage.getByTestId('order-id')).toHaveText('ord_001');
+
+  const isolated = await state(request);
+  expect(isolated.requestCounters).toEqual({ payments: 1, orders: 1 });
+  expect(isolated.payments).toHaveLength(1);
+  expect(isolated.orders).toHaveLength(1);
+  await freshContext.close();
 });
