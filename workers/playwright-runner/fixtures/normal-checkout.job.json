@@ -1,0 +1,26 @@
+{
+  "workerId": "local-worker-normal",
+  "experimentId": "normal-checkout-experiment",
+  "worldId": "normal-checkout-world",
+  "target": { "baseUrl": "http://127.0.0.1:5174", "journeyPath": "/products/sku-1" },
+  "browser": { "engine": "chromium", "viewport": "desktop", "headless": true },
+  "journey": {
+    "id": "commerce-checkout", "name": "Normal checkout",
+    "steps": [
+      { "type": "goto", "path": "/products/sku-1", "name": "product" },
+      { "type": "click", "selector": "[data-testid=\"add-to-cart\"]", "name": "add-to-cart", "screenshotCheckpoint": true },
+      { "type": "click", "selector": "[data-testid=\"checkout\"]", "name": "checkout" },
+      { "type": "fill", "selector": "[data-testid=\"email\"]", "value": "worker@example.test", "name": "email" },
+      { "type": "click", "selector": "[data-testid=\"place-order\"]", "name": "payment-submit", "screenshotCheckpoint": true },
+      { "type": "waitFor", "selector": "[data-testid=\"order-confirmation\"]", "timeoutMs": 10000, "name": "confirmation" }
+    ],
+    "successCondition": { "type": "visible", "selector": "[data-testid=\"order-confirmation\"]" }
+  },
+  "world": { "userProfile": "normal", "networkProfile": "normal", "latencyMs": 0, "doubleSubmit": false, "clearStorageBeforeRun": true, "submitSelector": "[data-testid=\"place-order\"]", "randomSeed": 101, "reason": "Healthy deterministic checkout baseline." },
+  "invariants": [
+    { "id": "no-duplicate-payment", "type": "NO_DUPLICATE_PAYMENT", "severity": "CRITICAL" },
+    { "id": "no-duplicate-order", "type": "NO_DUPLICATE_ORDER", "severity": "HIGH" }
+  ],
+  "evidence": { "outputDirectory": "./artifacts/normal-checkout", "screenshots": true, "trace": true, "console": true, "network": true, "video": false },
+  "limits": { "timeoutMs": 30000 }
+}

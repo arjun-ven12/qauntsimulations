@@ -1,11 +1,12 @@
-import type { Page } from '@playwright/test'; import type { JourneyExecutionPlan } from '@taskos/execution-contracts';
-export async function executeJourney(page: Page, journey: JourneyExecutionPlan): Promise<void> {
-  for (const step of journey.steps) {
-    if (step.action === 'NAVIGATE') await page.goto(new URL(step.value ?? '/', journey.baseUrl).toString());
-    else if (step.action === 'CLICK' && step.selector) await page.locator(step.selector).click();
-    else if (step.action === 'FILL' && step.selector) await page.locator(step.selector).fill(step.value ?? '');
-    else if (step.action === 'SELECT' && step.selector) await page.locator(step.selector).selectOption(step.value ?? '');
-    else if (step.action === 'WAIT') await page.waitForTimeout(Number(step.value ?? '100'));
-    else if (step.action === 'ASSERT' && step.selector) await page.locator(step.selector).waitFor({ state: 'visible' });
+import type { Page } from '@playwright/test'; import type { JourneyAction, WorkerJob } from '@taskos/execution-contracts'; import type { FaultController } from '../faults/fault-controller.js'; import { nowIso } from '../utils/timestamps.js'; import type { ScreenshotCollector } from '../evidence/screenshot-collector.js'; import { JourneyStepExecutor } from './journey-step-executor.js'; import type { JourneyExecutionResult } from './journey.types.js'; import { stepSelector } from './journey.types.js';
+export async function executeJourney(page: Page, job: WorkerJob, faults: FaultController, screenshots: ScreenshotCollector): Promise<JourneyExecutionResult> {
+  const executor = new JourneyStepExecutor(page, job, faults.interaction); const actions: JourneyAction[] = []; let completedSteps = 0;
+  for (const [index, step] of job.journey.steps.entries()) {
+    await faults.beforeStep(index);
+    try { const action = await executor.execute(step, index); actions.push(action); completedSteps++; if (step.screenshotCheckpoint) await screenshots.captureCheckpoint(page, index + 2, step.name ?? step.type); }
+    catch (error) { const message = error instanceof Error ? error.message : 'Unknown journey step error'; const selector = stepSelector(step); actions.push({ stepIndex: index, type: step.type, ...(step.name ? { name: step.name } : {}), ...(selector ? { selector } : {}), startedAt: nowIso(), completedAt: nowIso(), status: step.continueOnFailure ? 'CONTINUED' : 'FAILED', error: message }); if (!step.continueOnFailure) return { completed: false, completedSteps, totalSteps: job.journey.steps.length, actions, failedStep: { index, ...(step.name ? { name: step.name } : {}), type: step.type, ...(selector ? { selector } : {}), error: message } }; }
   }
+  try { const condition = job.journey.successCondition; if (condition.type === 'visible') await page.locator(condition.selector).waitFor({ state: 'visible' }); else { const text = await page.locator(condition.selector).textContent(); if (!text?.includes(condition.expectedText)) throw new Error(`Success condition expected "${condition.expectedText}"`); } }
+  catch (error) { return { completed: false, completedSteps, totalSteps: job.journey.steps.length, actions, failedStep: { index: job.journey.steps.length, name: 'success-condition', type: job.journey.successCondition.type, selector: job.journey.successCondition.selector, error: error instanceof Error ? error.message : 'Success condition failed' } }; }
+  return { completed: true, completedSteps, totalSteps: job.journey.steps.length, actions };
 }
