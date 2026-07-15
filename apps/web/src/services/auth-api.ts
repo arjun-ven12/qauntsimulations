@@ -1,3 +1,7 @@
+import type { UserRole } from '@taskos/shared-types';
+
+export type OrganisationPermission = 'VIEW_ORGANISATION' | 'VIEW_MEMBERS';
+
 export interface AuthSession {
   user: {
     id: string;
@@ -6,7 +10,8 @@ export interface AuthSession {
     createdAt: string;
     updatedAt: string;
   };
-  organisation: { id: string; name: string; slug: string; role: string };
+  organisation: { id: string; name: string; slug: string; role: UserRole };
+  permissions: OrganisationPermission[];
 }
 
 export interface LoginInput {

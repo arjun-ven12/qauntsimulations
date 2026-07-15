@@ -42,6 +42,7 @@ export function AuthPage() {
   });
 
   const isLogin = mode === 'login';
+  const requestedPath = readRequestedPath(location.state);
 
   useEffect(() => {
     const content = formContent.current;
@@ -84,7 +85,7 @@ export function AuthPage() {
         await register(input);
       }
       setComplete(true);
-      window.setTimeout(() => navigate('/projects'), 680);
+      window.setTimeout(() => navigate(requestedPath, { replace: true }), 680);
     } catch (error) {
       setFormError(
         error instanceof AuthApiError
@@ -569,4 +570,19 @@ function validate(mode: AuthMode, values: Record<string, string>): FieldErrors {
     errors.password = 'Password must be at least 12 characters.';
   }
   return errors;
+}
+
+function readRequestedPath(state: unknown): string {
+  if (
+    typeof state === 'object' &&
+    state !== null &&
+    'from' in state &&
+    typeof state.from === 'string' &&
+    state.from.startsWith('/') &&
+    state.from !== '/login' &&
+    state.from !== '/register'
+  ) {
+    return state.from;
+  }
+  return '/projects';
 }
