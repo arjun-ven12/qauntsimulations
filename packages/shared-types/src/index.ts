@@ -153,11 +153,145 @@ export const experimentPlanSchema = z.object({
 });
 export type ExperimentPlan = z.infer<typeof experimentPlanSchema>;
 
-export const investigationStatusSchema = z.enum([
-  'DRAFT', 'PLANNING', 'PLAN_READY', 'QUEUED', 'PROVISIONING', 'RUNNING', 'OBSERVING',
-  'ADAPTING', 'REPRODUCING', 'MINIMISING', 'COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED', 'CANCELLED',
+export const investigationStatuses = [
+  'PLANNING',
+  'QUEUED',
+  'PROVISIONING',
+  'RUNNING',
+  'OBSERVING',
+  'ADAPTING',
+  'REPRODUCING',
+  'MINIMISING',
+  'COMPLETED',
+  'FAILED',
+] as const;
+export const investigationStatusSchema = z.enum(investigationStatuses);
+export type InvestigationStatus = (typeof investigationStatuses)[number];
+
+// Existing persisted records may still use pre-contract lifecycle states. This schema is internal
+// compatibility for the legacy Investigation detail response, not the frozen progress contract.
+export const legacyInvestigationStatusSchema = z.enum([
+  'DRAFT',
+  'PLANNING',
+  'PLAN_READY',
+  'QUEUED',
+  'PROVISIONING',
+  'RUNNING',
+  'OBSERVING',
+  'ADAPTING',
+  'REPRODUCING',
+  'MINIMISING',
+  'COMPLETED',
+  'PARTIALLY_COMPLETED',
+  'FAILED',
+  'CANCELLED',
 ]);
-export type InvestigationStatus = z.infer<typeof investigationStatusSchema>;
+export type LegacyInvestigationStatus = z.infer<typeof legacyInvestigationStatusSchema>;
+
+export type JsonValue =
+  string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number().finite(),
+    z.boolean(),
+    z.null(),
+    z.array(jsonValueSchema),
+    z.record(jsonValueSchema),
+  ]),
+);
+
+export const investigationEventSchema = z.object({
+  id: idSchema,
+  investigationId: idSchema,
+  type: z.string().min(1),
+  message: z.string().min(1),
+  createdAt: dateTimeSchema,
+  worldId: idSchema.optional(),
+  metadata: z.record(jsonValueSchema).optional(),
+});
+export type InvestigationEvent = z.infer<typeof investigationEventSchema>;
+
+const investigationProgressCountersSchema = z.object({
+  totalWorlds: z.number().int().nonnegative(),
+  queued: z.number().int().nonnegative(),
+  running: z.number().int().nonnegative(),
+  passed: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+  flaky: z.number().int().nonnegative(),
+});
+
+export const investigationProgressSchema = z
+  .object({
+    id: idSchema,
+    status: investigationStatusSchema,
+    progress: investigationProgressCountersSchema,
+    recentEvents: z.array(investigationEventSchema),
+    findingsCount: z.number().int().nonnegative(),
+  })
+  .superRefine(({ progress }, context) => {
+    const classified =
+      progress.queued + progress.running + progress.passed + progress.failed + progress.flaky;
+    if (classified > progress.totalWorlds) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['progress'],
+        message: 'Classified world counters must not exceed totalWorlds',
+      });
+    }
+  });
+export type InvestigationProgress = z.infer<typeof investigationProgressSchema>;
+
+const normalizedNonEmptyStringArraySchema = z
+  .array(z.string().trim().min(1))
+  .min(1)
+  .max(20)
+  .transform((values) => [...new Set(values)]);
+
+export const createInvestigationInputSchema = z
+  .object({
+    projectId: z.string().trim().min(1),
+    environmentId: z.string().trim().min(1),
+    journeyId: z.string().trim().min(1),
+    scenario: z.object({
+      prompt: z.string().trim().min(1).max(5_000),
+      controls: z.object({
+        browsers: normalizedNonEmptyStringArraySchema,
+        viewports: normalizedNonEmptyStringArraySchema,
+        networkProfiles: normalizedNonEmptyStringArraySchema,
+        maximumWorlds: z.number().int().positive().max(100),
+        maximumConcurrentWorkers: z.number().int().positive().max(20),
+      }),
+    }),
+    invariantIds: normalizedNonEmptyStringArraySchema,
+  })
+  .superRefine(({ scenario }, context) => {
+    if (scenario.controls.maximumConcurrentWorkers > scenario.controls.maximumWorlds) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['scenario', 'controls', 'maximumConcurrentWorkers'],
+        message: 'maximumConcurrentWorkers must not exceed maximumWorlds',
+      });
+    }
+  });
+export type CreateInvestigationInput = z.infer<typeof createInvestigationInputSchema>;
+
+export const demoCreateInvestigationInput = createInvestigationInputSchema.parse({
+  projectId: 'project_demo_checkout',
+  environmentId: 'environment_demo_local',
+  journeyId: 'journey_checkout',
+  scenario: {
+    prompt: 'Test checkout under delayed payment responses and impatient repeated clicks.',
+    controls: {
+      browsers: ['chromium'],
+      viewports: ['desktop-1440x900'],
+      networkProfiles: ['normal', 'delayed-payment'],
+      maximumWorlds: 4,
+      maximumConcurrentWorkers: 2,
+    },
+  },
+  invariantIds: ['invariant_single_checkout_submission'],
+});
 
 export const investigationEventTypeSchema = z.enum([
   'plan_created', 'world_generated', 'worker_queued', 'sandbox_provisioning', 'sandbox_ready',
@@ -173,7 +307,7 @@ export const investigationSchema = timestampsSchema.extend({
   journeyId: idSchema,
   scenarioId: idSchema,
   name: z.string().min(1),
-  status: investigationStatusSchema,
+  status: legacyInvestigationStatusSchema,
   plan: experimentPlanSchema.nullable(),
   aggregateProgress: z.number().min(0).max(100),
   workerCounts: z.object({ queued: z.number(), running: z.number(), completed: z.number(), failed: z.number() }),

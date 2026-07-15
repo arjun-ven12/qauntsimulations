@@ -1,0 +1,35 @@
+{
+  "id": "journey_checkout",
+  "name": "Complete checkout",
+  "baseUrl": "http://localhost:5174",
+  "startPath": "/products/test-product",
+  "setup": {
+    "resetEndpoint": "/api/test/reset",
+    "configEndpoint": "/api/test/config"
+  },
+  "steps": [
+    { "type": "goto", "path": "/products/test-product" },
+    { "type": "waitFor", "selector": "[data-testid=\"product-page\"]" },
+    { "type": "click", "selector": "[data-testid=\"add-to-cart\"]" },
+    { "type": "click", "selector": "[data-testid=\"open-cart\"]" },
+    { "type": "waitFor", "selector": "[data-testid=\"cart-item\"]" },
+    { "type": "click", "selector": "[data-testid=\"checkout-button\"]" },
+    {
+      "type": "fill",
+      "selector": "[data-testid=\"email-input\"]",
+      "value": "test@taskos.dev"
+    },
+    { "type": "click", "selector": "[data-testid=\"pay-button\"]" },
+    { "type": "waitFor", "selector": "[data-testid=\"order-confirmation\"]" }
+  ],
+  "successCondition": {
+    "type": "visible",
+    "selector": "[data-testid=\"order-confirmation\"]"
+  },
+  "observations": {
+    "paymentEndpointPattern": "**/api/payments",
+    "orderEndpointPattern": "**/api/orders",
+    "successSelector": "[data-testid=\"order-confirmation\"]",
+    "orderIdSelector": "[data-testid=\"order-id\"]"
+  }
+}
