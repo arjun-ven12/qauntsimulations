@@ -1,12 +1,90 @@
-import type { Finding, Investigation, Project, WorldConfig } from '@taskos/shared-types'; import type { CreateInvestigationRequest, InvestigationApi } from './investigation-api.js';
-const now = () => new Date().toISOString();
-const world: WorldConfig = { worldId: 'world-delayed-payment', browser: 'CHROMIUM', viewport: 'DESKTOP', networkProfile: 'SLOW_3G', userProfile: 'IMPATIENT', concurrency: 2, latencyMs: 800, bandwidthKbps: 750, packetLossPercent: 0, offlineDurationMs: 0, inventoryState: { 'demo-sku': 5 }, sessionState: {}, paymentDelayMs: 2200, retryIntervalMs: 300, doubleSubmit: true, webhookOrder: [], injectedFaults: [{ type: 'PAYMENT_DELAY', parameters: { delayMs: 2200 }, startAfterMs: 0, durationMs: null }], randomSeed: 42, reason: 'Explore delayed payment with an impatient user.' };
+import {
+  createInvestigationInputSchema,
+  investigationProgressSchema,
+  type CreateInvestigationInput,
+  type Finding,
+  type InvestigationProgress,
+  type Project,
+} from '@taskos/shared-types';
+import type { InvestigationApi } from './investigation-api.js';
+
+const FIXED_TIME = '2026-01-01T00:00:00.000Z';
+
 export class MockInvestigationApi implements InvestigationApi {
-  private readonly projects: Project[] = [{ id: 'project-demo', organisationId: 'org-demo', name: 'Demo Store', description: 'A controlled commerce reliability target.', repositoryUrl: null, createdAt: now(), updatedAt: now() }];
-  async listProjects() { return this.projects; }
-  async createProject(input: { name: string; description: string | null; repositoryUrl: string | null }) { const item = { id: crypto.randomUUID(), organisationId: 'org-demo', ...input, createdAt: now(), updatedAt: now() }; this.projects.push(item); return item; }
-  async createInvestigation(input: CreateInvestigationRequest) { return this.investigation(input.name, input.projectId); }
-  async getInvestigation(id: string) { return this.investigation(id === 'investigation-demo' ? 'Delayed payments under impatience' : 'Checkout investigation', 'project-demo'); }
-  async listFindings(investigationId: string): Promise<Finding[]> { return [{ id: 'finding-duplicate-payment', investigationId, title: 'Duplicate payment after impatient resubmission', summary: 'A second submit during the delayed payment window created two successful payment records for one order.', severity: 'HIGH', confidence: 'CONFIRMED', reproductionCount: 3, causalConditions: { paymentDelayMs: 2200, retryIntervalMs: 300, doubleSubmit: true }, createdAt: now(), updatedAt: now() }]; }
-  private investigation(name: string, projectId: string): Investigation { return { id: 'investigation-demo', projectId, environmentId: 'environment-demo', journeyId: 'journey-checkout', scenarioId: 'scenario-delay', name, status: 'REPRODUCING', plan: { objective: 'Find checkout failures caused by delayed payment responses and impatient users.', journeyId: 'journey-checkout', scenarioId: 'scenario-delay', worldPack: 'commerce', selectedVariables: ['paymentDelayMs', 'retryIntervalMs', 'doubleSubmit'], initialWorldCount: 8, maximumWorldCount: 24, maximumConcurrentWorkers: 4, timeoutSeconds: 120, retryCount: 1, safetyConstraints: [], invariants: [], worlds: [world], planningExplanation: 'Sweep payment delay and user retry timing, then reproduce any duplicate charge.', aiProvider: 'MOCK', estimatedComputeUnits: 8 }, aggregateProgress: 78, workerCounts: { queued: 1, running: 2, completed: 8, failed: 1 }, recentEvents: [{ id: 'event-1', type: 'finding_confirmed', occurredAt: now(), data: { findingId: 'finding-duplicate-payment' } }, { id: 'event-2', type: 'reproduction_started', occurredAt: now(), data: { repeats: 3 } }], findingsCount: 1, elapsedTimeSeconds: 94, createdAt: now(), updatedAt: now() }; }
+  private readonly projects: Project[] = [
+    {
+      id: 'project_demo_checkout',
+      organisationId: 'organisation_demo_taskos',
+      name: 'TaskOS Demo Commerce',
+      description: 'A controlled commerce reliability target.',
+      repositoryUrl: null,
+      createdAt: FIXED_TIME,
+      updatedAt: FIXED_TIME,
+    },
+  ];
+
+  async listProjects() {
+    return this.projects;
+  }
+
+  async createProject(input: {
+    name: string;
+    description: string | null;
+    repositoryUrl: string | null;
+  }) {
+    const item = {
+      id: `project_mock_${this.projects.length + 1}`,
+      organisationId: 'organisation_demo_taskos',
+      ...input,
+      createdAt: FIXED_TIME,
+      updatedAt: FIXED_TIME,
+    };
+    this.projects.push(item);
+    return item;
+  }
+
+  async createInvestigation(input: CreateInvestigationInput): Promise<InvestigationProgress> {
+    createInvestigationInputSchema.parse(input);
+    return this.progress('investigation_demo_checkout');
+  }
+
+  async getInvestigation(investigationId: string): Promise<InvestigationProgress> {
+    return this.progress(investigationId);
+  }
+
+  async listFindings(investigationId: string): Promise<Finding[]> {
+    return [
+      {
+        id: 'finding_duplicate_payment',
+        investigationId,
+        title: 'Duplicate payment after impatient resubmission',
+        summary: 'A repeated submit during the delayed response created duplicate activity.',
+        severity: 'HIGH',
+        confidence: 'CONFIRMED',
+        reproductionCount: 3,
+        causalConditions: { paymentDelayMs: 1200, duplicateSubmissionBug: true },
+        createdAt: FIXED_TIME,
+        updatedAt: FIXED_TIME,
+      },
+    ];
+  }
+
+  private progress(id: string): InvestigationProgress {
+    return investigationProgressSchema.parse({
+      id,
+      status: 'QUEUED',
+      progress: { totalWorlds: 4, queued: 4, running: 0, passed: 0, failed: 0, flaky: 0 },
+      recentEvents: [
+        {
+          id: 'event_investigation_queued',
+          investigationId: id,
+          type: 'investigation_queued',
+          message: 'Investigation is ready for local orchestration.',
+          createdAt: FIXED_TIME,
+          metadata: { source: 'mock' },
+        },
+      ],
+      findingsCount: 0,
+    });
+  }
 }
