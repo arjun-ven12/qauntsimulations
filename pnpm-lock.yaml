@@ -47,6 +47,12 @@ importers:
       '@taskos/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@taskos/execution-contracts':
+        specifier: workspace:*
+        version: link:../../packages/execution-contracts
+      '@taskos/playwright-runner':
+        specifier: workspace:*
+        version: link:../../workers/playwright-runner
       '@taskos/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
@@ -139,6 +145,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@fontsource/outfit':
+        specifier: ^5.2.8
+        version: 5.2.8
       '@tanstack/react-query':
         specifier: ^5.80.7
         version: 5.101.2(react@19.2.7)
@@ -173,6 +182,9 @@ importers:
         specifier: ^5.0.5
         version: 5.0.14(@types/react@19.2.17)(react@19.2.7)(use-sync-external-store@1.6.0(react@19.2.7))
     devDependencies:
+      '@playwright/test':
+        specifier: ^1.61.1
+        version: 1.61.1
       '@types/react':
         specifier: ^19.1.8
         version: 19.2.17
@@ -724,6 +736,9 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@fontsource/outfit@5.2.8':
+    resolution: {integrity: sha512-rXC6g0MqD7cOBjht0bMqc43qM6lRqDLML9KXsmg9uykz0wLQhy8Z/ajrMG6iyoT3NJR+MYgU+OEHp7uHoTb+Yw==}
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -3134,6 +3149,8 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@fontsource/outfit@5.2.8': {}
 
   '@humanfs/core@0.19.2':
     dependencies:

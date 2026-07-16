@@ -1,0 +1,105 @@
+# Local investigation orchestration
+
+Runtime Milestone 3 adds a development-only, in-process orchestration path around the existing Playwright worker. It persists all durable state in Neon through Prisma but does not claim to be a production distributed queue. Daytona, adaptive follow-up generation, AI planning, reproduction, minimisation, and repair verification are intentionally excluded.
+
+## Architecture
+
+Authenticated investigation requests are validated with the canonical `createInvestigationInputSchema` from `@taskos/shared-types`. `InvestigationService` validates product scope, creates a deterministic plan, persists the `PLANNING` investigation, and schedules `InvestigationOrchestratorService` with `setImmediate` so the HTTP request does not wait for browser execution.
+
+The orchestrator uses:
+
+- `DeterministicExperimentPlanService` for four bounded initial worlds;
+- `ExecutionConcurrencyService` for an in-process worker pool with a server hard maximum of two;
+- `WorkerJobFactoryService` to load and validate `demo/fixtures/checkout-journey.json` and convert its approved pay action into the runtime `submitPayment` control;
+- `LocalPlaywrightWorkerExecutor` to call the existing validated worker runtime directly;
+- `LocalEvidenceMetadataService` to normalize paths, enforce the storage root, calculate SHA-256 checksums, and persist metadata rather than binaries;
+- `InvestigationRepository` as the Prisma persistence boundary.
+
+The in-memory active-investigation map is only a duplicate-start guard. Investigation, world, experiment, worker, attempt, result, evaluation, artifact, event, and finding state is stored in PostgreSQL.
+
+## Lifecycle and counters
+
+The normal lifecycle is:
+
+```text
+PLANNING → QUEUED → RUNNING → OBSERVING → COMPLETED
+```
+
+An orchestration-level fatal error enters `FAILED`. A world-level invariant violation does not fail the investigation; it increments the public `failed` world counter and the investigation can still complete.
+
+Public progress follows the frozen contract:
+
+- `totalWorlds`: persisted worlds/experiments belonging to the investigation;
+- `queued`: experiments not yet started;
+- `running`: executing experiments;
+- `passed`: experiments whose validated worker result is `PASSED`;
+- `failed`: invariant-violating, execution-error, or cancelled experiments;
+- `flaky`: zero in this milestone.
+
+At normal completion the classified counters equal `totalWorlds`.
+
+## Deterministic worlds
+
+| Order | World | Viewport | Delay | Duplicate mode | Repeated submit | Expected |
+|---:|---|---|---:|---|---|---|
+| 0 | Baseline checkout | desktop | 0 ms | off | off | pass |
+| 1 | Healthy repeated submission protection | desktop | 1200 ms | off | on, 100 ms | pass |
+| 2 | Duplicate submission under delayed payment | mobile | 1200 ms | on | on, 100 ms | invariant violation |
+| 3 | Duplicate mode with reduced latency | mobile | 600 ms | on | on, 100 ms | observe |
+
+The local demo store has one global reset/configuration state at port 5174. To prevent a baseline worker from overwriting the protected delayed world’s configuration, those incompatible setup worlds are run sequentially. The two duplicate-mode comparison worlds may use the two-worker pool together. The generic concurrency controller is still bounded at two and is separately tested with a fake executor.
+
+## Persistence
+
+Existing Prisma models are reused: `Investigation`, `ExperimentPlan`, `World`, `Experiment`, `Worker`, `ExecutionAttempt`, `EvidenceArtifact`, `InvariantEvaluation`, `Finding`, `FindingEvidence`, and `InvestigationEvent`.
+
+Execution attempts store the validated `WorkerResult`, exit code, duration, result and manifest paths, and compact metrics. Evidence rows store relative paths, content type, size, checksum, redaction state, and safe metadata. Screenshots, traces, console logs, network logs, manifests, and result JSON remain on local disk beneath:
+
+```text
+storage/evidence/<investigationId>/<worldId>/<experimentId>/attempt-1/
+```
+
+Every passing and failing invariant evaluation is persisted with confidence and evidence references.
+
+## Findings
+
+Payment and order invariant failures in the same delayed repeated-submission condition use one deterministic fingerprint and one consolidated finding:
+
+```text
+Duplicate checkout submission under delayed payment response
+```
+
+The initial severity is `CRITICAL`, confidence classification is `POSSIBLE`, numeric evidence confidence is recorded as `0.75`, causal status is `UNCONFIRMED`, and reproduction count starts at one. A concurrent matching violation increments the same finding through a unique fingerprint. The finding says a customer *may* experience duplicate charging or orders and explicitly records that this is a test-payment environment.
+
+## Events
+
+Persisted events include `investigation_created`, `plan_created`, `world_generated`, `world_queued`, `worker_started`, `worker_completed`, `worker_failed`, `evidence_captured`, `invariant_violated`, `finding_created`, `investigation_completed`, `investigation_failed`, and `investigation_cancelled`. The progress response returns the most recent 20 with ISO timestamps and JSON-safe metadata.
+
+## API
+
+All routes require the existing JWT authentication and organisation context.
+
+```text
+POST /api/investigations
+POST /api/projects/:projectId/investigations
+GET  /api/investigations/:investigationId
+GET  /api/investigations/:investigationId/plan
+GET  /api/investigations/:investigationId/worlds
+GET  /api/investigations/:investigationId/experiments
+GET  /api/investigations/:investigationId/workers
+GET  /api/investigations/:investigationId/evidence
+GET  /api/investigations/:investigationId/findings
+POST /api/investigations/:investigationId/cancel
+```
+
+Creation and progress responses validate as `InvestigationProgress`. List endpoints return JSON-safe summaries rather than raw Prisma records. Filesystem roots, secrets, stack traces, and binary evidence are not exposed.
+
+## Cancellation and restart behavior
+
+Cancellation atomically marks the investigation cancelled and prevents queued worlds from starting. Completed evidence is retained. Because the executor calls the Playwright runtime in-process, an already-running browser cannot currently be force-terminated through this abstraction and may finish after cancellation. The frozen public status contract has no `CANCELLED` value, so internal cancellation is exposed as terminal `FAILED` progress plus an explicit `investigation_cancelled` event.
+
+An API restart interrupts active in-process workers. Startup cleanup marks local attempts older than ten minutes, their worlds, and their investigations failed. It does not resume a browser journey. A persistent queue with leases and heartbeat-based recovery is required before production use.
+
+## Future Daytona replacement
+
+The orchestrator depends on the `WorkerExecutor` port. Runtime Milestone 4 can replace `LocalPlaywrightWorkerExecutor` with a Daytona-backed implementation while retaining job construction, result validation, persistence, evidence processing, concurrency policy, and API mapping. No Daytona code is invoked in this milestone.
