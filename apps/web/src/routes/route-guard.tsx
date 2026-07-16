@@ -32,7 +32,7 @@ export function RouteGuard({ children }: { children: ReactNode }) {
   return authenticated ? (
     children
   ) : (
-    <Navigate to="/login" replace state={{ from: location.pathname }} />
+    <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />
   );
 }
 

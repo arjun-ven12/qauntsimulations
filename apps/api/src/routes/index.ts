@@ -17,6 +17,8 @@ import { createOrganisationRouter } from '../modules/organisations/organisation.
 import type { ScenarioController } from '../modules/scenarios/scenarios.controller.js';
 import { createScenarioRouter } from '../modules/scenarios/scenarios.routes.js';
 import { createNotImplementedRouter } from './not-implemented.js';
+import type { InvitationController } from '../modules/invitations/invitation.controller.js';
+import { createOrganisationInvitationRouter } from '../modules/invitations/invitation.routes.js';
 
 export interface ProtectedControllers {
   projects: ProjectController;
@@ -25,6 +27,7 @@ export interface ProtectedControllers {
   scenarios: ScenarioController;
   investigations: InvestigationController;
   organisations: OrganisationController;
+  invitations: InvitationController;
 }
 export function createProtectedRouter(
   tokens: AuthTokenService,
@@ -33,6 +36,10 @@ export function createProtectedRouter(
   const router = Router();
   router.use(requireAuth(tokens), requireOrganisation);
   router.use('/users', createNotImplementedRouter('User management'));
+  router.use(
+    '/organisations/current/invitations',
+    createOrganisationInvitationRouter(controllers.invitations),
+  );
   router.use('/organisations', createOrganisationRouter(controllers.organisations));
   router.use(
     '/projects/:projectId/environments',

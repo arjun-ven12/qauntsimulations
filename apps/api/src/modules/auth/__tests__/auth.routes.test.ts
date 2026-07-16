@@ -47,7 +47,15 @@ describe('authentication HTTP contract', () => {
     expect(response.body).toMatchObject({
       user: { email: 'owner@example.com', displayName: 'Test Owner' },
       organisation: { name: 'World Lab', role: 'OWNER' },
-      permissions: ['VIEW_ORGANISATION', 'VIEW_MEMBERS'],
+      permissions: [
+        'VIEW_ORGANISATION',
+        'VIEW_MEMBERS',
+        'MANAGE_MEMBERS',
+        'VIEW_PROJECTS',
+        'CREATE_PROJECTS',
+        'EDIT_PROJECTS',
+        'MANAGE_PROJECT_SAFETY',
+      ],
     });
     expect(JSON.stringify(response.body)).not.toMatch(/password|token/i);
     expect(repository.users[0]?.passwordHash).not.toBe(validRegistration.password);
@@ -177,6 +185,52 @@ describe('authentication HTTP contract', () => {
     await agent.post('/api/auth/logout').expect(204);
     await agent.get('/api/auth/me').expect(401);
   });
+
+  it('returns all memberships and securely switches the active organisation in both cookies', async () => {
+    const agent = request.agent(app);
+    await agent.post('/api/auth/register').send(validRegistration).expect(201);
+    const user = repository.users[0]!;
+    repository.memberships.push({
+      id: 'membership-2',
+      userId: user.id,
+      organisation: { id: 'org-2', name: 'Second World', slug: 'second-world' },
+      role: 'MEMBER',
+    });
+
+    const before = await agent.get('/api/auth/me').expect(200);
+    expect(before.body.memberships).toHaveLength(2);
+    expect(before.body.organisation.id).toBe('org-1');
+
+    const switched = await agent
+      .post('/api/auth/switch-organisation')
+      .send({ organisationId: 'org-2' })
+      .expect(200);
+    expect(switched.body).toMatchObject({
+      organisation: { id: 'org-2', role: 'MEMBER' },
+      membership: { id: 'membership-2', role: 'MEMBER' },
+      permissions: [
+        'VIEW_ORGANISATION',
+        'VIEW_MEMBERS',
+        'VIEW_PROJECTS',
+        'CREATE_PROJECTS',
+        'EDIT_PROJECTS',
+      ],
+    });
+    expect((switched.headers['set-cookie'] as unknown as string[]).join(';')).toContain(
+      'taskos_refresh=',
+    );
+    await agent
+      .get('/api/auth/me')
+      .expect(200)
+      .expect((response) => {
+        expect(response.body.organisation.id).toBe('org-2');
+      });
+
+    await agent
+      .post('/api/auth/switch-organisation')
+      .send({ organisationId: 'org-unrelated' })
+      .expect(403);
+  });
 });
 
 function tokenService(accessExpiresIn = '15m') {
@@ -191,6 +245,7 @@ function tokenService(accessExpiresIn = '15m') {
 class MemoryAuthRepository implements AuthRepository {
   users: AuthUserRecord[] = [];
   memberships: Array<{
+    id: string;
     userId: string;
     organisation: { id: string; name: string; slug: string };
     role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
@@ -233,20 +288,35 @@ class MemoryAuthRepository implements AuthRepository {
       slug: input.slug,
     };
     this.users.push(user);
-    this.memberships.push({ userId: user.id, organisation, role: 'OWNER' });
+    this.memberships.push({
+      id: `membership-${this.memberships.length + 1}`,
+      userId: user.id,
+      organisation,
+      role: 'OWNER',
+    });
     return { user, organisation };
   }
 
   async findPrimaryMembership(userId: string) {
     const membership = this.memberships.find((candidate) => candidate.userId === userId);
-    return membership ? { organisation: membership.organisation, role: membership.role } : null;
+    return membership
+      ? { id: membership.id, organisation: membership.organisation, role: membership.role }
+      : null;
   }
 
   async findMembership(userId: string, organisationId: string) {
     const membership = this.memberships.find(
       (candidate) => candidate.userId === userId && candidate.organisation.id === organisationId,
     );
-    return membership ? { organisation: membership.organisation, role: membership.role } : null;
+    return membership
+      ? { id: membership.id, organisation: membership.organisation, role: membership.role }
+      : null;
+  }
+
+  async listMemberships(userId: string) {
+    return this.memberships
+      .filter((membership) => membership.userId === userId)
+      .map(({ id, organisation, role }) => ({ id, organisation, role }));
   }
 
   async storeRefreshToken(userId: string, tokenHash: string, expiresAt: Date) {

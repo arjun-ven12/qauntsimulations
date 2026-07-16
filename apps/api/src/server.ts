@@ -26,6 +26,9 @@ import { ScenarioController } from './modules/scenarios/scenarios.controller.js'
 import { ScenarioRepository } from './modules/scenarios/scenarios.repository.js';
 import { ScenarioService } from './modules/scenarios/scenarios.service.js';
 import { logger } from './core/logging/logger.js';
+import { InvitationController } from './modules/invitations/invitation.controller.js';
+import { PrismaInvitationRepository } from './modules/invitations/invitation.repository.js';
+import { InvitationService } from './modules/invitations/invitation.service.js';
 import { loadEnvFile } from 'node:process';
 import { fileURLToPath } from 'node:url';
 const rootEnvPath = fileURLToPath(new URL('../../../.env', import.meta.url));
@@ -44,6 +47,9 @@ const authService = new AuthService(
   new PrismaAuthRepository(database),
   new BcryptPasswordHasher(env.BCRYPT_ROUNDS),
   tokens,
+);
+const invitationController = new InvitationController(
+  new InvitationService(new PrismaInvitationRepository(database), env.WEB_URL),
 );
 const ai = createAIProvider({
   provider: env.AI_PROVIDER,
@@ -67,6 +73,7 @@ const app = createApplication({
     secure: env.COOKIE_SECURE,
     ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
   }),
+  invitationController,
   controllers: {
     projects: new ProjectController(new ProjectService(new PrismaProjectRepository(database))),
     environments: new EnvironmentController(
@@ -75,6 +82,7 @@ const app = createApplication({
     organisations: new OrganisationController(
       new OrganisationService(new PrismaOrganisationRepository(database)),
     ),
+    invitations: invitationController,
     journeys: new JourneyController(new JourneyService(new JourneyRepository(database))),
     scenarios: new ScenarioController(new ScenarioService(new ScenarioRepository(database))),
     investigations: new InvestigationController(

@@ -17,10 +17,13 @@ interface AuthState {
   user: AuthSession['user'] | null;
   organisation: AuthSession['organisation'] | null;
   permissions: OrganisationPermission[];
+  memberships: AuthSession['memberships'];
   login(input: LoginInput): Promise<void>;
   register(input: RegisterInput): Promise<void>;
   restore(): Promise<void>;
   signOut(): Promise<void>;
+  switchOrganisation(organisationId: string): Promise<void>;
+  syncSession(): Promise<void>;
 }
 
 const unauthenticatedState = {
@@ -30,6 +33,7 @@ const unauthenticatedState = {
   user: null,
   organisation: null,
   permissions: [],
+  memberships: [],
 };
 
 function authenticatedState(session: AuthSession) {
@@ -40,6 +44,7 @@ function authenticatedState(session: AuthSession) {
     user: session.user,
     organisation: session.organisation,
     permissions: session.permissions,
+    memberships: session.memberships,
   };
 }
 
@@ -52,6 +57,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   organisation: null,
   permissions: [],
+  memberships: [],
   login: async (input) => {
     const session = await authApi.login(input);
     set(authenticatedState(session));
@@ -89,5 +95,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     } finally {
       set(unauthenticatedState);
     }
+  },
+  switchOrganisation: async (organisationId) => {
+    const session = await authApi.switchOrganisation(organisationId);
+    set(authenticatedState(session));
+  },
+  syncSession: async () => {
+    const session = await authApi.me();
+    set(authenticatedState(session));
   },
 }));

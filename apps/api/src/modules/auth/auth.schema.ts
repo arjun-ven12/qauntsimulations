@@ -17,3 +17,6 @@ export const loginSchema = z.object({
     .transform((value) => value.toLowerCase()),
   password: z.string().min(1).max(128),
 });
+export const switchOrganisationSchema = z
+  .object({ organisationId: z.string().trim().min(1) })
+  .strict();
