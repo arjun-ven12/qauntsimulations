@@ -47,6 +47,12 @@ importers:
       '@taskos/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@taskos/execution-contracts':
+        specifier: workspace:*
+        version: link:../../packages/execution-contracts
+      '@taskos/playwright-runner':
+        specifier: workspace:*
+        version: link:../../workers/playwright-runner
       '@taskos/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types

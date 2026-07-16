@@ -1,9 +1,20 @@
-import type { LegacyInvestigationStatus } from '@taskos/shared-types';
-const transitions: Record<LegacyInvestigationStatus, readonly LegacyInvestigationStatus[]> = {
-  DRAFT: ['PLANNING', 'CANCELLED'], PLANNING: ['PLAN_READY', 'FAILED', 'CANCELLED'], PLAN_READY: ['QUEUED', 'CANCELLED'],
-  QUEUED: ['PROVISIONING', 'CANCELLED'], PROVISIONING: ['RUNNING', 'FAILED', 'CANCELLED'], RUNNING: ['OBSERVING', 'FAILED', 'CANCELLED'],
-  OBSERVING: ['ADAPTING', 'REPRODUCING', 'COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED', 'CANCELLED'], ADAPTING: ['RUNNING', 'REPRODUCING', 'FAILED', 'CANCELLED'],
-  REPRODUCING: ['ADAPTING', 'MINIMISING', 'COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED', 'CANCELLED'], MINIMISING: ['COMPLETED', 'PARTIALLY_COMPLETED', 'FAILED', 'CANCELLED'],
-  COMPLETED: [], PARTIALLY_COMPLETED: [], FAILED: [], CANCELLED: [],
+import type { InvestigationStatus } from '@taskos/shared-types';
+
+type RuntimeInvestigationStatus = InvestigationStatus | 'CANCELLED';
+const transitions: Record<RuntimeInvestigationStatus, readonly RuntimeInvestigationStatus[]> = {
+  PLANNING: ['QUEUED', 'FAILED', 'CANCELLED'],
+  QUEUED: ['RUNNING', 'FAILED', 'CANCELLED'],
+  PROVISIONING: ['RUNNING', 'FAILED', 'CANCELLED'],
+  RUNNING: ['OBSERVING', 'FAILED', 'CANCELLED'],
+  OBSERVING: ['COMPLETED', 'FAILED', 'CANCELLED'],
+  ADAPTING: ['FAILED', 'CANCELLED'],
+  REPRODUCING: ['FAILED', 'CANCELLED'],
+  MINIMISING: ['FAILED', 'CANCELLED'],
+  COMPLETED: [],
+  FAILED: [],
+  CANCELLED: [],
 };
-export function canTransitionInvestigation(from: LegacyInvestigationStatus, to: LegacyInvestigationStatus): boolean { return transitions[from].includes(to); }
+
+export function canTransitionInvestigation(from: RuntimeInvestigationStatus, to: RuntimeInvestigationStatus): boolean {
+  return transitions[from].includes(to);
+}

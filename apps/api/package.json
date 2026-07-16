@@ -3,7 +3,7 @@
   "main": "dist/server.js",
   "scripts": { "dev": "tsx watch src/server.ts", "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit --pretty false", "start": "node dist/server.js" },
   "dependencies": {
-    "@taskos/ai-providers": "workspace:*", "@taskos/database": "workspace:*", "@taskos/shared-types": "workspace:*",
+    "@taskos/ai-providers": "workspace:*", "@taskos/database": "workspace:*", "@taskos/execution-contracts": "workspace:*", "@taskos/playwright-runner": "workspace:*", "@taskos/shared-types": "workspace:*",
     "bcrypt": "^6.0.0", "cookie-parser": "^1.4.7", "cors": "^2.8.5", "express": "^5.1.0",
     "express-rate-limit": "^7.5.0", "helmet": "^8.1.0", "jsonwebtoken": "^9.0.2", "pino": "^9.7.0",
     "pino-http": "^10.4.0", "zod": "^3.25.67"

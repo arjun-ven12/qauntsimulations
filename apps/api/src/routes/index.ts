@@ -14,7 +14,6 @@ export function createProtectedRouter(tokens: AuthTokenService, controllers: Pro
   router.use('/projects/:projectId/scenarios', createScenarioRouter(controllers.scenarios)); router.use('/projects/:projectId/invariants', createNotImplementedRouter('Invariant management'));
   router.use('/projects/:projectId/investigations', createProjectInvestigationRouter(controllers.investigations)); router.use('/projects', createProjectRouter(controllers.projects));
   router.use('/investigations', createInvestigationRouter(controllers.investigations));
-  router.use('/investigations/:investigationId/experiments', createNotImplementedRouter('Experiment listing')); router.use('/investigations/:investigationId/workers', createNotImplementedRouter('Worker listing')); router.use('/investigations/:investigationId/evidence', createNotImplementedRouter('Evidence listing'));
   router.use('/findings', createNotImplementedRouter('Finding detail and reproduction')); router.use('/repairs', createNotImplementedRouter('Repair verification'));
   router.get('/world-packs', (_request, response) => response.json([{ identifier: 'commerce', name: 'Commerce', version: '0.1.0' }]));
   router.get('/world-packs/commerce/templates', (_request, response) => response.json([{ id: 'delayed-payment', name: 'Delayed payment' }, { id: 'duplicate-submission', name: 'Duplicate submission' }, { id: 'limited-inventory', name: 'Limited inventory' }]));
