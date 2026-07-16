@@ -10,17 +10,18 @@ datasource db {
 
 // Identity is global, while all product and execution records are anchored to an organisation.
 model User {
-  id            String               @id @default(cuid())
-  email         String               @unique
-  displayName   String
-  passwordHash  String
-  tokenVersion  Int                  @default(0)
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  deletedAt     DateTime?
-  memberships   OrganisationMember[]
-  refreshTokens RefreshToken[]
-  auditLogs     AuditLog[]           @relation("AuditActor")
+  id                          String                   @id @default(cuid())
+  email                       String                   @unique
+  displayName                 String
+  passwordHash                String
+  tokenVersion                Int                      @default(0)
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
+  deletedAt                   DateTime?
+  memberships                 OrganisationMember[]
+  refreshTokens               RefreshToken[]
+  sentOrganisationInvitations OrganisationInvitation[] @relation("OrganisationInvitationInviter")
+  auditLogs                   AuditLog[]               @relation("AuditActor")
 }
 
 model Organisation {
@@ -31,6 +32,7 @@ model Organisation {
   updatedAt      DateTime                 @updatedAt
   deletedAt      DateTime?
   members        OrganisationMember[]
+  invitations    OrganisationInvitation[]
   projects       Project[]
   auditLogs      AuditLog[]
   memory         MemoryRecord[]
@@ -56,6 +58,29 @@ model OrganisationMember {
 
   @@unique([organisationId, userId])
   @@index([userId])
+}
+
+model OrganisationInvitation {
+  id              String                       @id @default(cuid())
+  organisationId  String
+  email           String
+  role            UserRole
+  invitedByUserId String
+  tokenHash       String                       @unique
+  status          OrganisationInvitationStatus @default(PENDING)
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  declinedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+  organisation    Organisation                 @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  invitedBy       User                         @relation("OrganisationInvitationInviter", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organisationId])
+  @@index([email])
+  @@index([status, expiresAt])
+  @@index([organisationId, email])
 }
 
 model RefreshToken {
@@ -640,6 +665,14 @@ enum UserRole {
   ADMIN
   MEMBER
   VIEWER
+}
+
+enum OrganisationInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REVOKED
+  EXPIRED
 }
 
 enum EnvironmentType {
