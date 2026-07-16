@@ -11,9 +11,8 @@ export interface AuthRepository {
     organisationName: string;
     slug: string;
   }): Promise<{ user: AuthUserRecord; organisation: { id: string; name: string; slug: string } }>;
-  findPrimaryMembership(
-    userId: string,
-  ): Promise<{
+  findPrimaryMembership(userId: string): Promise<{
+    id: string;
     organisation: { id: string; name: string; slug: string };
     role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
   } | null>;
@@ -21,9 +20,17 @@ export interface AuthRepository {
     userId: string,
     organisationId: string,
   ): Promise<{
+    id: string;
     organisation: { id: string; name: string; slug: string };
     role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
   } | null>;
+  listMemberships(userId: string): Promise<
+    Array<{
+      id: string;
+      organisation: { id: string; name: string; slug: string };
+      role: 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+    }>
+  >;
   storeRefreshToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void>;
   revokeRefreshToken(tokenHash: string): Promise<void>;
   findActiveRefreshToken(tokenHash: string): Promise<{ userId: string } | null>;
@@ -66,7 +73,11 @@ export class PrismaAuthRepository implements AuthRepository {
     return this.database.organisationMember.findFirst({
       where: { userId, user: { deletedAt: null }, organisation: { deletedAt: null } },
       orderBy: { createdAt: 'asc' },
-      select: { role: true, organisation: { select: { id: true, name: true, slug: true } } },
+      select: {
+        id: true,
+        role: true,
+        organisation: { select: { id: true, name: true, slug: true } },
+      },
     });
   }
   async findMembership(userId: string, organisationId: string) {
@@ -77,7 +88,22 @@ export class PrismaAuthRepository implements AuthRepository {
         user: { deletedAt: null },
         organisation: { deletedAt: null },
       },
-      select: { role: true, organisation: { select: { id: true, name: true, slug: true } } },
+      select: {
+        id: true,
+        role: true,
+        organisation: { select: { id: true, name: true, slug: true } },
+      },
+    });
+  }
+  listMemberships(userId: string) {
+    return this.database.organisationMember.findMany({
+      where: { userId, user: { deletedAt: null }, organisation: { deletedAt: null } },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        role: true,
+        organisation: { select: { id: true, name: true, slug: true } },
+      },
     });
   }
   async storeRefreshToken(userId: string, tokenHash: string, expiresAt: Date): Promise<void> {

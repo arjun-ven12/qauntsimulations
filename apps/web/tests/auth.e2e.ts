@@ -14,13 +14,29 @@ const session = {
     slug: 'world-reliability',
     role: 'OWNER',
   },
-  permissions: ['VIEW_ORGANISATION', 'VIEW_MEMBERS'],
+  membership: { id: 'membership_owner', role: 'OWNER' },
+  memberships: [
+    {
+      membershipId: 'membership_owner',
+      organisation: { id: 'organisation_demo', name: 'World Reliability', slug: 'world-reliability' },
+      role: 'OWNER',
+    },
+  ],
+  permissions: [
+    'VIEW_ORGANISATION',
+    'VIEW_MEMBERS',
+    'MANAGE_MEMBERS',
+    'VIEW_PROJECTS',
+    'CREATE_PROJECTS',
+    'EDIT_PROJECTS',
+    'MANAGE_PROJECT_SAFETY',
+  ],
 };
 
 const currentOrganisation = {
   organisation: { id: 'organisation_demo', name: 'World Reliability', slug: 'world-reliability' },
   membership: { id: 'membership_owner', role: 'OWNER', joinedAt: '2026-01-01T00:00:00.000Z' },
-  permissions: ['VIEW_ORGANISATION', 'VIEW_MEMBERS'],
+  permissions: ['VIEW_ORGANISATION', 'VIEW_MEMBERS', 'MANAGE_MEMBERS'],
 };
 
 const members = [
@@ -366,7 +382,7 @@ test('organisation owners can inspect their role and tenant member directory', a
 
   await expect(page.getByTestId('current-role')).toHaveText('OWNER');
   await expect(page.getByTestId('member-row')).toHaveCount(2);
-  await expect(page.getByText('Alex Chen')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Alex Chen' })).toBeVisible();
   await expect(page.getByText('alex@taskos.dev')).toBeVisible();
 });
 

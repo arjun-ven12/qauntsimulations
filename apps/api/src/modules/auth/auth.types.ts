@@ -36,6 +36,12 @@ export interface PublicAuthSession {
     updatedAt: string;
   };
   organisation: { id: string; name: string; slug: string; role: UserRole };
+  membership: { id: string; role: UserRole };
+  memberships: Array<{
+    membershipId: string;
+    organisation: { id: string; name: string; slug: string };
+    role: UserRole;
+  }>;
   permissions: OrganisationPermission[];
 }
 

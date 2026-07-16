@@ -70,6 +70,24 @@ export class AuthController {
     }
   };
 
+  switchOrganisation = async (
+    request: Request,
+    response: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const session = await this.service.switchOrganisation(
+        request.auth!,
+        request.body.organisationId,
+        request.cookies?.[REFRESH_COOKIE_NAME] as string | undefined,
+      );
+      this.setCookies(response, session);
+      response.json(publicSession(session));
+    } catch (error) {
+      next(error);
+    }
+  };
+
   private setCookies(response: Response, session: AuthSession): void {
     response.cookie(ACCESS_COOKIE_NAME, session.accessToken, {
       ...this.cookieOptions('/'),
@@ -100,6 +118,8 @@ function publicSession(session: AuthSession) {
   return {
     user: session.user,
     organisation: session.organisation,
+    membership: session.membership,
+    memberships: session.memberships,
     permissions: session.permissions,
   };
 }

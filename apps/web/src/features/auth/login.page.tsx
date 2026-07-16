@@ -128,6 +128,7 @@ export function AuthPage() {
               className={isLogin ? 'is-active' : ''}
               role="tab"
               to="/login"
+              state={location.state}
             >
               Log in
             </Link>
@@ -136,6 +137,7 @@ export function AuthPage() {
               className={!isLogin ? 'is-active' : ''}
               role="tab"
               to="/register"
+              state={location.state}
             >
               Sign up
             </Link>
@@ -262,7 +264,7 @@ export function AuthPage() {
 
                 <p className="auth-secondary">
                   {isLogin ? 'New to TaskOS?' : 'Already have an account?'}{' '}
-                  <Link to={isLogin ? '/register' : '/login'}>
+                  <Link state={location.state} to={isLogin ? '/register' : '/login'}>
                     {isLogin ? 'Create an account' : 'Log in'}
                   </Link>
                 </p>

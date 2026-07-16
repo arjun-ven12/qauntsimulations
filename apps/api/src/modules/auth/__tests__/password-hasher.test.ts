@@ -1,1 +1,11 @@
-import { describe,expect,it } from 'vitest'; import { BcryptPasswordHasher } from '../password-hasher.js'; describe('BcryptPasswordHasher',()=>{it('hashes and verifies without retaining plaintext',async()=>{const hasher=new BcryptPasswordHasher(10);const hash=await hasher.hash('long-test-password');expect(hash).not.toContain('long-test-password');await expect(hasher.verify('long-test-password',hash)).resolves.toBe(true);await expect(hasher.verify('wrong-password',hash)).resolves.toBe(false)})});
+import { describe, expect, it } from 'vitest';
+import { BcryptPasswordHasher } from '../password-hasher.js';
+describe('BcryptPasswordHasher', () => {
+  it('hashes and verifies without retaining plaintext', async () => {
+    const hasher = new BcryptPasswordHasher(10);
+    const hash = await hasher.hash('long-test-password');
+    expect(hash).not.toContain('long-test-password');
+    await expect(hasher.verify('long-test-password', hash)).resolves.toBe(true);
+    await expect(hasher.verify('wrong-password', hash)).resolves.toBe(false);
+  });
+});

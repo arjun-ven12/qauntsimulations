@@ -1,6 +1,13 @@
 import type { UserRole } from '@taskos/shared-types';
 
-export type OrganisationPermission = 'VIEW_ORGANISATION' | 'VIEW_MEMBERS';
+export type OrganisationPermission =
+  | 'VIEW_ORGANISATION'
+  | 'VIEW_MEMBERS'
+  | 'MANAGE_MEMBERS'
+  | 'VIEW_PROJECTS'
+  | 'CREATE_PROJECTS'
+  | 'EDIT_PROJECTS'
+  | 'MANAGE_PROJECT_SAFETY';
 
 export interface AuthSession {
   user: {
@@ -11,6 +18,12 @@ export interface AuthSession {
     updatedAt: string;
   };
   organisation: { id: string; name: string; slug: string; role: UserRole };
+  membership: { id: string; role: UserRole };
+  memberships: Array<{
+    membershipId: string;
+    organisation: { id: string; name: string; slug: string };
+    role: UserRole;
+  }>;
   permissions: OrganisationPermission[];
 }
 
@@ -41,6 +54,7 @@ export interface AuthApi {
   me(): Promise<AuthSession>;
   refresh(): Promise<AuthSession>;
   logout(): Promise<void>;
+  switchOrganisation(organisationId: string): Promise<AuthSession>;
 }
 
 export class HttpAuthApi implements AuthApi {
@@ -70,6 +84,13 @@ export class HttpAuthApi implements AuthApi {
 
   async logout(): Promise<void> {
     await this.request<void>('/auth/logout', { method: 'POST' });
+  }
+
+  switchOrganisation(organisationId: string): Promise<AuthSession> {
+    return this.request<AuthSession>('/auth/switch-organisation', {
+      method: 'POST',
+      body: JSON.stringify({ organisationId }),
+    });
   }
 
   private async request<T>(path: string, init: RequestInit): Promise<T> {

@@ -19,4 +19,43 @@ export class OrganisationController {
       next(error);
     }
   };
+
+  addMember = async (request: Request, response: Response, next: NextFunction): Promise<void> => {
+    try {
+      response.status(201).json(await this.service.addMember(request.auth!, request.body));
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  updateMember = async (
+    request: Request,
+    response: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      response.json(
+        await this.service.updateMember(
+          request.auth!,
+          String(request.params.membershipId),
+          request.body,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  removeMember = async (
+    request: Request,
+    response: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      await this.service.removeMember(request.auth!, String(request.params.membershipId));
+      response.status(204).end();
+    } catch (error) {
+      next(error);
+    }
+  };
 }

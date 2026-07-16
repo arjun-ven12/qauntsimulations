@@ -1,4 +1,5 @@
 import type { UserRole } from '@taskos/shared-types';
+import { ApplicationError } from '../../core/errors/application-error.js';
 import { permissionsForRole } from '../organisations/organisation.permissions.js';
 import { EmailAlreadyRegisteredError, InvalidCredentialsError } from './auth.errors.js';
 import type { AuthRepository } from './auth.repository.js';
@@ -102,11 +103,27 @@ export class AuthService {
     ) {
       throw new InvalidCredentialsError();
     }
-    return {
-      user: publicUser(user),
-      organisation: { ...membership.organisation, role: membership.role },
-      permissions: permissionsForRole(membership.role),
-    };
+    return this.publicSession(user, membership);
+  }
+
+  async switchOrganisation(
+    context: AuthContext,
+    organisationId: string,
+    currentRefreshToken?: string,
+  ): Promise<AuthSession> {
+    const user = await this.repository.findUserById(context.userId);
+    const membership = user ? await this.repository.findMembership(user.id, organisationId) : null;
+    if (!user || !membership || context.tokenVersion !== user.tokenVersion) {
+      throw new ApplicationError(
+        'ORGANISATION_ACCESS_DENIED',
+        'You do not have access to that organisation',
+        403,
+      );
+    }
+    if (currentRefreshToken) {
+      await this.repository.revokeRefreshToken(this.tokens.hashToken(currentRefreshToken));
+    }
+    return this.createSession(user, membership.organisation, membership.role, membership.id);
   }
 
   private async createSession(
@@ -120,6 +137,7 @@ export class AuthService {
     },
     organisation: { id: string; name: string; slug: string },
     role: UserRole,
+    membershipId?: string,
   ): Promise<AuthSession> {
     const subject = {
       userId: user.id,
@@ -136,14 +154,50 @@ export class AuthService {
       this.tokens.hashToken(refreshToken),
       new Date(refreshPayload.expiry * 1000),
     );
+    const activeMembership = membershipId
+      ? { id: membershipId, role }
+      : await this.repository.findMembership(user.id, organisation.id).then((membership) => ({
+          id: membership!.id,
+          role: membership!.role,
+        }));
     return {
-      user: publicUser(user),
-      organisation: { ...organisation, role },
-      permissions: permissionsForRole(role),
+      ...(await this.publicSession(user, {
+        id: activeMembership.id,
+        role,
+        organisation,
+      })),
       accessToken,
       refreshToken,
       accessTokenExpiresAt: accessPayload.expiry * 1000,
       refreshTokenExpiresAt: refreshPayload.expiry * 1000,
+    };
+  }
+
+  private async publicSession(
+    user: {
+      id: string;
+      email: string;
+      displayName: string;
+      createdAt: Date;
+      updatedAt: Date;
+    },
+    membership: {
+      id: string;
+      role: UserRole;
+      organisation: { id: string; name: string; slug: string };
+    },
+  ): Promise<PublicAuthSession> {
+    const memberships = await this.repository.listMemberships(user.id);
+    return {
+      user: publicUser(user),
+      organisation: { ...membership.organisation, role: membership.role },
+      membership: { id: membership.id, role: membership.role },
+      memberships: memberships.map((item) => ({
+        membershipId: item.id,
+        organisation: item.organisation,
+        role: item.role,
+      })),
+      permissions: permissionsForRole(membership.role),
     };
   }
 }
