@@ -42,5 +42,5 @@ export function GuestRoute({ children }: { children: ReactNode }) {
   const initialized = useAuthStore((state) => state.initialized);
 
   if (!initialized) return <AuthLoading />;
-  return authenticated ? <Navigate to="/projects" replace /> : children;
+  return authenticated ? <Navigate to="/dashboard" replace /> : children;
 }

@@ -6,6 +6,7 @@ import type {
   DashboardInvestigationSummary,
   DashboardProject,
 } from './dashboard.types.js';
+import { dashboardRoutes } from './dashboard.routes.js';
 
 export interface DashboardProjectView {
   project: DashboardProject;
@@ -69,9 +70,9 @@ export function projectView(project: DashboardProject): DashboardProjectView {
     onboarding,
     ready: onboarding.complete,
     readinessScore: onboarding.percentage,
-    startInvestigationHref: `/projects/${project.id}/investigations/new`,
-    continueSetupHref: onboarding.nextStep?.href ?? `/projects/${project.id}`,
-    projectHref: `/projects/${project.id}`,
+    startInvestigationHref: dashboardRoutes.startInvestigation(project.id),
+    continueSetupHref: onboarding.nextStep?.href ?? dashboardRoutes.project(project.id),
+    projectHref: dashboardRoutes.project(project.id),
   };
 }
 

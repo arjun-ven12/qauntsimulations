@@ -586,5 +586,5 @@ function readRequestedPath(state: unknown): string {
   ) {
     return state.from;
   }
-  return '/projects';
+  return '/dashboard';
 }

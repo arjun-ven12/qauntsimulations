@@ -1,5 +1,6 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom';
 import { AuthPage } from '../features/auth/login.page.js';
+import { ProductDashboardPage } from '../features/dashboard/product-dashboard.page.js';
 import { ExperimentPlanPage } from '../features/experiment-plan/experiment-plan.page.js';
 import { FindingDetailPage } from '../features/findings/finding-detail.page.js';
 import { InvestigationFindingsPage } from '../features/findings/investigation-findings.page.js';
@@ -33,6 +34,47 @@ import { VerifyRepairPage } from '../features/repairs/verify-repair.page.js';
 import { AppLayout } from '../layouts/app-layout.js';
 import { GuestRoute, RouteGuard } from '../routes/route-guard.js';
 
+export const authenticatedRoutes: RouteObject[] = [
+  { index: true, element: <Navigate to="/dashboard" replace /> },
+  { path: '/dashboard', element: <ProductDashboardPage /> },
+  { path: '/projects', element: <ProjectsPage /> },
+  { path: '/projects/new', element: <NewProjectPage /> },
+  { path: '/projects/:projectId', element: <ProjectOverviewPage /> },
+  { path: '/projects/:projectId/settings', element: <ProjectSettingsPage /> },
+  { path: '/projects/:projectId/safety', element: <SafetySettingsPage /> },
+  { path: '/projects/:projectId/environments', element: <EnvironmentsPage /> },
+  { path: '/projects/:projectId/environments/new', element: <NewEnvironmentPage /> },
+  { path: '/projects/:projectId/environments/:environmentId', element: <EnvironmentOverviewPage /> },
+  { path: '/projects/:projectId/environments/:environmentId/settings', element: <EnvironmentSettingsPage /> },
+  { path: '/projects/:projectId/journeys', element: <JourneysPage /> },
+  { path: '/projects/:projectId/journeys/new', element: <NewJourneyPage /> },
+  { path: '/projects/:projectId/journeys/:journeyId', element: <JourneyOverviewPage /> },
+  {
+    path: '/projects/:projectId/journeys/:journeyId/settings',
+    element: <JourneySettingsPage />,
+  },
+  { path: '/projects/:projectId/invariants', element: <InvariantsPage /> },
+  { path: '/projects/:projectId/invariants/new', element: <NewInvariantPage /> },
+  { path: '/projects/:projectId/invariants/:invariantId', element: <InvariantOverviewPage /> },
+  {
+    path: '/projects/:projectId/invariants/:invariantId/settings',
+    element: <InvariantSettingsPage />,
+  },
+  { path: '/projects/:projectId/investigations/new', element: <ScenarioCreatePage /> },
+  { path: '/investigations/:investigationId', element: <LiveWorldLabPage /> },
+  { path: '/investigations/:investigationId/plan', element: <ExperimentPlanPage /> },
+  { path: '/investigations/:investigationId/live', element: <LiveWorldLabPage /> },
+  { path: '/investigations/:investigationId/worlds', element: <LiveWorldLabPage /> },
+  {
+    path: '/investigations/:investigationId/findings',
+    element: <InvestigationFindingsPage />,
+  },
+  { path: '/investigations/:investigationId/findings/:findingId', element: <FindingDetailPage /> },
+  { path: '/repairs/:repairId/verify', element: <VerifyRepairPage /> },
+  { path: '/settings/organisation', element: <OrganisationPage /> },
+  { path: '/invitations', element: <InvitationsPage /> },
+];
+
 export const router = createBrowserRouter([
   { path: '/invitations/accept', element: <InvitationAcceptPage /> },
   {
@@ -52,44 +94,6 @@ export const router = createBrowserRouter([
         <AppLayout />
       </RouteGuard>
     ),
-    children: [
-      { index: true, element: <Navigate to="/projects" replace /> },
-      { path: '/projects', element: <ProjectsPage /> },
-      { path: '/projects/new', element: <NewProjectPage /> },
-      { path: '/projects/:projectId', element: <ProjectOverviewPage /> },
-      { path: '/projects/:projectId/settings', element: <ProjectSettingsPage /> },
-      { path: '/projects/:projectId/safety', element: <SafetySettingsPage /> },
-      { path: '/projects/:projectId/environments', element: <EnvironmentsPage /> },
-      { path: '/projects/:projectId/environments/new', element: <NewEnvironmentPage /> },
-      { path: '/projects/:projectId/environments/:environmentId', element: <EnvironmentOverviewPage /> },
-      { path: '/projects/:projectId/environments/:environmentId/settings', element: <EnvironmentSettingsPage /> },
-      { path: '/projects/:projectId/journeys', element: <JourneysPage /> },
-      { path: '/projects/:projectId/journeys/new', element: <NewJourneyPage /> },
-      { path: '/projects/:projectId/journeys/:journeyId', element: <JourneyOverviewPage /> },
-      {
-        path: '/projects/:projectId/journeys/:journeyId/settings',
-        element: <JourneySettingsPage />,
-      },
-      { path: '/projects/:projectId/invariants', element: <InvariantsPage /> },
-      { path: '/projects/:projectId/invariants/new', element: <NewInvariantPage /> },
-      { path: '/projects/:projectId/invariants/:invariantId', element: <InvariantOverviewPage /> },
-      {
-        path: '/projects/:projectId/invariants/:invariantId/settings',
-        element: <InvariantSettingsPage />,
-      },
-      { path: '/projects/:projectId/investigations/new', element: <ScenarioCreatePage /> },
-      { path: '/investigations/:investigationId', element: <LiveWorldLabPage /> },
-      { path: '/investigations/:investigationId/plan', element: <ExperimentPlanPage /> },
-      { path: '/investigations/:investigationId/live', element: <LiveWorldLabPage /> },
-      { path: '/investigations/:investigationId/worlds', element: <LiveWorldLabPage /> },
-      {
-        path: '/investigations/:investigationId/findings',
-        element: <InvestigationFindingsPage />,
-      },
-      { path: '/investigations/:investigationId/findings/:findingId', element: <FindingDetailPage /> },
-      { path: '/repairs/:repairId/verify', element: <VerifyRepairPage /> },
-      { path: '/settings/organisation', element: <OrganisationPage /> },
-      { path: '/invitations', element: <InvitationsPage /> },
-    ],
+    children: authenticatedRoutes,
   },
 ]);

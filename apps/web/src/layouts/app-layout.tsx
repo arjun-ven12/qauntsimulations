@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Boxes, FlaskConical, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Boxes, FlaskConical, Gauge, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { invitationApi } from '../services/invitation-api.js';
@@ -7,7 +7,8 @@ import { useAuthStore } from '../stores/auth.store.js';
 
 const runtimeInvestigationId = import.meta.env.VITE_DEMO_INVESTIGATION_ID ?? 'cmrol9cxh0001rurb8godxnh6';
 
-const nav = [
+export const appNavigation = [
+  { to: '/dashboard', label: 'Dashboard', icon: Gauge },
   { to: '/projects', label: 'Projects', icon: Boxes },
   { to: `/investigations/${runtimeInvestigationId}`, label: 'Live WorldLab', icon: Activity },
   {
@@ -47,7 +48,7 @@ export function AppLayout() {
     try {
       await switchOrganisation(organisationId);
       await queryClient.resetQueries();
-      navigate('/projects');
+      navigate('/dashboard');
     } catch (error) {
       setSwitchError(
         error instanceof Error ? error.message : 'WorldLab could not switch organisations.',
@@ -106,7 +107,7 @@ export function AppLayout() {
           </div>
         ) : null}
         <nav aria-label="WorldLab" className="space-y-2">
-          {nav.map(({ to, label, icon: Icon }) => (
+          {appNavigation.map(({ to, label, icon: Icon }) => (
             <NavLink
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${

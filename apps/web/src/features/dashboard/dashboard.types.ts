@@ -19,7 +19,10 @@ export interface DashboardProject {
   recentInvestigationCount: number;
   openFindingCount: number;
   updatedAt?: string;
+  unavailableConfiguration?: Array<'environments' | 'journeys' | 'invariants'>;
 }
+
+export type DashboardActivityAvailability = 'available' | 'unavailable';
 
 export interface DashboardInvestigationSummary {
   id: string;
