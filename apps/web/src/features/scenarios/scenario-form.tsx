@@ -11,6 +11,7 @@ import {
   isJourneySelectable,
   createRequestLock,
   preflightMatchesPayload,
+  runRequestOnce,
   scenarioFormErrors,
   toScenarioLaunchInput,
   type ScenarioFormValue,
@@ -82,14 +83,15 @@ export function ScenarioForm({
   };
 
   const launch = async () => {
-    if (!readyPreflight || !readyForCurrentPayload || launchPending || !launchInFlight.current.enter()) return;
-    setLocalLaunchPending(true);
-    try {
-      await onLaunch(structuredClone(readyPreflight.payload));
-    } finally {
-      launchInFlight.current.leave();
-      setLocalLaunchPending(false);
-    }
+    if (!readyPreflight || !readyForCurrentPayload || launchPending) return;
+    await runRequestOnce(launchInFlight.current, async () => {
+      setLocalLaunchPending(true);
+      try {
+        await onLaunch(structuredClone(readyPreflight.payload));
+      } finally {
+        setLocalLaunchPending(false);
+      }
+    });
   };
 
   return (

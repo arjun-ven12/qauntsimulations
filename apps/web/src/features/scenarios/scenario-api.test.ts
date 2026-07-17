@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { scenarioApi, type ScenarioApiError } from './scenario-api.js';
+import { createRequestLock, runRequestOnce } from './scenario-form.model.js';
 import { validScenario } from './scenario-test-fixtures.js';
 
 describe('Scenario launch API', () => {
@@ -53,6 +54,32 @@ describe('Scenario launch API', () => {
 
     expect(bodies).toEqual([input, input]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('sends one POST for two immediate launch attempts while the first is pending', async () => {
+    const input = validScenario();
+    let completePost!: (value: Response) => void;
+    const pendingPost = new Promise<Response>((resolve) => {
+      completePost = resolve;
+    });
+    const fetchMock = vi.fn().mockReturnValue(pendingPost);
+    vi.stubGlobal('fetch', fetchMock);
+    const lock = createRequestLock();
+    const launch = () => runRequestOnce(lock, async () => {
+      await scenarioApi.launch('project-1', input);
+    });
+
+    const first = launch();
+    const second = launch();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/projects/project-1/investigations'),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(input) }),
+    );
+    expect(await second).toBe(false);
+    completePost(response({ id: 'investigation-1', status: 'PLANNING' }));
+    expect(await first).toBe(true);
   });
 
   it('preserves backend error codes and submitted values after launch failure', async () => {

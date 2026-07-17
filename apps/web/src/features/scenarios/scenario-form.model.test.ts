@@ -5,6 +5,7 @@ import {
   isJourneySelectable,
   liveWorldLabRoute,
   preflightMatchesPayload,
+  runRequestOnce,
   scenarioFormErrors,
   supportedScenarioControls,
   toScenarioLaunchInput,
@@ -61,12 +62,25 @@ describe('Scenario form model', () => {
     expect(preflightMatchesPayload(readyPayload, changed)).toBe(false);
   });
 
-  it('prevents duplicate submissions while a request is in flight', () => {
+  it('runs one submission callback for two immediate attempts while the first is pending', async () => {
     const lock = createRequestLock();
-    expect(lock.enter()).toBe(true);
-    expect(lock.enter()).toBe(false);
-    lock.leave();
-    expect(lock.enter()).toBe(true);
+    let posts = 0;
+    let completePost!: () => void;
+    const pendingPost = new Promise<void>((resolve) => {
+      completePost = resolve;
+    });
+    const post = async () => {
+      posts += 1;
+      await pendingPost;
+    };
+
+    const first = runRequestOnce(lock, post);
+    const second = runRequestOnce(lock, post);
+
+    expect(posts).toBe(1);
+    expect(await second).toBe(false);
+    completePost();
+    expect(await first).toBe(true);
   });
 
   it('excludes disabled, non-READY, unsupported, and incompatible persisted records', () => {

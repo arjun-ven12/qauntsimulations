@@ -30,7 +30,8 @@ describe('Scenario frontend', () => {
     expect(html).toContain('Browsers');
     expect(html).toContain('Viewports');
     expect(html).toContain('Network profiles');
-    expect(html).toContain('Maximum worlds');
+    expect(html).toContain('Maximum initial worlds');
+    expect(html).toContain('Adaptive reproduction and minimisation may add additional worlds.');
     expect(html).toContain('Maximum concurrent workers');
     expect(html).not.toContain('Maximum compute');
     expect(html).not.toContain('JSON editor');

@@ -41,7 +41,11 @@ export function ScenarioControlsEditor({
         selected={value.networkProfiles}
       />
       <div className="grid gap-5 md:grid-cols-2">
-        <Field error={errors.maximumWorlds} label="Maximum worlds">
+        <Field
+          description="Adaptive reproduction and minimisation may add additional worlds."
+          error={errors.maximumWorlds}
+          label="Maximum initial worlds"
+        >
           <input
             className="w-full"
             disabled={disabled}

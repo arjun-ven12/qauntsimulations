@@ -147,6 +147,19 @@ export function createRequestLock() {
   };
 }
 
+export async function runRequestOnce(
+  lock: ReturnType<typeof createRequestLock>,
+  request: () => Promise<void>,
+) {
+  if (!lock.enter()) return false;
+  try {
+    await request();
+    return true;
+  } finally {
+    lock.leave();
+  }
+}
+
 export function liveWorldLabRoute(investigationId: string) {
   return `/investigations/${investigationId}`;
 }

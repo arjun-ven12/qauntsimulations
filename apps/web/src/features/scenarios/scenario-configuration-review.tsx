@@ -50,7 +50,7 @@ export function ScenarioConfigurationReview({
           label="Network profiles"
           value={controls.networkProfiles.join(', ') || 'None'}
         />
-        <ReviewItem label="Maximum worlds" value={String(controls.maximumWorlds)} />
+        <ReviewItem label="Maximum initial worlds" value={String(controls.maximumWorlds)} />
         <ReviewItem
           label="Maximum concurrent workers"
           value={String(controls.maximumConcurrentWorkers)}
