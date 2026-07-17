@@ -3,7 +3,6 @@ import { AuthPage } from '../features/auth/login.page.js';
 import { ExperimentPlanPage } from '../features/experiment-plan/experiment-plan.page.js';
 import { FindingDetailPage } from '../features/findings/finding-detail.page.js';
 import { InvestigationFindingsPage } from '../features/findings/investigation-findings.page.js';
-import { NewInvestigationPage } from '../features/investigations/new-investigation.page.js';
 import { LiveWorldLabPage } from '../features/live-worldlab/live-worldlab.page.js';
 import { OrganisationPage } from '../features/organisation/organisation.page.js';
 import { InvitationsPage } from '../features/organisation/invitations.page.js';
@@ -29,6 +28,7 @@ import {
   InvariantsPage,
   NewInvariantPage,
 } from '../features/invariants/index.js';
+import { ScenarioCreatePage } from '../features/scenarios/index.js';
 import { VerifyRepairPage } from '../features/repairs/verify-repair.page.js';
 import { AppLayout } from '../layouts/app-layout.js';
 import { GuestRoute, RouteGuard } from '../routes/route-guard.js';
@@ -77,7 +77,7 @@ export const router = createBrowserRouter([
         path: '/projects/:projectId/invariants/:invariantId/settings',
         element: <InvariantSettingsPage />,
       },
-      { path: '/projects/:projectId/investigations/new', element: <NewInvestigationPage /> },
+      { path: '/projects/:projectId/investigations/new', element: <ScenarioCreatePage /> },
       { path: '/investigations/:investigationId', element: <LiveWorldLabPage /> },
       { path: '/investigations/:investigationId/plan', element: <ExperimentPlanPage /> },
       { path: '/investigations/:investigationId/live', element: <LiveWorldLabPage /> },
