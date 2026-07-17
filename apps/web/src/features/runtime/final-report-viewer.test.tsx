@@ -29,7 +29,8 @@ describe('final report viewer', () => {
     );
 
     expect(html).toContain('View report');
-    expect(html).toContain('reports/investigation/finding/final-report.md');
+    expect(html).toContain('final-report.md');
+    expect(html).not.toContain('reports/investigation/finding/final-report.md');
     expect(fetch).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
@@ -84,4 +85,3 @@ describe('final report viewer', () => {
     expect(invalid).toContain('could not be parsed safely');
   });
 });
-

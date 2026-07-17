@@ -21,10 +21,11 @@ export function useInvestigationProgress(investigationId: string) {
   });
 }
 
-export function useExperimentPlan(investigationId: string) {
+export function useExperimentPlan(investigationId: string, status?: string) {
   return useQuery({
     queryKey: ['investigation', investigationId, 'plan'],
     queryFn: () => investigationApi.getExperimentPlan(investigationId),
+    refetchInterval: status && isTerminalStatus(status) ? false : polling.progressMs,
   });
 }
 

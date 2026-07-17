@@ -2,6 +2,8 @@ import { findingSchema, investigationProgressSchema, type InvestigationProgress 
 import type { InvestigationProgressRecord } from './investigations.types.js';
 import { sanitizeRuntimePublicMetadata } from './runtime-public-sanitizer.js';
 
+const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+
 const publicStatus = (status: string): InvestigationProgress['status'] => {
   if (status === 'PLANNING') return 'PLANNING';
   if (status === 'QUEUED') return 'QUEUED';
@@ -108,10 +110,50 @@ export function mapFindingList(records: FindingListRecord[]) { return records.ma
 interface FindingDetailRecord extends FindingListRecord {
   evidence: Array<{ artifact: EvidenceListRecord }>;
   reproductions: Array<{ id: string; experimentId: string; reproduced: boolean; createdAt: Date }>;
+  minimisationRuns: Array<{
+    id: string;
+    status: string;
+    completedTrials: number;
+    currentRetainedConditions: unknown;
+    removedConditions: unknown;
+    inconclusiveConditions: unknown;
+    knownPassingDelayMs: number | null;
+    knownFailingDelayMs: number | null;
+    finalReportEvidenceId: string | null;
+  }>;
   minimalReproduction: { id: string; journeySteps: unknown; worldConfiguration: unknown; scriptArtifactId: string | null; createdAt: Date; updatedAt: Date } | null;
 }
 export function mapFindingDetail(finding: FindingDetailRecord) {
-  const summary = findingSchema.parse({ ...finding, causalConditions: finding.causalConditions, createdAt: finding.createdAt.toISOString(), updatedAt: finding.updatedAt.toISOString() });
+  const latestMinimisationRun = finding.minimisationRuns[0];
+  const causalConditions = record(finding.causalConditions);
+  const minimisation = record(causalConditions.minimisation);
+  const enrichedConditions = latestMinimisationRun
+    ? {
+        ...causalConditions,
+        minimisationRun: sanitizeRuntimePublicMetadata({
+          id: latestMinimisationRun.id,
+          status: latestMinimisationRun.status,
+          completedTrials: latestMinimisationRun.completedTrials,
+          retainedConditions: latestMinimisationRun.currentRetainedConditions,
+          removedConditions: latestMinimisationRun.removedConditions,
+          inconclusiveConditions: latestMinimisationRun.inconclusiveConditions,
+          knownPassingDelayMs: latestMinimisationRun.knownPassingDelayMs,
+          knownFailingDelayMs: latestMinimisationRun.knownFailingDelayMs,
+          finalReportEvidenceId: latestMinimisationRun.finalReportEvidenceId,
+        }),
+        minimisation: {
+          ...minimisation,
+          retainedConditions: minimisation.retainedConditions ?? latestMinimisationRun.currentRetainedConditions,
+          removedConditions: minimisation.removedConditions ?? latestMinimisationRun.removedConditions,
+          inconclusiveConditions: minimisation.inconclusiveConditions ?? latestMinimisationRun.inconclusiveConditions,
+          boundedRange: minimisation.boundedRange ?? {
+            ...(latestMinimisationRun.knownPassingDelayMs !== null ? { lowerPassingBoundMs: latestMinimisationRun.knownPassingDelayMs } : {}),
+            ...(latestMinimisationRun.knownFailingDelayMs !== null ? { upperFailingBoundMs: latestMinimisationRun.knownFailingDelayMs } : {}),
+          },
+        },
+      }
+    : causalConditions;
+  const summary = findingSchema.parse({ ...finding, causalConditions: enrichedConditions, createdAt: finding.createdAt.toISOString(), updatedAt: finding.updatedAt.toISOString() });
   return {
     ...summary,
     evidence: mapEvidenceList(finding.evidence.map(({ artifact }) => artifact)),

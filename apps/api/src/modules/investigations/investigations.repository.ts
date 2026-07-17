@@ -27,6 +27,7 @@ import type {
 import type { WorkerExecutionProvider } from '../execution/worker-executor.types.js';
 import type { AdaptiveReproductionPlan } from '../experiments/services/adaptive-reproduction-plan.service.js';
 import type { DeterministicWorldDefinition } from '../experiments/services/deterministic-experiment-plan.service.js';
+import { aggregateMinimisationDelayBounds } from './minimisation-bounds.js';
 
 const json = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 const messageData = (message: string, metadata: Record<string, unknown> = {}): Prisma.InputJsonValue => json({ message, ...metadata });
@@ -424,12 +425,24 @@ export class InvestigationRepository {
         supportingEvidenceIds: json(input.evidenceArtifactIds),
         completedAt: new Date(),
       } });
+      const candidates = await transaction.minimisationCandidate.findMany({
+        where: { minimisationRunId: input.runId },
+        select: { variableName: true, candidateValue: true, result: true },
+      });
+      const bounds = aggregateMinimisationDelayBounds({
+        existingPassingDelayMs: existingRun?.knownPassingDelayMs ?? null,
+        existingFailingDelayMs: existingRun?.knownFailingDelayMs ?? null,
+        candidates,
+      });
+      if (bounds.contradictory) {
+        throw new Error('Contradictory minimisation delay bounds detected');
+      }
       await transaction.minimisationRun.update({ where: { id: input.runId }, data: {
         currentRetainedConditions: json(input.retainedConditions),
         removedConditions: json(input.removedConditions),
         inconclusiveConditions: json(input.inconclusiveConditions),
-        ...(input.delayRange.lowerPassingBoundMs !== undefined ? { knownPassingDelayMs: input.delayRange.lowerPassingBoundMs } : {}),
-        ...(input.delayRange.upperFailingBoundMs !== undefined ? { knownFailingDelayMs: input.delayRange.upperFailingBoundMs } : {}),
+        ...(bounds.knownPassingDelayMs !== undefined ? { knownPassingDelayMs: bounds.knownPassingDelayMs } : {}),
+        ...(bounds.knownFailingDelayMs !== undefined ? { knownFailingDelayMs: bounds.knownFailingDelayMs } : {}),
         generatedCandidateWorldIds: json([...new Set([...generated, ...(candidate?.worldId ? [candidate.worldId] : [])])]),
         completedTrials: { increment: candidate?.completedAt ? 0 : 1 },
       } });
@@ -993,6 +1006,21 @@ export class InvestigationRepository {
       include: {
         evidence: { include: { artifact: true } },
         reproductions: { orderBy: { createdAt: 'asc' } },
+        minimisationRuns: {
+          orderBy: { startedAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            completedTrials: true,
+            currentRetainedConditions: true,
+            removedConditions: true,
+            inconclusiveConditions: true,
+            knownPassingDelayMs: true,
+            knownFailingDelayMs: true,
+            finalReportEvidenceId: true,
+          },
+        },
         minimalReproduction: true,
       },
     });

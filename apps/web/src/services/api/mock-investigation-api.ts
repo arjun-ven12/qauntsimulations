@@ -61,8 +61,8 @@ export class MockInvestigationApi implements InvestigationApi {
     world(7, 'ADAPTIVE_REPRODUCTION', 'PASSED', { adaptive: { purpose: 'CONTROL_BUG_DISABLED' }, browser: 'chromium', viewport: 'mobile', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: false }),
     world(8, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'REMOVE_VIEWPORT', variable: 'viewport', conditionDecision: 'REMOVED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
     world(9, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'REMOVE_NETWORK_PROFILE', variable: 'networkProfile', conditionDecision: 'REMOVED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(10, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'TEST_PAYMENT_DELAY', variable: 'paymentDelayMs', conditionDecision: 'INCONCLUSIVE' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 600, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(11, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'TEST_PAYMENT_DELAY', variable: 'paymentDelayMs', conditionDecision: 'INCONCLUSIVE' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 900, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(10, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'OTHER_CONTROL', variable: 'networkProfile', conditionDecision: 'INCONCLUSIVE' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 600, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(11, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'OTHER_CONTROL', variable: 'networkProfile', conditionDecision: 'INCONCLUSIVE' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 900, doubleSubmit: true, duplicateSubmissionBug: true }),
     world(12, 'MINIMISATION', 'FAILED', { minimisation: { purpose: 'TEST_PAYMENT_DELAY', variable: 'paymentDelayMs', conditionDecision: 'RETAINED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
     world(13, 'MINIMISATION', 'FAILED', { minimisation: { purpose: 'CONFIRM_MINIMAL_SET', variable: 'paymentDelayMs', conditionDecision: 'RETAINED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
   ];
@@ -184,7 +184,7 @@ export class MockInvestigationApi implements InvestigationApi {
   }
 
   async getEvidence(_investigationId: string): Promise<EvidenceArtifactResponse[]> {
-    const types = ['SCREENSHOT', 'TRACE', 'CONSOLE_LOG', 'NETWORK_LOG', 'WORKER_RESULT', 'ENVIRONMENT_MANIFEST'] as const;
+    const types = ['SCREENSHOT', 'TRACE', 'CONSOLE_LOG', 'NETWORK_LOG', 'WORKER_RESULT', 'ENVIRONMENT_MANIFEST', 'DOM_SNAPSHOT'] as const;
     const artifacts: EvidenceArtifactResponse[] = this.worlds.flatMap((item, index) =>
       types.map((type, offset) => ({
         id: `evidence_${index + 1}_${type.toLowerCase()}`,
@@ -245,7 +245,7 @@ export class MockInvestigationApi implements InvestigationApi {
           businessImpact: 'Duplicate payment and order activity can occur for one checkout intent.',
           retainedConditions: { duplicateSubmissionBug: true, doubleSubmit: true },
           removedConditions: { viewport: 'mobile-390x844' },
-          boundedRange: { knownPassingDelayMs: 900, knownFailingDelayMs: 1200 },
+          boundedRange: { knownFailingDelayMs: 1200, targetPrecisionMs: 100 },
           reproductionSteps: ['Open product', 'Submit payment twice'],
           limitations: ['Applies to the deterministic checkout fixture.'],
         }, null, 2),
@@ -298,8 +298,11 @@ export class MockInvestigationApi implements InvestigationApi {
         retainedConditions: { duplicateSubmissionBug: true, doubleSubmit: true, userProfile: 'impatient' },
         removedConditions: { viewport: 'mobile-390x844', networkProfile: 'delayed-payment' },
         inconclusiveConditions: {},
-        boundedRange: { knownPassingDelayMs: 900, knownFailingDelayMs: 1200, targetPrecisionMs: 100, testedPointsMs: [600, 900, 1200] },
+        boundedRange: { knownFailingDelayMs: 1200, targetPrecisionMs: 100, testedPointsMs: [1200] },
         reproductionSteps: ['Open the test product.', 'Add it to cart.', 'Open checkout.', 'Enter email.', 'Click Pay twice quickly.', 'Observe duplicate payment and order requests.'],
+        confidenceExplanation: 'Seven deterministic reproductions and controls support the finding within the tested fixture.',
+        causalSequence: ['Delayed payment response', 'Repeated checkout submission', 'Duplicate payment request', 'Duplicate order'],
+        limitations: ['Greedy minimisation was used.', 'The boundary is bounded rather than an exact threshold.', 'The result is fixture-specific.'],
         finalReportEvidenceId: 'cmrola2p000fgrurbry3xvnhj',
         finalReportMarkdownEvidenceId: 'cmrola2pf00firurb7yjm6kt6',
         minimisationRunId: 'min_run_179623b1052669254ba2',

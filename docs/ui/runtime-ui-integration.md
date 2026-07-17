@@ -85,14 +85,18 @@ The same utility extracts:
 
 ## Evidence handling
 
-Evidence is grouped by:
+Investigation-level evidence is grouped by runtime stage on the finding detail page:
 
 1. Final reports
-2. Screenshots
-3. Traces
-4. Logs
-5. Worker outputs
-6. Other
+2. Original observation
+3. Exact reproduction
+4. Controlled comparisons
+5. Minimisation trials
+6. Final confirmation
+7. Other
+
+Evidence cards also support type filtering, search, group counts, and show-more pagination so the preserved
+93-artifact investigation does not render every artifact body or card at once.
 
 The UI does not assume artifact bodies are browser-fetchable. It renders metadata and a clear unavailable-preview message when no safe artifact body endpoint exists.
 
@@ -110,22 +114,19 @@ Supported evidence types include:
 
 ## Finding detail
 
-Finding detail renders:
+Finding detail now renders:
 
-- summary
-- severity
-- confidence
-- reproduction count
-- causal status
-- source world and experiment
-- failed invariants
-- retained conditions
-- removed conditions
-- inconclusive conditions
-- bounded failure range
-- reproduction steps
-- linked evidence
-- final-report artifacts
+- finding header with severity, confidence, causal status, reproduction count, and final-report availability
+- executive summary, business impact, original observation, source world, and failed invariants
+- reproduction confidence panel
+- minimal tested condition set
+- retained, removed, and inconclusive conditions
+- observed failure boundary with tested points
+- deterministic reproduction steps
+- experiment history across initial, adaptive, and minimisation worlds
+- evidence-supported sequence when runtime metadata exists
+- grouped evidence with lazy report body loading
+- limitations
 
 The UI uses careful language:
 
@@ -190,3 +191,7 @@ The product owner can now polish:
 - Live WorldLab visual polish
 - findings visual polish
 - demo storytelling
+
+## Prompt 12 Live WorldLab overview
+
+The main Live WorldLab page now provides a runtime-oriented investigation overview: phase tracker, world-based progress, terminal summary, worker/attempt visibility, searchable/sortable world table, two-world comparison, actual-world matrix, grouped event timeline, finding summary, and evidence availability counts. It intentionally does not fetch final-report bodies on the overview page. See `docs/ui/live-worldlab-experience.md` for phase mappings, matrix cohort rules, polling semantics, partial-failure behavior, and accessibility notes.

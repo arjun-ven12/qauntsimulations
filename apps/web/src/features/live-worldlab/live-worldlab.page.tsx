@@ -2,13 +2,16 @@ import type { InvestigationEvent } from '@taskos/shared-types';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeading } from '../../components/page-heading.js';
 import {
+  CompletedRunSummary,
   EventTimeline,
-  EvidenceViewer,
+  EvidenceSummary,
   InvestigationOverviewHeader,
+  LiveFindingSummary,
   PanelState,
   ProgressSummary,
   RuntimeNav,
   WorkerPanel,
+  WorldMatrix,
   WorldTable,
 } from '../runtime/runtime-components.js';
 import { phaseLabel } from '../runtime/runtime-normalizers.js';
@@ -73,7 +76,7 @@ export function LiveWorldLabPage() {
 
   const progress = useInvestigationProgress(investigationId);
   const status = progress.data?.status;
-  const plan = useExperimentPlan(investigationId);
+  const plan = useExperimentPlan(investigationId, status);
   const worlds = useInvestigationWorlds(investigationId, status);
   const experiments = useInvestigationExperiments(investigationId, status);
   const workers = useInvestigationWorkers(investigationId, status);
@@ -104,21 +107,17 @@ export function LiveWorldLabPage() {
             One or more world panels could not load. Loaded panels remain visible.
           </PanelState>
         ) : null}
-        <WorldTable worlds={worlds.data ?? []} experiments={experiments.data ?? []} evidence={evidence.data ?? []} />
-        {workers.error ? <PanelState title="Workers unavailable" retry={() => void workers.refetch()}>{workers.error instanceof Error ? workers.error.message : 'Worker data could not load.'}</PanelState> : <WorkerPanel workers={workers.data ?? []} />}
+        <CompletedRunSummary progress={progress.data} findings={findings.data ?? []} />
+        <WorldTable worlds={worlds.data ?? []} experiments={experiments.data ?? []} workers={workers.data ?? []} evidence={evidence.data ?? []} />
+        <WorldMatrix worlds={worlds.data ?? []} experiments={experiments.data ?? []} workers={workers.data ?? []} evidence={evidence.data ?? []} />
+        {workers.error ? <PanelState title="Workers unavailable" retry={() => void workers.refetch()}>{workers.error instanceof Error ? workers.error.message : 'Worker data could not load.'}</PanelState> : <WorkerPanel workers={workers.data ?? []} experiments={experiments.data ?? []} />}
         <EventTimeline events={progress.data.recentEvents} />
         {findings.error ? (
           <PanelState title="Findings unavailable" retry={() => void findings.refetch()}>{findings.error instanceof Error ? findings.error.message : 'Findings could not load.'}</PanelState>
         ) : (
-          <section className="card">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-bold">Findings</h2>
-              <Link className="text-sm font-bold text-cyan" to={`/investigations/${investigationId}/findings`}>Open findings</Link>
-            </div>
-            <p className="mt-3 text-sm text-slate-400">{findings.data?.length ?? 0} findings linked to this investigation.</p>
-          </section>
+          <LiveFindingSummary findings={findings.data ?? []} investigationId={investigationId} investigationStatus={progress.data.status} />
         )}
-        {evidence.error ? <PanelState title="Evidence unavailable" retry={() => void evidence.refetch()}>{evidence.error instanceof Error ? evidence.error.message : 'Evidence could not load.'}</PanelState> : <EvidenceViewer evidence={evidence.data ?? []} investigationId={investigationId} />}
+        {evidence.error ? <PanelState title="Evidence unavailable" retry={() => void evidence.refetch()}>{evidence.error instanceof Error ? evidence.error.message : 'Evidence could not load.'}</PanelState> : <EvidenceSummary evidence={evidence.data ?? []} />}
       </div>
     </>
   );

@@ -46,6 +46,17 @@ function application(evidenceRoot?: string) {
       deletedAt: null,
       evidence: [{ findingId: 'finding_api_test', artifactId: 'evidence_final_report', artifact: finalReportArtifact }],
       reproductions: [{ id: 'reproduction_api_test', findingId: 'finding_api_test', experimentId: 'experiment_api_test', reproduced: true, createdAt }],
+      minimisationRuns: [{
+        id: 'minimisation_api_test',
+        status: 'COMPLETED',
+        completedTrials: 3,
+        currentRetainedConditions: { paymentDelayMs: 1200 },
+        removedConditions: { viewport: 'desktop' },
+        inconclusiveConditions: {},
+        knownPassingDelayMs: 900,
+        knownFailingDelayMs: 1200,
+        finalReportEvidenceId: 'evidence_final_report',
+      }],
       minimalReproduction: { id: 'minimal_api_test', findingId: 'finding_api_test', journeySteps: [], worldConfiguration: {}, scriptArtifactId: null, createdAt, updatedAt: createdAt },
     } : null,
     cancel: async () => { progressRecord.status = 'CANCELLED'; return true; },
@@ -110,6 +121,9 @@ describe('investigation API', () => {
     expect(response.body.evidence[0].path).not.toContain('/Users/');
     expect(response.body.evidence[0].metadata.path).toBeUndefined();
     expect(response.body.causalConditions.minimisation.retainedConditions.paymentDelayMs).toBe(1200);
+    expect(response.body.causalConditions.minimisationRun.knownPassingDelayMs).toBe(900);
+    expect(response.body.causalConditions.minimisationRun.knownFailingDelayMs).toBe(1200);
+    expect(response.body.causalConditions.minimisation.boundedRange.lowerPassingBoundMs).toBe(900);
     expect(response.body.minimalReproduction.id).toBe('minimal_api_test');
   });
   it('returns not found for missing finding detail', async () => {
