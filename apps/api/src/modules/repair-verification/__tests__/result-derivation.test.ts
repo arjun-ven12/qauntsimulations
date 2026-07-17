@@ -7,6 +7,9 @@ const minimal = (businessOutcome: 'PASS' | 'FAIL' | 'INCONCLUSIVE'): Verificatio
 const control = (businessOutcome: 'PASS' | 'FAIL' | 'INCONCLUSIVE'): VerificationWorldResult => ({
   purpose: 'REPAIR_PASSING_CONTROL', executionState: 'COMPLETED', businessOutcome,
 });
+const boundary = (businessOutcome: 'PASS' | 'FAIL' | 'INCONCLUSIVE'): VerificationWorldResult => ({
+  purpose: 'REPAIR_BOUNDARY_REGRESSION', executionState: 'COMPLETED', businessOutcome,
+});
 
 describe('Repair Verification result derivation', () => {
   const derive = (worlds: VerificationWorldResult[], investigationStatus = 'COMPLETED') =>
@@ -23,6 +26,12 @@ describe('Repair Verification result derivation', () => {
     expect(derive([minimal('PASS'), control('FAIL')])).toMatchObject({
       executionStatus: 'COMPLETED', verificationResult: 'REGRESSION_DETECTED',
       repairedBusinessOutcome: 'PASS', regressionControlOutcome: 'FAIL',
+    });
+  });
+
+  it('treats a failing bounded adjacent World as a regression', () => {
+    expect(derive([minimal('PASS'), control('PASS'), boundary('FAIL')])).toMatchObject({
+      verificationResult: 'REGRESSION_DETECTED', repairedBusinessOutcome: 'PASS', regressionControlOutcome: 'FAIL',
     });
   });
 

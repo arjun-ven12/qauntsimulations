@@ -22,7 +22,8 @@ export class RepairVerificationResultDerivationService {
     worlds: VerificationWorldResult[];
   }): DerivedRepairVerificationResult {
     const minimal = input.worlds.filter(({ purpose }) => purpose === 'REPAIR_MINIMAL_REPRODUCTION');
-    const controls = input.worlds.filter(({ purpose }) => purpose === 'REPAIR_PASSING_CONTROL');
+    const controls = input.worlds.filter(({ purpose }) =>
+      purpose === 'REPAIR_PASSING_CONTROL' || purpose === 'REPAIR_BOUNDARY_REGRESSION');
     const cancelled = input.investigationStatus === 'CANCELLED'
       || input.worlds.some(({ executionState }) => executionState === 'CANCELLED');
     if (cancelled) return result('CANCELLED', 'INCONCLUSIVE', 'INCONCLUSIVE', 'INCONCLUSIVE', 'Verification was cancelled.');

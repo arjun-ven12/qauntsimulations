@@ -27,6 +27,7 @@ export interface RepairVerificationWorldEvidence {
   configuration: JsonRecord;
   origin?: string;
   adaptivePurpose?: string;
+  repairVerificationPurpose?: 'REPAIR_MINIMAL_REPRODUCTION' | 'REPAIR_PASSING_CONTROL' | 'REPAIR_BOUNDARY_REGRESSION';
   executionState: 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'INCOMPLETE';
   businessOutcome: 'PASS' | 'FAIL' | 'INCONCLUSIVE';
 }

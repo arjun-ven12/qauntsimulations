@@ -164,6 +164,15 @@ function repository(role: 'OWNER' | 'VIEWER') {
       records.set(verificationId, cancelled);
       return cancelled;
     },
+    beginExecution: async (verificationId) => {
+      const current = records.get(verificationId);
+      if (!current || current.executionStatus !== 'QUEUED') return null;
+      const running = { ...current, executionStatus: 'RUNNING', startedAt: new Date('2026-07-17T00:00:00.000Z') };
+      records.set(verificationId, running);
+      return running;
+    },
+    terminalExecutionEvidence: async () => null,
+    persistTerminalResult: async () => null,
   };
   return { repository, prepared, runtimeStarts };
 }

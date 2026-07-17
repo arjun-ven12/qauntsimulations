@@ -1,4 +1,5 @@
 export * from './eligibility.service.js';
+export * from './repair-verification-execution.service.js';
 export * from './prepared-investigation.service.js';
 export * from './repair-verification.controller.js';
 export * from './repair-verification.repository.js';

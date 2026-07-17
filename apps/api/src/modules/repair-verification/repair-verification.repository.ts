@@ -1,4 +1,9 @@
-import type { DatabaseClient } from '@taskos/database';
+import type {
+  DatabaseClient,
+  RepairVerificationBusinessOutcome,
+  RepairVerificationExecutionStatus,
+  RepairVerificationResult,
+} from '@taskos/database';
 import type {
   JsonRecord,
   RepairVerificationEligibilityContext,
@@ -26,6 +31,23 @@ export interface RepairVerificationReadRepository {
     verificationId: string;
     cancelledByUserId: string;
     cancellationReason?: string;
+  }): Promise<RepairVerificationRecord | null>;
+  beginExecution(verificationId: string): Promise<RepairVerificationRecord | null>;
+  terminalExecutionEvidence(verificationInvestigationId: string): Promise<{
+    verification: RepairVerificationRecord;
+    investigationStatus: string;
+    worlds: RepairVerificationWorldEvidence[];
+  } | null>;
+  persistTerminalResult(input: {
+    verificationId: string;
+    executionStatus: RepairVerificationExecutionStatus;
+    verificationResult: RepairVerificationResult;
+    repairedBusinessOutcome: RepairVerificationBusinessOutcome;
+    regressionControlOutcome: RepairVerificationBusinessOutcome;
+    comparisonSnapshot: JsonRecord;
+    inconclusiveReason?: string;
+    failureCode?: string;
+    failureMessage?: string;
   }): Promise<RepairVerificationRecord | null>;
 }
 
@@ -285,6 +307,80 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
       return mapRepairVerification(cancelled);
     });
   }
+
+  async beginExecution(verificationId: string) {
+    const now = new Date();
+    const changed = await this.database.repairVerification.updateMany({
+      where: { id: verificationId, executionStatus: 'QUEUED' },
+      data: { executionStatus: 'RUNNING', startedAt: now },
+    });
+    if (changed.count !== 1) return null;
+    const record = await this.database.repairVerification.findUnique({ where: { id: verificationId } });
+    return record ? mapRepairVerification(record) : null;
+  }
+
+  async terminalExecutionEvidence(verificationInvestigationId: string) {
+    const verification = await this.database.repairVerification.findFirst({
+      where: { verificationInvestigationId },
+      include: {
+        verificationInvestigation: {
+          select: {
+            status: true,
+            worlds: {
+              orderBy: { createdAt: 'asc' },
+              include: {
+                experiments: {
+                  orderBy: { createdAt: 'desc' },
+                  take: 1,
+                  include: {
+                    evaluations: { select: { passed: true } },
+                    attempts: { orderBy: { attempt: 'desc' }, take: 1, select: { status: true, result: true, completedAt: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!verification || !['COMPLETED', 'FAILED', 'CANCELLED'].includes(String(verification.verificationInvestigation.status))) return null;
+    return {
+      verification: mapRepairVerification(verification),
+      investigationStatus: String(verification.verificationInvestigation.status),
+      worlds: verification.verificationInvestigation.worlds.map(mapWorldEvidence),
+    };
+  }
+
+  async persistTerminalResult(input: {
+    verificationId: string;
+    executionStatus: RepairVerificationExecutionStatus;
+    verificationResult: RepairVerificationResult;
+    repairedBusinessOutcome: RepairVerificationBusinessOutcome;
+    regressionControlOutcome: RepairVerificationBusinessOutcome;
+    comparisonSnapshot: JsonRecord;
+    inconclusiveReason?: string;
+    failureCode?: string;
+    failureMessage?: string;
+  }) {
+    const changed = await this.database.repairVerification.updateMany({
+      where: { id: input.verificationId, executionStatus: { in: ['QUEUED', 'RUNNING'] } },
+      data: {
+        executionStatus: input.executionStatus,
+        verificationResult: input.verificationResult,
+        repairedBusinessOutcome: input.repairedBusinessOutcome,
+        regressionControlOutcome: input.regressionControlOutcome,
+        comparisonSnapshot: input.comparisonSnapshot as never,
+        completedAt: new Date(),
+        ...(input.executionStatus === 'CANCELLED' ? { cancelledAt: new Date() } : {}),
+        ...(input.inconclusiveReason ? { inconclusiveReason: input.inconclusiveReason } : {}),
+        ...(input.failureCode ? { failureCode: input.failureCode } : {}),
+        ...(input.failureMessage ? { failureMessage: input.failureMessage } : {}),
+      },
+    });
+    if (changed.count !== 1) return null;
+    const record = await this.database.repairVerification.findUnique({ where: { id: input.verificationId } });
+    return record ? mapRepairVerification(record) : null;
+  }
 }
 
 function mapRepairVerification(record: {
@@ -335,14 +431,20 @@ function mapWorldEvidence(world: {
     ? 'INCONCLUSIVE'
     : experiment.evaluations.some(({ passed }) => !passed) ? 'FAIL' : 'PASS';
   const adaptive = jsonRecord(configuration.adaptive);
+  const repairVerification = jsonRecord(configuration.repairVerification);
   return {
     id: world.id,
     configuration,
     ...(typeof configuration.origin === 'string' ? { origin: configuration.origin } : {}),
     ...(typeof adaptive?.adaptivePurpose === 'string' ? { adaptivePurpose: adaptive.adaptivePurpose } : {}),
+    ...(isRepairVerificationPurpose(repairVerification?.purpose) ? { repairVerificationPurpose: repairVerification.purpose } : {}),
     executionState,
     businessOutcome,
   };
+}
+
+function isRepairVerificationPurpose(value: unknown): value is NonNullable<RepairVerificationWorldEvidence['repairVerificationPurpose']> {
+  return value === 'REPAIR_MINIMAL_REPRODUCTION' || value === 'REPAIR_PASSING_CONTROL' || value === 'REPAIR_BOUNDARY_REGRESSION';
 }
 
 function readLaunchSnapshot(planValue: unknown): RepairVerificationLaunchSnapshot | null {

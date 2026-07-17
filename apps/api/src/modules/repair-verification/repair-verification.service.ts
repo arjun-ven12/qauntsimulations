@@ -3,6 +3,7 @@ import type { AuthContext } from '../auth/auth.types.js';
 import { hasOrganisationPermission, type OrganisationPermission } from '../organisations/organisation.permissions.js';
 import { RepairVerificationEligibilityService } from './eligibility.service.js';
 import { PreparedRepairVerificationInvestigationService } from './prepared-investigation.service.js';
+import type { RepairVerificationExecutionService } from './repair-verification-execution.service.js';
 import type { RepairVerificationReadRepository } from './repair-verification.repository.js';
 import {
   repairVerificationCancellationInputSchema,
@@ -29,6 +30,7 @@ export class RepairVerificationDomainService {
     private readonly repository: RepairVerificationReadRepository,
     private readonly eligibility = new RepairVerificationEligibilityService(),
     private readonly preparedInvestigations = new PreparedRepairVerificationInvestigationService(),
+    private readonly execution?: RepairVerificationExecutionService,
   ) {}
 
   async preflight(context: AuthContext, findingId: string, raw: unknown): Promise<RepairVerificationPreflightResult> {
@@ -66,6 +68,7 @@ export class RepairVerificationDomainService {
     });
     try {
       const created = await this.repository.createPrepared(persistence);
+      this.execution?.schedule(created.id, created.verificationInvestigationId);
       return { created: true, response: mapCreate(created) };
     } catch (error) {
       if (!isUniqueConstraintError(error)) throw error;
