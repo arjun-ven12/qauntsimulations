@@ -143,8 +143,9 @@ class HttpJourneyApi {
   }
 
   async create(projectId: string, input: JourneyInput): Promise<Journey> {
+    const body = serializeJourneyInput(input);
     return journeySchema.parse(
-      await this.request(pathFor(projectId), { method: 'POST', body: JSON.stringify(input) }),
+      await this.request(pathFor(projectId), { method: 'POST', body: JSON.stringify(body) }),
     );
   }
 
@@ -153,10 +154,11 @@ class HttpJourneyApi {
   }
 
   async update(projectId: string, journeyId: string, input: JourneyInput): Promise<Journey> {
+    const body = serializeJourneyInput(input);
     return journeySchema.parse(
       await this.request(`${pathFor(projectId)}/${journeyId}`, {
         method: 'PATCH',
-        body: JSON.stringify(input),
+        body: JSON.stringify(body),
       }),
     );
   }
@@ -210,6 +212,46 @@ class HttpJourneyApi {
     }
     return payload;
   }
+}
+
+export function serializeJourneyInput(input: JourneyInput): JourneyInput {
+  return {
+    name: input.name,
+    description: input.description,
+    environmentId: input.environmentId,
+    startPath: input.startPath,
+    state: input.state,
+    completionCondition:
+      input.completionCondition.type === 'VISIBLE'
+        ? { type: 'VISIBLE', selector: input.completionCondition.selector }
+        : {
+            type: 'TEXT',
+            selector: input.completionCondition.selector,
+            expectedText: input.completionCondition.expectedText,
+          },
+    steps: input.steps.map((step) => ({
+      order: step.order,
+      action: step.action,
+      selector: step.selector,
+      value: step.value,
+      metadata: {
+        ...(step.metadata.name !== undefined ? { name: step.metadata.name } : {}),
+        ...(step.metadata.timeoutMs !== undefined ? { timeoutMs: step.metadata.timeoutMs } : {}),
+        ...(step.metadata.expectedState !== undefined
+          ? { expectedState: step.metadata.expectedState }
+          : {}),
+        ...(step.metadata.screenshotCheckpoint !== undefined
+          ? { screenshotCheckpoint: step.metadata.screenshotCheckpoint }
+          : {}),
+        ...(step.metadata.screenshotCheckpointName !== undefined
+          ? { screenshotCheckpointName: step.metadata.screenshotCheckpointName }
+          : {}),
+        ...(step.metadata.continueOnFailure !== undefined
+          ? { continueOnFailure: step.metadata.continueOnFailure }
+          : {}),
+      },
+    })),
+  };
 }
 
 function pathFor(projectId: string) {
