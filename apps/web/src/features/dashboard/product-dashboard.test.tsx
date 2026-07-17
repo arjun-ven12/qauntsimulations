@@ -16,7 +16,7 @@ describe('isolated Product Dashboard', () => {
     expect(html).toContain('Project ready for investigation');
     expect(html).toContain('4 of 4 readiness steps complete');
     expect(html).toContain('Start Investigation');
-    expect(html).toContain('Continue Setup');
+    expect(html).not.toContain('Continue Setup');
     expect(html).toContain('/projects/project_demo_checkout/investigations/new');
     expect(html).toContain('1/1 READY');
     expect(html).toContain('2/2 READY');
@@ -30,7 +30,7 @@ describe('isolated Product Dashboard', () => {
     expect(html).not.toContain('Duplicate checkout submission under delayed payment');
   });
 
-  it('renders supplied recent Investigations and Findings as presentation-only summaries', () => {
+  it('keeps Investigation lifecycle and Finding business status presentation separate', () => {
     const data: DashboardData = {
       ...seededDemoDashboardData,
       projects: [
@@ -70,6 +70,7 @@ describe('isolated Product Dashboard', () => {
     expect(html).toContain('1 finding');
     expect(html).toContain('Duplicate payment request');
     expect(html).toContain('CRITICAL');
+    expect(html).toContain('OPEN');
     expect(html).toContain('/investigations/investigation-1/findings/finding-1');
   });
 
@@ -85,6 +86,80 @@ describe('isolated Product Dashboard', () => {
     expect(html).toContain('/projects/new');
   });
 
+  it('does not give TaskOS Demo Commerce seeded primary-demo treatment', () => {
+    const html = render({
+      ...seededDemoDashboardData,
+      projects: [
+        {
+          ...seededDemoDashboardData.projects[0]!,
+          id: 'project-commerce',
+          name: 'TaskOS Demo Commerce',
+          isPrimaryDemo: false,
+        },
+      ],
+    });
+    expect(html).toContain('Featured Project');
+    expect(html).not.toContain('Primary demo');
+    expect(html).not.toContain('data-testid="primary-demo-project"');
+    expect(html).toContain('data-testid="featured-project"');
+  });
+
+  it('retains seeded primary-demo treatment for Checkout Reliability Lab', () => {
+    const html = render(seededDemoDashboardData);
+    expect(html).toContain('Checkout Reliability Lab');
+    expect(html).toContain('Primary demo');
+    expect(html).toContain('data-testid="primary-demo-project"');
+  });
+
+  it('shows Create Project actions for an OWNER with CREATE_PROJECTS permission', () => {
+    const html = render(emptyDashboard('OWNER'), { canCreateProject: true });
+    expect(html).toContain('Create Project');
+    expect(html).toContain('Create your first Project');
+    expect(html).toContain('/projects/new');
+  });
+
+  it('matches current Product rules by allowing a MEMBER with CREATE_PROJECTS permission', () => {
+    const html = render(emptyDashboard('MEMBER'), { canCreateProject: true });
+    expect(html).toContain('Create Project');
+    expect(html).toContain('Create your first Project');
+  });
+
+  it('shows a permission-aware empty state without creation links when permission is absent', () => {
+    const html = render(emptyDashboard('VIEWER'), { canCreateProject: false });
+    expect(html).toContain('view Projects but not create them');
+    expect(html).not.toContain('Create Project');
+    expect(html).not.toContain('/projects/new');
+  });
+
+  it('offers Continue Setup instead of Start Investigation for an incomplete Project', () => {
+    const html = render({
+      ...seededDemoDashboardData,
+      projects: [
+        {
+          ...seededDemoDashboardData.projects[0]!,
+          readyJourneyCount: 0,
+        },
+      ],
+    });
+    expect(html).toContain('Continue Setup');
+    expect(html).toContain('/projects/project_demo_checkout/journeys');
+    expect(html).not.toContain('Start Investigation');
+  });
+
+  it('renders honest unavailable states when aggregate runtime APIs do not exist', () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <ProductDashboard
+          activityAvailability={{ findings: 'unavailable', investigations: 'unavailable' }}
+          data={seededDemoDashboardData}
+        />
+      </MemoryRouter>,
+    );
+    expect(html).toContain('Recent Investigations unavailable');
+    expect(html).toContain('Recent Findings unavailable');
+    expect(html).not.toContain('No Investigations yet');
+  });
+
   it.each(['desktop', 'tablet', 'mobile'])(
     'uses wrapping and responsive grids for %s presentation',
     () => {
@@ -98,10 +173,22 @@ describe('isolated Product Dashboard', () => {
   );
 });
 
-function render(data: DashboardData) {
+function emptyDashboard(role: string): DashboardData {
+  return {
+    organisation: { id: 'org-empty', name: 'Empty Organisation', role },
+    projects: [],
+    recentInvestigations: [],
+    recentFindings: [],
+  };
+}
+
+function render(
+  data: DashboardData,
+  props: { canCreateProject?: boolean } = {},
+) {
   return renderToStaticMarkup(
     <MemoryRouter>
-      <ProductDashboard data={data} />
+      <ProductDashboard data={data} {...props} />
     </MemoryRouter>,
   );
 }
