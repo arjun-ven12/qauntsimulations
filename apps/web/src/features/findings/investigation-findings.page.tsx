@@ -1,1 +1,28 @@
-import { useQuery } from '@tanstack/react-query'; import { Link, useParams } from 'react-router-dom'; import { PageHeading } from '../../components/page-heading.js'; import { investigationApi } from '../../services/api/index.js'; export function InvestigationFindingsPage(){const {investigationId='investigation-demo'}=useParams();const {data=[]}=useQuery({queryKey:['findings',investigationId],queryFn:()=>investigationApi.listFindings(investigationId)});return <><PageHeading eyebrow="Evidence-backed" title="Investigation findings" description="Only reproduced, invariant-linked defects graduate to confirmed findings."/><div className="space-y-4">{data.map((finding)=><Link className="card block" to={`/findings/${finding.id}`} key={finding.id}><div className="flex items-center justify-between"><span className="rounded-full bg-red-400/10 px-2 py-1 text-xs font-bold text-red-300">{finding.severity}</span><span className="text-xs text-cyan">{finding.confidence} · {finding.reproductionCount} reproductions</span></div><h2 className="mt-4 text-xl font-bold">{finding.title}</h2><p className="mt-2 text-slate-400">{finding.summary}</p></Link>)}</div></>}
+import { Link, useParams } from 'react-router-dom';
+import { PageHeading } from '../../components/page-heading.js';
+import { FindingsList, PanelState, RuntimeNav } from '../runtime/runtime-components.js';
+import { phaseLabel } from '../runtime/runtime-normalizers.js';
+import { useInvestigationFindings, useInvestigationProgress } from '../runtime/use-runtime-queries.js';
+
+export function InvestigationFindingsPage() {
+  const { investigationId } = useParams();
+  if (!investigationId) return <PanelState title="Investigation not found">The URL does not include an investigation ID.</PanelState>;
+
+  const progress = useInvestigationProgress(investigationId);
+  const findings = useInvestigationFindings(investigationId, progress.data?.status);
+
+  return (
+    <>
+      <PageHeading
+        eyebrow={progress.data?.status ?? 'Findings'}
+        title="Investigation findings"
+        description={progress.data ? `${phaseLabel(progress.data.status)} · ${progress.data.findingsCount} findings recorded.` : 'Evidence-backed invariant findings.'}
+        action={<Link className="rounded-lg bg-cyan px-4 py-2 font-bold text-ink" to={`/investigations/${investigationId}`}>Back to overview</Link>}
+      />
+      <RuntimeNav investigationId={investigationId} />
+      {findings.isLoading ? <PanelState title="Loading findings">Loading evidence-backed findings…</PanelState> : null}
+      {findings.error ? <PanelState title="Findings unavailable" retry={() => void findings.refetch()}>{findings.error instanceof Error ? findings.error.message : 'WorldLab could not load findings.'}</PanelState> : null}
+      {!findings.isLoading && !findings.error ? <FindingsList investigationId={investigationId} findings={findings.data ?? []} /> : null}
+    </>
+  );
+}

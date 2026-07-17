@@ -5,28 +5,68 @@ import {
   projectSchema,
 } from '@taskos/shared-types';
 import { z } from 'zod';
-import type { CreateInvestigationInput, InvestigationApi } from './investigation-api.js';
+import {
+  evidenceArtifactResponseSchema,
+  experimentPlanResponseSchema,
+  findingDetailSchema,
+  investigationExperimentSchema,
+  InvestigationApiError,
+  investigationWorkerSchema,
+  investigationWorldSchema,
+  type CreateInvestigationInput,
+  type InvestigationApi,
+} from './investigation-api.js';
 
 export class HttpInvestigationApi implements InvestigationApi {
   constructor(private readonly baseUrl: string) {}
 
   private async request(path: string, init?: RequestInit): Promise<unknown> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
-      ...init,
-    });
-    const payload = (await response.json()) as unknown;
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...init?.headers },
+        ...init,
+      });
+    } catch (error) {
+      const timedOut =
+        typeof DOMException !== 'undefined' &&
+        error instanceof DOMException &&
+        error.name === 'TimeoutError';
+      throw new InvestigationApiError(
+        'WorldLab could not reach the investigation API.',
+        0,
+        timedOut ? 'TIMEOUT' : 'NETWORK',
+        error,
+      );
+    }
+    let payload: unknown;
+    try {
+      payload = (await response.json()) as unknown;
+    } catch (error) {
+      throw new InvestigationApiError('WorldLab received invalid JSON.', response.status, 'INVALID_JSON', error);
+    }
     if (!response.ok) {
-      throw new Error(
+      throw new InvestigationApiError(
         (payload as { error?: { message?: string } }).error?.message ?? 'API request failed',
+        response.status,
+        response.status === 404 ? 'NOT_FOUND' : 'HTTP',
+        payload,
       );
     }
     return payload;
   }
 
+  private parse<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, payload: unknown): T {
+    try {
+      return schema.parse(payload);
+    } catch (error) {
+      throw new InvestigationApiError('WorldLab received an unexpected response shape.', 0, 'SCHEMA_MISMATCH', error);
+    }
+  }
+
   async listProjects() {
-    return z.array(projectSchema).parse(await this.request('/projects'));
+    return this.parse(z.array(projectSchema), await this.request('/projects'));
   }
 
   async createProject(input: {
@@ -34,7 +74,8 @@ export class HttpInvestigationApi implements InvestigationApi {
     description: string | null;
     repositoryUrl: string | null;
   }) {
-    return projectSchema.parse(
+    return this.parse(
+      projectSchema,
       await this.request('/projects', { method: 'POST', body: JSON.stringify(input) }),
     );
   }
@@ -42,7 +83,8 @@ export class HttpInvestigationApi implements InvestigationApi {
   async createInvestigation(input: CreateInvestigationInput) {
     const validated = createInvestigationInputSchema.parse(input);
     const { projectId, ...body } = validated;
-    return investigationProgressSchema.parse(
+    return this.parse(
+      investigationProgressSchema,
       await this.request(`/projects/${projectId}/investigations`, {
         method: 'POST',
         body: JSON.stringify(body),
@@ -51,14 +93,55 @@ export class HttpInvestigationApi implements InvestigationApi {
   }
 
   async getInvestigation(investigationId: string) {
-    return investigationProgressSchema.parse(
-      await this.request(`/investigations/${investigationId}`),
+    return this.parse(investigationProgressSchema, await this.request(`/investigations/${investigationId}`));
+  }
+
+  async getExperimentPlan(investigationId: string) {
+    return this.parse(
+      experimentPlanResponseSchema.nullable(),
+      await this.request(`/investigations/${investigationId}/plan`),
+    );
+  }
+
+  async getWorlds(investigationId: string) {
+    return this.parse(
+      z.array(investigationWorldSchema),
+      await this.request(`/investigations/${investigationId}/worlds`),
+    );
+  }
+
+  async getExperiments(investigationId: string) {
+    return this.parse(
+      z.array(investigationExperimentSchema),
+      await this.request(`/investigations/${investigationId}/experiments`),
+    );
+  }
+
+  async getWorkers(investigationId: string) {
+    return this.parse(
+      z.array(investigationWorkerSchema),
+      await this.request(`/investigations/${investigationId}/workers`),
+    );
+  }
+
+  async getEvidence(investigationId: string) {
+    return this.parse(
+      z.array(evidenceArtifactResponseSchema),
+      await this.request(`/investigations/${investigationId}/evidence`),
     );
   }
 
   async listFindings(investigationId: string) {
-    return z
-      .array(findingSchema)
-      .parse(await this.request(`/investigations/${investigationId}/findings`));
+    return this.parse(
+      z.array(findingSchema),
+      await this.request(`/investigations/${investigationId}/findings`),
+    );
+  }
+
+  async getFindingDetail(investigationId: string, findingId: string) {
+    return this.parse(
+      findingDetailSchema,
+      await this.request(`/investigations/${investigationId}/findings/${findingId}`),
+    );
   }
 }
