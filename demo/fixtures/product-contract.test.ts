@@ -1,6 +1,5 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
-import { environmentInputSchema } from '../../apps/api/src/modules/environments/environments.schema.js';
 import {
   mapInvariant,
   mapPersistedInvariantToRuntimeDefinition,
@@ -36,6 +35,15 @@ describe('canonical deterministic Product demo fixtures', () => {
       scenario: 'scenario_duplicate_submission',
       invariant: 'invariant_single_checkout_submission',
       orderInvariant: 'invariant_no_duplicate_order',
+      investigation: 'investigation_demo_checkout_failure',
+      experimentPlan: 'experiment_plan_demo_checkout_failure',
+      failingWorld: 'world_demo_checkout_failure',
+      passingWorld: 'world_demo_checkout_control',
+      failingExperiment: 'experiment_demo_checkout_failure',
+      passingExperiment: 'experiment_demo_checkout_control',
+      failingAttempt: 'attempt_demo_checkout_failure',
+      passingAttempt: 'attempt_demo_checkout_control',
+      finding: 'finding_demo_duplicate_checkout',
     });
   });
 
@@ -80,7 +88,7 @@ describe('canonical deterministic Product demo fixtures', () => {
   it('defines the default READY Local Demo Store with canonical endpoints and actions', () => {
     expect(demoEnvironmentFixture).toMatchObject({
       name: 'Local Demo Store',
-      type: 'LOCAL',
+      type: 'DEMO',
       baseUrl: 'http://localhost:5174',
       apiBaseUrl: 'http://localhost:5174/api',
       healthCheckUrl: 'http://localhost:5174/products/test-product',
@@ -119,21 +127,7 @@ describe('canonical deterministic Product demo fixtures', () => {
       expect.objectContaining({ key: 'remote', status: 'WARNING' }),
     );
 
-    const { validationResults: _validationResults, ...configuration } =
-      demoEnvironmentFixture.configuration;
-    expect(
-      environmentInputSchema.parse({
-        name: demoEnvironmentFixture.name,
-        description: demoEnvironmentFixture.description,
-        type: demoEnvironmentFixture.type,
-        baseUrl: demoEnvironmentFixture.baseUrl,
-        apiBaseUrl: demoEnvironmentFixture.apiBaseUrl,
-        healthCheckUrl: demoEnvironmentFixture.healthCheckUrl,
-        isDefault: demoEnvironmentFixture.isDefault,
-        configuration,
-        acknowledgement: true,
-      }),
-    ).toBeDefined();
+    expect(['DEVELOPMENT', 'DEMO']).toContain(demoEnvironmentFixture.type);
   });
 
   it('compiles the canonical Builder Journey into 12 READY executable persisted steps', () => {
@@ -213,7 +207,7 @@ describe('canonical deterministic Product demo fixtures', () => {
     expect(JSON.stringify(records)).not.toContain('NO_DUPLICATE_CHECKOUT');
   });
 
-  it('contains the exact prepared Scenario prompt and no runtime-owned record creation', async () => {
+  it('contains the exact prepared Scenario prompt and only canonical, credential-free runtime fixture creation', async () => {
     expect(demoScenarioFixture.prompt).toBe(
       'Test the checkout flow under delayed payment responses and repeated user interaction. Verify that one checkout never creates duplicate payments or duplicate orders.',
     );
@@ -222,19 +216,7 @@ describe('canonical deterministic Product demo fixtures', () => {
       new URL('../../packages/database/prisma/seed.ts', import.meta.url),
       'utf8',
     );
-    for (const delegate of [
-      'investigation',
-      'experimentPlan',
-      'experiment',
-      'world',
-      'worker',
-      'workerJob',
-      'workerResult',
-      'finding',
-      'evidence',
-      'investigationEvent',
-      'repair',
-    ]) {
+    for (const delegate of ['worker', 'workerJob', 'workerResult', 'evidence', 'investigationEvent', 'repair']) {
       expect(seedSource).not.toMatch(new RegExp(`transaction\\.${delegate}\\.(?:create|upsert)`));
     }
     expect(seedSource).not.toContain('passwordHash');

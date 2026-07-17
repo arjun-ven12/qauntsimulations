@@ -30,12 +30,13 @@ export function RepairVerificationCreatePage() {
     },
   });
   const update = (next: RepairVerificationDraft) => { setInput(next); setPreflight(null); setPreflightPayload(null); };
-  const submitPreflight = () => validate.mutate(repairVerificationInputSchema.parse(input));
+  const normalizedPayload = input.acknowledgement ? formPayload(input) : null;
+  const submitPreflight = () => { if (normalizedPayload) validate.mutate(normalizedPayload); };
   if (!findingId || !investigationId) return <PanelState title="Finding not found">The URL does not identify a Finding to verify.</PanelState>;
   if (!editable) return <PanelState title="Repair Verification requires edit access">Your current organisation role cannot queue a Repair Verification.</PanelState>;
   const error = validate.error ?? create.error;
   const selected = environments.data?.environments.find((environment) => environment.id === input.environmentId);
-  const currentPayload = input.acknowledgement ? payloadKey(repairVerificationInputSchema.parse(input)) : null;
+  const currentPayload = normalizedPayload ? payloadKey(normalizedPayload) : null;
   const eligible = preflight?.eligibility.status === 'ELIGIBLE' && preflightPayload === currentPayload;
   return <section className="mx-auto max-w-3xl">
     <PageHeading eyebrow="Repair verification" title="Verify the repair" description="Replay the persisted minimum reproduction, passing controls, and bounded regression Worlds against a target Environment." action={<Link className="rounded-lg border border-slate-700 px-4 py-2 text-sm" to={`/investigations/${investigationId}/findings/${findingId}`}>Back to Finding</Link>} />
@@ -54,7 +55,7 @@ export function RepairVerificationCreatePage() {
       <label className="flex gap-3 text-sm"><input type="checkbox" checked={input.acknowledgement} onChange={(event) => update({ ...input, acknowledgement: event.target.checked })} />I acknowledge this runs only against the selected authorised Environment.</label>
       {error instanceof Error ? <p role="alert" className="text-sm text-red-300">{error.message}</p> : null}
       {preflight ? <PreflightResult result={preflight} /> : null}
-      <div className="flex flex-wrap gap-3"><button className="rounded-lg border border-cyan px-4 py-2 font-semibold text-cyan disabled:opacity-50" disabled={validate.isPending || !input.acknowledgement || !selected?.selectable} onClick={submitPreflight}>Check readiness</button><button className="rounded-lg bg-cyan px-4 py-2 font-bold text-slate-950 disabled:opacity-50" disabled={!eligible || create.isPending} onClick={() => create.mutate(repairVerificationInputSchema.parse(input))}>Queue verification</button></div>
+      <div className="flex flex-wrap gap-3"><button className="rounded-lg border border-cyan px-4 py-2 font-semibold text-cyan disabled:opacity-50" disabled={validate.isPending || !input.acknowledgement || !selected?.selectable} onClick={submitPreflight}>Check readiness</button><button className="rounded-lg bg-cyan px-4 py-2 font-bold text-slate-950 disabled:opacity-50" disabled={!eligible || create.isPending || !normalizedPayload} onClick={() => { if (normalizedPayload) create.mutate(normalizedPayload); }}>Queue verification</button></div>
     </div>
   </section>;
 }
@@ -65,6 +66,15 @@ function PreflightResult({ result }: { result: Awaited<ReturnType<typeof repairV
 }
 
 function payloadKey(input: RepairVerificationInput) { return JSON.stringify({ environmentId: input.environmentId, deploymentVersion: input.deploymentVersion ?? '', notes: input.notes ?? '', acknowledgement: input.acknowledgement }); }
+
+function formPayload(input: RepairVerificationDraft): RepairVerificationInput {
+  return repairVerificationInputSchema.parse({
+    environmentId: input.environmentId,
+    acknowledgement: input.acknowledgement,
+    ...((input.deploymentVersion ?? '').trim() ? { deploymentVersion: (input.deploymentVersion ?? '').trim() } : {}),
+    ...((input.notes ?? '').trim() ? { notes: (input.notes ?? '').trim() } : {}),
+  });
+}
 
 export function RepairVerificationDetailPage() {
   const { investigationId = '', findingId = '', verificationId = '' } = useParams();
