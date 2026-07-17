@@ -24,6 +24,10 @@ export class RepairVerificationController {
     try { response.json(await this.service.list(request.auth!, String(request.params.findingId))); } catch (error) { next(error); }
   };
 
+  targets = async (request: Request, response: Response, next: NextFunction) => {
+    try { response.json(await this.service.targets(request.auth!, String(request.params.findingId))); } catch (error) { next(error); }
+  };
+
   detail = async (request: Request, response: Response, next: NextFunction) => {
     try { response.json(await this.service.detail(request.auth!, String(request.params.verificationId))); } catch (error) { next(error); }
   };

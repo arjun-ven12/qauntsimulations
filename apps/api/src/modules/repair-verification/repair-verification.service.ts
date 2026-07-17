@@ -13,6 +13,7 @@ import {
   repairVerificationIdempotencyKeySchema,
   repairVerificationListItemSchema,
   repairVerificationTargetInputSchema,
+  repairVerificationTargetsResponseSchema,
   type RepairVerificationEligibilitySummary,
 } from './repair-verification.schema.js';
 import { repairVerificationRequestFingerprint } from './request-fingerprint.js';
@@ -87,6 +88,13 @@ export class RepairVerificationDomainService {
     const projectId = await this.repository.findFindingProjectId(organisationId, findingId);
     if (!projectId) throw notFound();
     return (await this.repository.listForFinding(organisationId, findingId)).map(mapListItem);
+  }
+
+  async targets(context: AuthContext, findingId: string) {
+    const organisationId = await this.requirePermission(context, 'EDIT_PROJECTS');
+    const environments = await this.repository.listTargetEnvironments(organisationId, findingId);
+    if (!environments) throw notFound();
+    return repairVerificationTargetsResponseSchema.parse({ findingId, environments });
   }
 
   async detail(context: AuthContext, verificationId: string) {

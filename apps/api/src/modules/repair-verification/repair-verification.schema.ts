@@ -16,6 +16,14 @@ export const repairVerificationCancellationInputSchema = z.object({
   reason: z.string().trim().min(1).max(1_000).optional(),
 }).strict().default({});
 
+export const repairVerificationTargetsResponseSchema = z.object({
+  findingId: z.string().min(1),
+  environments: z.array(z.object({
+    id: z.string().min(1), name: z.string().min(1), type: z.string().nullable(), status: z.string().min(1),
+    selectable: z.boolean(), disabledReason: z.string().nullable(),
+  })),
+});
+
 export const repairVerificationExecutionStatusSchema = z.enum([
   'QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED',
 ]);

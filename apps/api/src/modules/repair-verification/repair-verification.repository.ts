@@ -25,6 +25,9 @@ export interface RepairVerificationReadRepository {
   findByIdempotencyKey(organisationId: string, idempotencyKey: string): Promise<RepairVerificationRecord | null>;
   findMembershipRole(organisationId: string, userId: string): Promise<string | null>;
   findFindingProjectId(organisationId: string, findingId: string): Promise<string | null>;
+  listTargetEnvironments(organisationId: string, findingId: string): Promise<Array<{
+    id: string; name: string; type: string | null; status: string; selectable: boolean; disabledReason: string | null;
+  }> | null>;
   createPrepared(input: PreparedRepairVerificationPersistence): Promise<RepairVerificationRecord>;
   cancelQueued(input: {
     organisationId: string;
@@ -219,6 +222,31 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
       select: { projectId: true },
     });
     return finding?.projectId ?? null;
+  }
+
+  async listTargetEnvironments(organisationId: string, findingId: string) {
+    const finding = await this.database.finding.findFirst({
+      where: { id: findingId, organisationId, deletedAt: null },
+      select: { projectId: true },
+    });
+    if (!finding) return null;
+    const environments = await this.database.environment.findMany({
+      where: { projectId: finding.projectId, deletedAt: null },
+      orderBy: [{ isDefault: 'desc' }, { name: 'asc' }],
+      select: { id: true, name: true, type: true, validationStatus: true },
+    });
+    return environments.map((environment) => {
+      const status = String(environment.validationStatus);
+      const selectable = status === 'READY';
+      return {
+        id: environment.id,
+        name: environment.name,
+        type: environment.type ? String(environment.type) : null,
+        status,
+        selectable,
+        disabledReason: selectable ? null : 'Environment must be READY before it can be used for Repair Verification.',
+      };
+    });
   }
 
   async createPrepared(input: PreparedRepairVerificationPersistence) {

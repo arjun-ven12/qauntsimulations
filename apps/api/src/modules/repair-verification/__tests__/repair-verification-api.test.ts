@@ -17,7 +17,7 @@ import type {
 describe('Repair Verification HTTP contract', () => {
   it('preflights and atomically queues a prepared Investigation without starting runtime execution', async () => {
     const fixture = repository('OWNER');
-    const app = application(fixture.repository);
+    const app = application(fixture.repository, repository('VIEWER').repository);
     const input = { environmentId: 'environment-repaired', deploymentVersion: 'release-2', notes: 'Fix deployed', acknowledgement: true };
 
     const preflight = await request(app)
@@ -76,6 +76,18 @@ describe('Repair Verification HTTP contract', () => {
     expect(missing.body.error.code).toBe('REPAIR_VERIFICATION_NOT_FOUND');
   });
 
+  it('returns only safe, tenant-scoped target Environment options to editors', async () => {
+    const fixture = repository('OWNER');
+    const app = application(fixture.repository, repository('VIEWER').repository);
+    const response = await request(app).get('/api/findings/finding/repair-verifications/targets').set('authorization', 'Bearer owner');
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({ findingId: 'finding', environments: [{
+      id: 'environment-repaired', name: 'Demo', type: 'DEMO', status: 'READY', selectable: true, disabledReason: null,
+    }] });
+    const viewer = await request(app).get('/api/findings/finding/repair-verifications/targets').set('authorization', 'Bearer viewer');
+    expect(viewer.status).toBe(403);
+  });
+
   it('lists tenant-scoped records and only cancels queued verification records', async () => {
     const fixture = repository('OWNER');
     const app = application(fixture.repository);
@@ -124,6 +136,7 @@ function repository(role: 'OWNER' | 'VIEWER') {
     loadEligibilityContext: async () => eligibilityContext(),
     findMembershipRole: async () => role,
     findFindingProjectId: async () => 'project',
+    listTargetEnvironments: async () => [{ id: 'environment-repaired', name: 'Demo', type: 'DEMO', status: 'READY', selectable: true, disabledReason: null }],
     findById: async (_organisationId, id) => records.get(id) ?? null,
     listForFinding: async () => [...records.values()],
     findByIdempotencyKey: async (_organisationId, key) => [...records.values()].find((record) => record.idempotencyKey === key) ?? null,

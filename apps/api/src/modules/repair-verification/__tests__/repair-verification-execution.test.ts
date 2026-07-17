@@ -53,7 +53,7 @@ describe('Repair Verification execution bridge', () => {
 function fakeRepository(overrides: Partial<RepairVerificationReadRepository>): RepairVerificationReadRepository {
   return {
     loadEligibilityContext: vi.fn(), findById: vi.fn(), listForFinding: vi.fn(), findByIdempotencyKey: vi.fn(),
-    findMembershipRole: vi.fn(), findFindingProjectId: vi.fn(), createPrepared: vi.fn(), cancelQueued: vi.fn(),
+    findMembershipRole: vi.fn(), findFindingProjectId: vi.fn(), listTargetEnvironments: vi.fn(), createPrepared: vi.fn(), cancelQueued: vi.fn(),
     beginExecution: vi.fn().mockResolvedValue(null), terminalExecutionEvidence: vi.fn().mockResolvedValue(null),
     persistTerminalResult: vi.fn().mockResolvedValue(null), ...overrides,
   } as RepairVerificationReadRepository;

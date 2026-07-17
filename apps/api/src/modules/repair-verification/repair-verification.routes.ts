@@ -10,6 +10,7 @@ export function createFindingRepairVerificationRouter(controller: RepairVerifica
   const router = Router({ mergeParams: true });
   router.post('/preflight', validateBody(repairVerificationTargetInputSchema), controller.preflight);
   router.post('/', validateBody(repairVerificationTargetInputSchema), controller.create);
+  router.get('/targets', controller.targets);
   router.get('/', controller.list);
   return router;
 }
