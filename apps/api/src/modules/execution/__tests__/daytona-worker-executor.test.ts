@@ -17,6 +17,7 @@ import type {
 import { assertRemoteChild, localArtifactPath, sanitizeSandboxName } from '../daytona-paths.js';
 import {
   DaytonaPlaywrightWorkerExecutor,
+  daytonaWorkerJob,
   demoStoreCommand,
   sandboxEnvironment,
   sandboxWorkerJob,
@@ -70,10 +71,12 @@ class FakeSandboxProvider implements SandboxProvider {
   readiness = true;
   failSetup = false;
   failDelete = false;
+  commands: SandboxCommand[] = [];
 
   async createSandbox(_spec: SandboxSpec) { return this.handle; }
   async uploadFiles(_sandbox: SandboxHandle, files: SandboxUpload[]) { this.uploads.push(...files); }
   async executeCommand(_sandbox: SandboxHandle, command: SandboxCommand): Promise<CommandResult> {
+    this.commands.push(command);
     if (this.failSetup && command.executable === 'npm') return { exitCode: 1, stdout: '', stderr: 'setup failed' };
     if (command.args.some((value) => value.includes('/products/test-product')) && !this.readiness) return { exitCode: 1, stdout: '', stderr: 'not ready' };
     if (command.args.includes('--version')) return { exitCode: 0, stdout: 'v22.18.0\n', stderr: '' };
@@ -142,6 +145,20 @@ describe('Daytona worker execution primitives', () => {
     expect(demoStoreCommand(config).args).toEqual(['/workspace/taskos/demo-store/dist/server/production-server.js']);
   });
 
+  it('preserves hosted worker targets while still rewriting evidence output', async () => {
+    const hosted = {
+      ...job('/tmp/local'),
+      target: {
+        baseUrl: 'https://tasks-demo-store.onrender.com',
+        apiBaseUrl: 'https://tasks-demo-store.onrender.com/api',
+        journeyPath: '/products/test-product',
+      },
+    };
+    const transformed = daytonaWorkerJob(hosted, remoteOutput, 4174);
+    expect(transformed.target).toEqual(hosted.target);
+    expect(transformed.evidence.outputDirectory).toBe(remoteOutput);
+  });
+
   it('rejects remote and local path traversal', async () => {
     const { evidence } = await fixture();
     expect(() => assertRemoteChild(remoteOutput, '/workspace/taskos/other/secret')).toThrow('escapes');
@@ -159,7 +176,8 @@ describe('Daytona worker execution primitives', () => {
 
   it('excludes host secrets from the sandbox environment', async () => {
     const { config } = await fixture();
-    expect(Object.keys(sandboxEnvironment(config))).toEqual(['NODE_ENV', 'TASKOS_WORKER_MODE', 'PORT', 'HOST', 'DEMO_STORE_URL', 'DEMO_API_URL', 'PLAYWRIGHT_BROWSERS_PATH']);
+    expect(Object.keys(sandboxEnvironment(config))).toEqual(['NODE_ENV', 'TASKOS_WORKER_MODE', 'PORT', 'HOST', 'DEMO_STORE_URL', 'DEMO_API_URL', 'NODE_OPTIONS', 'PLAYWRIGHT_BROWSERS_PATH']);
+    expect(sandboxEnvironment(config).NODE_OPTIONS).toBe('--dns-result-order=ipv4first');
     expect(JSON.stringify(sandboxEnvironment(config))).not.toMatch(/DATABASE_URL|DAYTONA_API_KEY|JWT|OPENAI|KIMI|NOSANA/);
   });
 
@@ -197,6 +215,34 @@ describe('DaytonaPlaywrightWorkerExecutor lifecycle', () => {
     expect(response.providerMetadata).toMatchObject({ provider: 'DAYTONA', sandboxId: 'sandbox-real-123', target: 'eu', cleanupOutcome: 'DELETED', playwrightVersion: '1.61.1', chromiumVersion: 'Chrome/140' });
     expect(events).toContain('evidence_download_completed'); expect(events).toContain('sandbox_deleted');
     expect(JSON.parse(await readFile(resolve(output, 'worker-result.json'), 'utf8')).status).toBe('PASSED');
+  });
+
+  it('uses hosted target readiness and skips sandbox demo process for external URLs', async () => {
+    const { evidence, config } = await fixture();
+    const output = resolve(evidence, 'investigation/world/experiment/attempt-1');
+    const events: string[] = [];
+    const hosted = {
+      ...job(output),
+      target: {
+        baseUrl: 'https://tasks-demo-store.onrender.com',
+        apiBaseUrl: 'https://tasks-demo-store.onrender.com/api',
+        journeyPath: '/products/test-product',
+      },
+    };
+    const response = await new DaytonaPlaywrightWorkerExecutor(provider, config).execute(hosted, {
+      investigationId: 'investigation',
+      worldId: 'world',
+      experimentId: 'experiment',
+      workerId: 'worker',
+      evidenceDirectory: output,
+      emitEvent: async ({ phase }) => { events.push(phase); },
+    });
+    expect(response.result.status).toBe('PASSED');
+    expect(provider.stopped).toBe(1);
+    expect(provider.uploads.some(({ destination }) => destination.includes('/demo-store/'))).toBe(false);
+    expect(provider.commands.find((command) => command.args.some((arg) => arg.includes('productUrl')))?.environment?.NODE_OPTIONS).toBe('--dns-result-order=ipv4first');
+    expect(events).toContain('hosted_target_ready');
+    expect(events).not.toContain('demo_store_ready');
   });
 
   it('treats invariant exit code 2 as a valid result and deletes the sandbox', async () => {
