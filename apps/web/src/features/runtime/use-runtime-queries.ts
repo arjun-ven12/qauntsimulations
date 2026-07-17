@@ -21,10 +21,11 @@ export function useInvestigationProgress(investigationId: string) {
   });
 }
 
-export function useExperimentPlan(investigationId: string) {
+export function useExperimentPlan(investigationId: string, status?: string) {
   return useQuery({
     queryKey: ['investigation', investigationId, 'plan'],
     queryFn: () => investigationApi.getExperimentPlan(investigationId),
+    refetchInterval: status && isTerminalStatus(status) ? false : polling.progressMs,
   });
 }
 
@@ -75,3 +76,16 @@ export function useFindingDetail(investigationId: string, findingId: string) {
   });
 }
 
+export function useEvidenceTextContent(
+  investigationId: string,
+  evidenceId: string,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['investigation', investigationId, 'evidence', evidenceId, 'content'],
+    queryFn: () => investigationApi.getEvidenceTextContent(investigationId, evidenceId),
+    enabled,
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: 10 * 60_000,
+  });
+}

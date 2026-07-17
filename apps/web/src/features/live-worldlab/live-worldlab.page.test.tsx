@@ -1,0 +1,117 @@
+import type { InvestigationEvent } from '@taskos/shared-types';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { MemoryRouter } from 'react-router-dom';
+import { describe, expect, it } from 'vitest';
+import { MockInvestigationApi, MOCK_INVESTIGATION_ID } from '../../services/api/mock-investigation-api.js';
+import { CompletedRunSummary, EventTimeline, EvidenceSummary, InvestigationOverviewHeader, LiveFindingSummary, ProgressSummary, WorkerPanel, WorldMatrix, WorldTable } from '../runtime/runtime-components.js';
+import { polling } from '../runtime/use-runtime-queries.js';
+import { cleanupWarning, plannerLabels, providerLabel, timingLabels } from './live-worldlab.page.js';
+
+const event = (metadata?: InvestigationEvent['metadata']): InvestigationEvent => ({
+  id: 'event-1',
+  investigationId: 'investigation-1',
+  type: 'sandbox_provisioning',
+  message: 'Sandbox lifecycle event.',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  metadata,
+});
+
+describe('LiveWorldLabPage runtime metadata helpers', () => {
+  it('labels known providers and falls back safely for unknown providers', () => {
+    expect(providerLabel(event({ provider: 'LOCAL' }))).toBe('Local worker');
+    expect(providerLabel(event({ provider: 'DAYTONA' }))).toBe('Daytona sandbox');
+    expect(providerLabel(event({ provider: 'EXPERIMENTAL_PROVIDER' }))).toBe(
+      'Provider: EXPERIMENTAL_PROVIDER',
+    );
+    expect(providerLabel(event())).toBeNull();
+  });
+
+  it('formats optional timings only when finite values exist', () => {
+    expect(
+      timingLabels(
+        event({
+          sandboxSetupDurationMs: 1200.4,
+          workerExecutionDurationMs: 333,
+          artifactDownloadDurationMs: null,
+          ignoredDurationMs: '200',
+        }),
+      ),
+    ).toEqual(['Setup: 1,200 ms', 'Worker: 333 ms']);
+    expect(timingLabels(event())).toEqual([]);
+  });
+
+  it('shows cleanup warnings only for cleanup failure metadata', () => {
+    expect(cleanupWarning(event({ cleanupOutcome: 'DELETED' }))).toBeNull();
+    expect(cleanupWarning(event({ phase: 'sandbox_cleanup_failed' }))).toBe(
+      'Cleanup failed. Manual sandbox cleanup may be required.',
+    );
+    expect(cleanupWarning(event({ cleanupOutcome: 'FAILED', cleanupError: 'delete failed' }))).toBe(
+      'Cleanup failed: delete failed',
+    );
+  });
+
+  it('labels optional planner provenance and status metadata without requiring AI fields', () => {
+    expect(
+      plannerLabels(
+        event({
+          plannerProvenance: 'FALLBACK',
+          plannerStatus: 'PARTIALLY_ACCEPTED',
+          rejectedPlanItems: ['unsafe-world'],
+        }),
+      ),
+    ).toEqual(['Planner: FALLBACK', 'Plan status: PARTIALLY ACCEPTED']);
+    expect(plannerLabels(event())).toEqual([]);
+  });
+
+  it('renders the completed 13-world runtime experience without report-body content', async () => {
+    const api = new MockInvestigationApi();
+    const progress = await api.getInvestigation(MOCK_INVESTIGATION_ID);
+    const plan = await api.getExperimentPlan(MOCK_INVESTIGATION_ID);
+    const worlds = await api.getWorlds(MOCK_INVESTIGATION_ID);
+    const experiments = await api.getExperiments(MOCK_INVESTIGATION_ID);
+    const workers = await api.getWorkers(MOCK_INVESTIGATION_ID);
+    const evidence = await api.getEvidence(MOCK_INVESTIGATION_ID);
+    const findings = await api.listFindings(MOCK_INVESTIGATION_ID);
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <InvestigationOverviewHeader progress={progress} plan={plan} workerProvider={workers[0]?.provider} />
+          <ProgressSummary progress={progress} />
+          <CompletedRunSummary progress={progress} findings={findings} />
+          <WorldTable worlds={worlds} experiments={experiments} workers={workers} evidence={evidence} />
+          <WorldMatrix worlds={worlds} experiments={experiments} workers={workers} evidence={evidence} />
+          <WorkerPanel workers={workers} experiments={experiments} />
+          <EventTimeline events={progress.recentEvents} />
+          <LiveFindingSummary investigationId={MOCK_INVESTIGATION_ID} findings={findings} investigationStatus={progress.status} />
+          <EvidenceSummary evidence={evidence} />
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+
+    expect(worlds).toHaveLength(13);
+    expect(workers).toHaveLength(13);
+    expect(evidence).toHaveLength(93);
+    expect(findings).toHaveLength(1);
+    expect(html).toContain('Investigation complete');
+    expect(html).toContain('World exploration');
+    expect(html).toContain('Adaptive reproduction');
+    expect(html).toContain('Failure minimisation');
+    expect(html).toContain('World matrix');
+    expect(html).toContain('Workers and attempts');
+    expect(html).toContain('Runtime event timeline');
+    expect(html).toContain('Discovered finding');
+    expect(html).toContain('Evidence availability');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('/Users/');
+    expect(html).not.toContain('Final report\\n\\nDuplicate checkout submission');
+  });
+
+  it('documents polling intervals used by active investigations', () => {
+    expect(polling.progressMs).toBe(2000);
+    expect(polling.worldsMs).toBe(3000);
+    expect(polling.workersMs).toBe(3000);
+    expect(polling.findingsMs).toBe(5000);
+    expect(polling.evidenceMs).toBe(5000);
+  });
+});

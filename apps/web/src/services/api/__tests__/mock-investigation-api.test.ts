@@ -24,5 +24,7 @@ describe('MockInvestigationApi', () => {
     expect(await api.listFindings(MOCK_INVESTIGATION_ID)).toHaveLength(1);
     expect((await api.getFindingDetail(MOCK_INVESTIGATION_ID, MOCK_FINDING_ID)).evidence.some((artifact) => artifact.type === 'FINAL_REPORT')).toBe(true);
     expect((await api.getEvidence(MOCK_INVESTIGATION_ID)).every((artifact) => !artifact.path.includes('/Users/'))).toBe(true);
+    expect(await api.getEvidenceTextContent(MOCK_INVESTIGATION_ID, 'cmrola2p000fgrurbry3xvnhj')).toMatchObject({ format: 'JSON' });
+    expect(await api.getEvidenceTextContent(MOCK_INVESTIGATION_ID, 'cmrola2pf00firurb7yjm6kt6')).toMatchObject({ format: 'MARKDOWN' });
   });
 });

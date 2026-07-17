@@ -85,14 +85,18 @@ The same utility extracts:
 
 ## Evidence handling
 
-Evidence is grouped by:
+Investigation-level evidence is grouped by runtime stage on the finding detail page:
 
 1. Final reports
-2. Screenshots
-3. Traces
-4. Logs
-5. Worker outputs
-6. Other
+2. Original observation
+3. Exact reproduction
+4. Controlled comparisons
+5. Minimisation trials
+6. Final confirmation
+7. Other
+
+Evidence cards also support type filtering, search, group counts, and show-more pagination so the preserved
+93-artifact investigation does not render every artifact body or card at once.
 
 The UI does not assume artifact bodies are browser-fetchable. It renders metadata and a clear unavailable-preview message when no safe artifact body endpoint exists.
 
@@ -110,22 +114,19 @@ Supported evidence types include:
 
 ## Finding detail
 
-Finding detail renders:
+Finding detail now renders:
 
-- summary
-- severity
-- confidence
-- reproduction count
-- causal status
-- source world and experiment
-- failed invariants
-- retained conditions
-- removed conditions
-- inconclusive conditions
-- bounded failure range
-- reproduction steps
-- linked evidence
-- final-report artifacts
+- finding header with severity, confidence, causal status, reproduction count, and final-report availability
+- executive summary, business impact, original observation, source world, and failed invariants
+- reproduction confidence panel
+- minimal tested condition set
+- retained, removed, and inconclusive conditions
+- observed failure boundary with tested points
+- deterministic reproduction steps
+- experiment history across initial, adaptive, and minimisation worlds
+- evidence-supported sequence when runtime metadata exists
+- grouped evidence with lazy report body loading
+- limitations
 
 The UI uses careful language:
 
@@ -141,9 +142,9 @@ It does not say:
 
 ## Final reports
 
-Final-report JSON and Markdown artifacts are identifiable through evidence metadata. The current API does not expose safe report body retrieval, so the UI shows artifact metadata and availability state rather than inventing file URLs.
-
-If a safe artifact-content endpoint is added later, the final-report viewer can lazily fetch and render Markdown or structured JSON on demand.
+Final-report JSON and Markdown artifacts are identifiable through evidence metadata. Prompt 10 adds a
+safe, read-only text endpoint for final-report content, so the UI now fetches report bodies lazily only
+after a user opens an individual final-report artifact.
 
 ## Optional-field fallbacks
 
@@ -172,7 +173,8 @@ The UI handles:
 - No repair verification runtime was added.
 - No Nosana UI was added.
 - No Kimi UI was added.
-- Evidence body retrieval is metadata-only until a safe artifact content endpoint exists.
+- Binary evidence body retrieval remains metadata-only. Final-report Markdown and JSON can be
+  previewed through the safe report-content endpoint.
 - The visual design is intentionally functional and ready for product-owner polish, not a full redesign.
 
 ## Product-owner handoff
@@ -190,3 +192,6 @@ The product owner can now polish:
 - findings visual polish
 - demo storytelling
 
+## Prompt 12 Live WorldLab overview
+
+The main Live WorldLab page now provides a runtime-oriented investigation overview: phase tracker, world-based progress, terminal summary, worker/attempt visibility, searchable/sortable world table, two-world comparison, actual-world matrix, grouped event timeline, finding summary, and evidence availability counts. It intentionally does not fetch final-report bodies on the overview page. See `docs/ui/live-worldlab-experience.md` for phase mappings, matrix cohort rules, polling semantics, partial-failure behavior, and accessibility notes.

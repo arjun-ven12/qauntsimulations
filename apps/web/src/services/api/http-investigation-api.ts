@@ -7,6 +7,7 @@ import {
 import { z } from 'zod';
 import {
   evidenceArtifactResponseSchema,
+  evidenceTextContentResponseSchema,
   experimentPlanResponseSchema,
   findingDetailSchema,
   investigationExperimentSchema,
@@ -47,10 +48,16 @@ export class HttpInvestigationApi implements InvestigationApi {
       throw new InvestigationApiError('WorldLab received invalid JSON.', response.status, 'INVALID_JSON', error);
     }
     if (!response.ok) {
+      const errorCode = (payload as { error?: { code?: string } }).error?.code;
+      const kind =
+        response.status === 404 ? 'NOT_FOUND'
+          : response.status === 413 || errorCode === 'EVIDENCE_CONTENT_TOO_LARGE' ? 'CONTENT_TOO_LARGE'
+            : errorCode === 'EVIDENCE_CONTENT_UNSUPPORTED' ? 'UNSUPPORTED_CONTENT'
+              : 'HTTP';
       throw new InvestigationApiError(
         (payload as { error?: { message?: string } }).error?.message ?? 'API request failed',
         response.status,
-        response.status === 404 ? 'NOT_FOUND' : 'HTTP',
+        kind,
         payload,
       );
     }
@@ -128,6 +135,13 @@ export class HttpInvestigationApi implements InvestigationApi {
     return this.parse(
       z.array(evidenceArtifactResponseSchema),
       await this.request(`/investigations/${investigationId}/evidence`),
+    );
+  }
+
+  async getEvidenceTextContent(investigationId: string, evidenceId: string) {
+    return this.parse(
+      evidenceTextContentResponseSchema,
+      await this.request(`/investigations/${investigationId}/evidence/${evidenceId}/content`),
     );
   }
 

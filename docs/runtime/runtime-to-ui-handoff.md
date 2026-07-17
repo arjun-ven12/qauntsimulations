@@ -56,7 +56,7 @@ Final report evidence:
 
 The public API evidence `path` values are relative storage keys. Evidence metadata is sanitized so absolute local filesystem paths are not exposed.
 
-## API endpoints for Prompt 9
+## API endpoints for Prompt 9 and Prompt 10
 
 All routes require the existing authenticated API session/JWT.
 
@@ -223,6 +223,37 @@ Main fields:
 The `path` field is a relative storage key. Public responses must not expose private absolute local paths.
 
 Evidence can be zero, partial, or full. Prompt 9 should group by type and render missing artifact families as unavailable.
+
+### `GET /api/investigations/:investigationId/evidence/:evidenceId/content`
+
+Prompt 10 adds this narrow read-only endpoint for final-report text preview.
+
+Allowed evidence type:
+
+- `FINAL_REPORT`
+
+Allowed content types:
+
+- `application/json`
+- `text/json`
+- `text/markdown`
+- `text/plain`
+
+Main response fields:
+
+- `evidenceId`
+- `investigationId`
+- `type`
+- `format`
+- `filename`
+- `contentType`
+- `sizeBytes`
+- `checksum`
+- `content`
+
+The response is JSON and does not expose resolved filesystem paths. Unsupported binary artifacts,
+cross-investigation evidence, path traversal, malformed JSON reports, and oversized reports are
+rejected with the standard API error envelope.
 
 ### `GET /api/investigations/:investigationId/findings`
 

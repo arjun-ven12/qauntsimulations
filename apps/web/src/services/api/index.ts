@@ -8,6 +8,7 @@ export const investigationApi: InvestigationApi =
 export type {
   CreateInvestigationInput,
   EvidenceArtifactResponse,
+  EvidenceTextContentResponse,
   ExperimentPlanResponse,
   FindingDetail,
   InvestigationApi,

@@ -91,4 +91,13 @@ describe('final evidence report generation', () => {
     expect(markdown).not.toContain('postgresql://');
     expect(markdown).not.toContain('authorization');
   });
+
+  it('does not invent a passing delay bound when the structured range only has a failing bound', () => {
+    const finalReport = report();
+    finalReport.minimisation.boundedRange = { upperFailingBoundMs: 1200, targetPrecisionMs: 100 };
+    const markdown = new FinalEvidenceReportService('/tmp/taskos-report-test').markdown(finalReport);
+    expect(markdown).toContain('"upperFailingBoundMs":1200');
+    expect(markdown).not.toContain('lowerPassingBoundMs');
+    expect(markdown).not.toContain('900 ms');
+  });
 });
