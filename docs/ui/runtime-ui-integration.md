@@ -141,9 +141,9 @@ It does not say:
 
 ## Final reports
 
-Final-report JSON and Markdown artifacts are identifiable through evidence metadata. The current API does not expose safe report body retrieval, so the UI shows artifact metadata and availability state rather than inventing file URLs.
-
-If a safe artifact-content endpoint is added later, the final-report viewer can lazily fetch and render Markdown or structured JSON on demand.
+Final-report JSON and Markdown artifacts are identifiable through evidence metadata. Prompt 10 adds a
+safe, read-only text endpoint for final-report content, so the UI now fetches report bodies lazily only
+after a user opens an individual final-report artifact.
 
 ## Optional-field fallbacks
 
@@ -172,7 +172,8 @@ The UI handles:
 - No repair verification runtime was added.
 - No Nosana UI was added.
 - No Kimi UI was added.
-- Evidence body retrieval is metadata-only until a safe artifact content endpoint exists.
+- Binary evidence body retrieval remains metadata-only. Final-report Markdown and JSON can be
+  previewed through the safe report-content endpoint.
 - The visual design is intentionally functional and ready for product-owner polish, not a full redesign.
 
 ## Product-owner handoff
@@ -189,4 +190,3 @@ The product owner can now polish:
 - Live WorldLab visual polish
 - findings visual polish
 - demo storytelling
-

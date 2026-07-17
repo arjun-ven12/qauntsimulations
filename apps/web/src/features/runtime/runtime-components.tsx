@@ -1,7 +1,9 @@
 import type { Finding, InvestigationEvent, InvestigationProgress } from '@taskos/shared-types';
 import { type ReactNode, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import type { EvidenceArtifactResponse, ExperimentPlanResponse, FindingDetail, InvestigationExperiment, InvestigationWorker, InvestigationWorld } from '../../services/api/index.js';
+import type { EvidenceArtifactResponse, EvidenceTextContentResponse, ExperimentPlanResponse, FindingDetail, InvestigationExperiment, InvestigationWorker, InvestigationWorld } from '../../services/api/index.js';
+import { InvestigationApiError } from '../../services/api/index.js';
+import { useEvidenceTextContent } from './use-runtime-queries.js';
 import {
   boundedRange,
   bugMode,
@@ -375,7 +377,7 @@ export function ReproductionSteps({ finding }: { finding: Finding | FindingDetai
   );
 }
 
-export function EvidenceViewer({ evidence }: { evidence: EvidenceArtifactResponse[] }) {
+export function EvidenceViewer({ evidence, investigationId }: { evidence: EvidenceArtifactResponse[]; investigationId: string }) {
   const groups = evidenceGroups(evidence);
   return (
     <section className="card">
@@ -394,7 +396,9 @@ export function EvidenceViewer({ evidence }: { evidence: EvidenceArtifactRespons
                     </div>
                     <div className="mt-1 font-mono text-xs text-slate-500" title={artifact.id}>{shortId(artifact.id, 14)}</div>
                     <div className="mt-1 break-all text-xs text-slate-500">{artifact.path}</div>
-                    <p className="mt-2 text-xs text-slate-400">{artifact.type === 'TRACE' ? 'Trace archives are available as metadata; browser preview is not supported here.' : artifact.type === 'FINAL_REPORT' ? 'Final report artifact is identifiable. Body retrieval is not exposed by this API.' : 'Artifact body preview is unavailable unless a safe file endpoint is added.'}</p>
+                    {artifact.type === 'FINAL_REPORT'
+                      ? <FinalReportPreview artifact={artifact} investigationId={investigationId} />
+                      : <p className="mt-2 text-xs text-slate-400">{artifact.type === 'TRACE' ? 'Trace archives are available as metadata; browser preview is not supported here.' : 'Artifact body preview is unavailable unless a safe file endpoint is added.'}</p>}
                   </div>
                 ))}
               </div>
@@ -403,6 +407,81 @@ export function EvidenceViewer({ evidence }: { evidence: EvidenceArtifactRespons
         ))}
       </div>
     </section>
+  );
+}
+
+function FinalReportPreview({ artifact, investigationId }: { artifact: EvidenceArtifactResponse; investigationId: string }) {
+  const [open, setOpen] = useState(false);
+  const query = useEvidenceTextContent(investigationId, artifact.id, open);
+  return (
+    <div className="mt-3">
+      <button
+        className="rounded-lg border border-cyan/40 px-3 py-2 text-xs font-bold text-cyan"
+        onClick={() => setOpen((value) => !value)}
+        type="button"
+      >
+        {open ? 'Hide report' : 'View report'}
+      </button>
+      {!open ? <p className="mt-2 text-xs text-slate-400">Report body is fetched only when opened.</p> : null}
+      {open && query.isLoading ? <p className="mt-3 text-xs text-slate-400">Loading report content…</p> : null}
+      {open && query.isError ? <ReportError error={query.error} /> : null}
+      {open && query.data ? <ReportContent content={query.data} /> : null}
+    </div>
+  );
+}
+
+function ReportError({ error }: { error: unknown }) {
+  const message = error instanceof InvestigationApiError && error.kind === 'CONTENT_TOO_LARGE'
+    ? 'This final report is too large to preview safely.'
+    : error instanceof InvestigationApiError && error.kind === 'UNSUPPORTED_CONTENT'
+      ? 'This artifact cannot be previewed safely.'
+      : 'Final report content is unavailable.';
+  return <p className="mt-3 rounded-lg border border-red-300/30 bg-red-300/10 p-3 text-xs text-red-100">{message}</p>;
+}
+
+export function ReportContent({ content }: { content: EvidenceTextContentResponse }) {
+  if (content.format === 'JSON') return <JsonReport content={content.content} />;
+  if (content.format === 'MARKDOWN') return <MarkdownReport content={content.content} />;
+  return <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-300 whitespace-pre-wrap">{content.content}</pre>;
+}
+
+function MarkdownReport({ content }: { content: string }) {
+  return (
+    <div className="mt-3 max-h-[32rem] overflow-auto rounded-lg bg-slate-950 p-4 text-sm text-slate-300">
+      {content.split(/\r?\n/).map((line, index) => {
+        if (line.startsWith('# ')) return <h3 className="mt-2 text-lg font-bold text-slate-100" key={`${index}-${line}`}>{line.slice(2)}</h3>;
+        if (line.startsWith('## ')) return <h4 className="mt-3 font-bold text-slate-100" key={`${index}-${line}`}>{line.slice(3)}</h4>;
+        if (line.startsWith('- ')) return <p className="ml-4" key={`${index}-${line}`}>• {line.slice(2)}</p>;
+        return <p className={line ? 'mt-1' : 'h-3'} key={`${index}-${line}`}>{line}</p>;
+      })}
+    </div>
+  );
+}
+
+function JsonReport({ content }: { content: string }) {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    return <p className="mt-3 rounded-lg border border-red-300/30 bg-red-300/10 p-3 text-xs text-red-100">Final report JSON could not be parsed safely.</p>;
+  }
+  const record = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  const rows = ['reportVersion', 'summary', 'businessImpact', 'confidence', 'retainedConditions', 'removedConditions', 'boundedRange', 'reproductionSteps', 'limitations'];
+  return (
+    <div className="mt-3 rounded-lg bg-slate-950 p-4 text-sm">
+      <dl className="grid gap-3">
+        {rows.filter((key) => record[key] !== undefined).map((key) => (
+          <div key={key}>
+            <dt className="text-xs uppercase tracking-widest text-slate-500">{humanize(key)}</dt>
+            <dd className="mt-1 whitespace-pre-wrap text-slate-300">{formatValue(record[key])}</dd>
+          </div>
+        ))}
+      </dl>
+      <details className="mt-4">
+        <summary className="cursor-pointer text-xs font-bold text-cyan">Raw JSON</summary>
+        <pre className="mt-2 max-h-80 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-300">{JSON.stringify(parsed, null, 2)}</pre>
+      </details>
+    </div>
   );
 }
 
@@ -432,7 +511,7 @@ export function FindingDetailSections({ finding }: { finding: FindingDetail }) {
       </div>
       <FailureRange finding={finding} />
       <ReproductionSteps finding={finding} />
-      <EvidenceViewer evidence={finding.evidence} />
+      <EvidenceViewer evidence={finding.evidence} investigationId={finding.investigationId} />
     </div>
   );
 }

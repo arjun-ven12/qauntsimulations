@@ -8,6 +8,7 @@ import {
 } from '@taskos/shared-types';
 import type {
   EvidenceArtifactResponse,
+  EvidenceTextContentResponse,
   ExperimentPlanResponse,
   FindingDetail,
   InvestigationApi,
@@ -225,6 +226,42 @@ export class MockInvestigationApi implements InvestigationApi {
       },
     );
     return artifacts;
+  }
+
+  async getEvidenceTextContent(investigationId: string, evidenceId: string): Promise<EvidenceTextContentResponse> {
+    if (evidenceId === 'cmrola2p000fgrurbry3xvnhj') {
+      return {
+        evidenceId,
+        investigationId,
+        type: 'FINAL_REPORT',
+        format: 'JSON',
+        filename: 'final-report.json',
+        contentType: 'application/json',
+        sizeBytes: 180,
+        checksum: 'safe-json-checksum',
+        content: JSON.stringify({
+          reportVersion: '2026-07-17.prompt8.v1',
+          summary: 'Duplicate checkout submission reproduced under delayed payment.',
+          businessImpact: 'Duplicate payment and order activity can occur for one checkout intent.',
+          retainedConditions: { duplicateSubmissionBug: true, doubleSubmit: true },
+          removedConditions: { viewport: 'mobile-390x844' },
+          boundedRange: { knownPassingDelayMs: 900, knownFailingDelayMs: 1200 },
+          reproductionSteps: ['Open product', 'Submit payment twice'],
+          limitations: ['Applies to the deterministic checkout fixture.'],
+        }, null, 2),
+      };
+    }
+    return {
+      evidenceId,
+      investigationId,
+      type: 'FINAL_REPORT',
+      format: 'MARKDOWN',
+      filename: 'final-report.md',
+      contentType: 'text/markdown',
+      sizeBytes: 120,
+      checksum: 'safe-md-checksum',
+      content: '# Final report\n\nDuplicate checkout submission reproduced under delayed payment.\n\n<script>alert("blocked")</script>',
+    };
   }
 
   async listFindings(investigationId: string): Promise<Finding[]> {

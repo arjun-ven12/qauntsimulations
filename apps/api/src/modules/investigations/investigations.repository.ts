@@ -942,10 +942,44 @@ export class InvestigationRepository {
     return this.database.world.findMany({ where: { investigationId: id, investigation: { organisationId } }, orderBy: { createdAt: 'asc' }, include: { experiments: { orderBy: { createdAt: 'asc' }, take: 1, include: { attempts: { orderBy: { attempt: 'desc' }, take: 1, select: { workerId: true, startedAt: true, completedAt: true } } } } } });
   }
   async listExperiments(organisationId: string, id: string) {
-    return this.database.experiment.findMany({ where: { investigationId: id, investigation: { organisationId } }, orderBy: { createdAt: 'asc' }, include: { _count: { select: { attempts: true } }, attempts: { orderBy: { attempt: 'desc' }, take: 1 } } });
+    return this.database.experiment.findMany({
+      where: { investigationId: id, investigation: { organisationId } },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        _count: { select: { attempts: true } },
+        attempts: {
+          orderBy: { attempt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            startedAt: true,
+            completedAt: true,
+            exitCode: true,
+            durationMs: true,
+          },
+        },
+      },
+    });
   }
   async listWorkers(organisationId: string, id: string) {
-    return this.database.worker.findMany({ where: { organisationId, attempts: { some: { experiment: { investigationId: id } } } }, orderBy: { createdAt: 'asc' }, include: { attempts: { where: { experiment: { investigationId: id } }, include: { experiment: { select: { worldId: true, investigationId: true } } } } } });
+    return this.database.worker.findMany({
+      where: { organisationId, attempts: { some: { experiment: { investigationId: id } } } },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        attempts: {
+          where: { experiment: { investigationId: id } },
+          select: {
+            id: true,
+            status: true,
+            startedAt: true,
+            completedAt: true,
+            exitCode: true,
+            durationMs: true,
+            experiment: { select: { worldId: true, investigationId: true } },
+          },
+        },
+      },
+    });
   }
   async listEvidence(organisationId: string, id: string) {
     return this.database.evidenceArtifact.findMany({ where: { experiment: { investigationId: id, investigation: { organisationId } } }, orderBy: { createdAt: 'asc' } });
@@ -960,6 +994,14 @@ export class InvestigationRepository {
         evidence: { include: { artifact: true } },
         reproductions: { orderBy: { createdAt: 'asc' } },
         minimalReproduction: true,
+      },
+    });
+  }
+  async getEvidenceArtifact(organisationId: string, investigationId: string, evidenceId: string) {
+    return this.database.evidenceArtifact.findFirst({
+      where: {
+        id: evidenceId,
+        experiment: { investigationId, investigation: { organisationId } },
       },
     });
   }

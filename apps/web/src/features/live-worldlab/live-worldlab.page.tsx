@@ -118,7 +118,7 @@ export function LiveWorldLabPage() {
             <p className="mt-3 text-sm text-slate-400">{findings.data?.length ?? 0} findings linked to this investigation.</p>
           </section>
         )}
-        {evidence.error ? <PanelState title="Evidence unavailable" retry={() => void evidence.refetch()}>{evidence.error instanceof Error ? evidence.error.message : 'Evidence could not load.'}</PanelState> : <EvidenceViewer evidence={evidence.data ?? []} />}
+        {evidence.error ? <PanelState title="Evidence unavailable" retry={() => void evidence.refetch()}>{evidence.error instanceof Error ? evidence.error.message : 'Evidence could not load.'}</PanelState> : <EvidenceViewer evidence={evidence.data ?? []} investigationId={investigationId} />}
       </div>
     </>
   );
