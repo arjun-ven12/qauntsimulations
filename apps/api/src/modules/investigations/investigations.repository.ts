@@ -1247,7 +1247,19 @@ export class InvestigationRepository {
   async progress(organisationId: string, id: string): Promise<InvestigationProgressRecord | null> {
     const record = await this.database.investigation.findFirst({ where: { id, organisationId }, select: {
       id: true, status: true,
-      worlds: { select: { id: true } },
+      worlds: { select: {
+        id: true,
+        status: true,
+        experiments: {
+          orderBy: { createdAt: 'asc' },
+          take: 1,
+          select: {
+            status: true,
+            evaluations: { select: { passed: true, executionAttemptId: true } },
+            attempts: { orderBy: { attempt: 'desc' }, take: 1, select: { id: true, status: true, result: true, completedAt: true } },
+          },
+        },
+      } },
       experiments: { select: { status: true } },
       events: { orderBy: { occurredAt: 'desc' }, take: 20, select: { id: true, type: true, occurredAt: true, data: true } },
       _count: { select: { findings: true } },
@@ -1256,19 +1268,23 @@ export class InvestigationRepository {
   }
 
   async listWorlds(organisationId: string, id: string) {
-    return this.database.world.findMany({ where: { investigationId: id, investigation: { organisationId } }, orderBy: { createdAt: 'asc' }, include: { experiments: { orderBy: { createdAt: 'asc' }, take: 1, include: { attempts: { orderBy: { attempt: 'desc' }, take: 1, select: { workerId: true, startedAt: true, completedAt: true } } } } } });
+    return this.database.world.findMany({ where: { investigationId: id, investigation: { organisationId } }, orderBy: { createdAt: 'asc' }, include: { experiments: { orderBy: { createdAt: 'asc' }, take: 1, include: { evaluations: { select: { passed: true, executionAttemptId: true } }, attempts: { orderBy: { attempt: 'desc' }, take: 1, select: { id: true, status: true, result: true, workerId: true, startedAt: true, completedAt: true } } } } } });
   }
   async listExperiments(organisationId: string, id: string) {
     return this.database.experiment.findMany({
       where: { investigationId: id, investigation: { organisationId } },
       orderBy: { createdAt: 'asc' },
       include: {
+        world: { select: { status: true } },
+        evaluations: { select: { passed: true, executionAttemptId: true } },
         _count: { select: { attempts: true } },
         attempts: {
           orderBy: { attempt: 'desc' },
           take: 1,
           select: {
             id: true,
+            status: true,
+            result: true,
             startedAt: true,
             completedAt: true,
             exitCode: true,

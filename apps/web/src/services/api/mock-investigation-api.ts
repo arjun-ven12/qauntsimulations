@@ -15,19 +15,22 @@ import type {
   InvestigationExperiment,
   InvestigationWorker,
   InvestigationWorld,
+  PublicBusinessOutcome,
 } from './investigation-api.js';
 
 const FIXED_TIME = '2026-07-17T07:01:03.585Z';
 export const MOCK_INVESTIGATION_ID = 'cmrol9cxh0001rurb8godxnh6';
 export const MOCK_FINDING_ID = 'cmrol9ijr004drurbren30ov6';
 
-function world(index: number, origin: 'INITIAL' | 'ADAPTIVE_REPRODUCTION' | 'MINIMISATION', status: string, configuration: Record<string, unknown>): InvestigationWorld {
+function world(index: number, origin: 'INITIAL' | 'ADAPTIVE_REPRODUCTION' | 'MINIMISATION', businessOutcome: PublicBusinessOutcome, configuration: Record<string, unknown>): InvestigationWorld {
   const id = `world_${origin.toLowerCase()}_${index}`;
   return {
     id,
     investigationId: MOCK_INVESTIGATION_ID,
     name: `${origin.replaceAll('_', ' ')} ${index}`,
-    status,
+    status: 'COMPLETED',
+    executionState: 'COMPLETED',
+    businessOutcome,
     reason: origin === 'MINIMISATION' ? 'Minimisation candidate' : 'Runtime comparison world',
     configuration: { ...configuration, ...(origin === 'INITIAL' ? {} : { origin }) },
     experimentId: `experiment_${index}`,
@@ -52,19 +55,19 @@ export class MockInvestigationApi implements InvestigationApi {
   ];
 
   private readonly worlds: InvestigationWorld[] = [
-    world(1, 'INITIAL', 'PASSED', { browser: 'chromium', viewport: 'desktop', networkProfile: 'normal', paymentDelayMs: 0, doubleSubmit: false, duplicateSubmissionBug: false }),
-    world(2, 'INITIAL', 'PASSED', { browser: 'chromium', viewport: 'desktop', networkProfile: 'delayed-payment', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: false }),
-    world(3, 'INITIAL', 'FAILED', { browser: 'chromium', viewport: 'mobile', networkProfile: 'delayed-payment', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(4, 'INITIAL', 'FAILED', { browser: 'webkit', viewport: 'mobile', networkProfile: 'delayed-payment', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(5, 'ADAPTIVE_REPRODUCTION', 'FAILED', { adaptive: { purpose: 'EXACT_REPRODUCTION' }, browser: 'chromium', viewport: 'mobile', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(6, 'ADAPTIVE_REPRODUCTION', 'PASSED', { adaptive: { purpose: 'CONTROL_DOUBLE_SUBMIT_DISABLED' }, browser: 'chromium', viewport: 'mobile', paymentDelayMs: 1200, doubleSubmit: false, duplicateSubmissionBug: true }),
-    world(7, 'ADAPTIVE_REPRODUCTION', 'PASSED', { adaptive: { purpose: 'CONTROL_BUG_DISABLED' }, browser: 'chromium', viewport: 'mobile', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: false }),
-    world(8, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'REMOVE_VIEWPORT', variable: 'viewport', conditionDecision: 'REMOVED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(9, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'REMOVE_NETWORK_PROFILE', variable: 'networkProfile', conditionDecision: 'REMOVED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(10, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'OTHER_CONTROL', variable: 'networkProfile', conditionDecision: 'INCONCLUSIVE' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 600, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(11, 'MINIMISATION', 'PASSED', { minimisation: { purpose: 'OTHER_CONTROL', variable: 'networkProfile', conditionDecision: 'INCONCLUSIVE' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 900, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(12, 'MINIMISATION', 'FAILED', { minimisation: { purpose: 'TEST_PAYMENT_DELAY', variable: 'paymentDelayMs', conditionDecision: 'RETAINED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
-    world(13, 'MINIMISATION', 'FAILED', { minimisation: { purpose: 'CONFIRM_MINIMAL_SET', variable: 'paymentDelayMs', conditionDecision: 'RETAINED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(1, 'INITIAL', 'PASS', { browser: 'chromium', viewport: 'desktop', networkProfile: 'normal', paymentDelayMs: 0, doubleSubmit: false, duplicateSubmissionBug: false }),
+    world(2, 'INITIAL', 'PASS', { browser: 'chromium', viewport: 'desktop', networkProfile: 'delayed-payment', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: false }),
+    world(3, 'INITIAL', 'FAIL', { browser: 'chromium', viewport: 'mobile', networkProfile: 'delayed-payment', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(4, 'INITIAL', 'FAIL', { browser: 'webkit', viewport: 'mobile', networkProfile: 'delayed-payment', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(5, 'ADAPTIVE_REPRODUCTION', 'FAIL', { adaptive: { purpose: 'EXACT_REPRODUCTION' }, browser: 'chromium', viewport: 'mobile', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(6, 'ADAPTIVE_REPRODUCTION', 'PASS', { adaptive: { purpose: 'CONTROL_DOUBLE_SUBMIT_DISABLED' }, browser: 'chromium', viewport: 'mobile', paymentDelayMs: 1200, doubleSubmit: false, duplicateSubmissionBug: true }),
+    world(7, 'ADAPTIVE_REPRODUCTION', 'PASS', { adaptive: { purpose: 'CONTROL_BUG_DISABLED' }, browser: 'chromium', viewport: 'mobile', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: false }),
+    world(8, 'MINIMISATION', 'PASS', { minimisation: { purpose: 'REMOVE_VIEWPORT', variable: 'viewport', conditionDecision: 'REMOVED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(9, 'MINIMISATION', 'PASS', { minimisation: { purpose: 'REMOVE_NETWORK_PROFILE', variable: 'networkProfile', conditionDecision: 'REMOVED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(10, 'MINIMISATION', 'PASS', { minimisation: { purpose: 'OTHER_CONTROL', variable: 'networkProfile', conditionDecision: 'INCONCLUSIVE' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 600, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(11, 'MINIMISATION', 'PASS', { minimisation: { purpose: 'OTHER_CONTROL', variable: 'networkProfile', conditionDecision: 'INCONCLUSIVE' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 900, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(12, 'MINIMISATION', 'FAIL', { minimisation: { purpose: 'TEST_PAYMENT_DELAY', variable: 'paymentDelayMs', conditionDecision: 'RETAINED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
+    world(13, 'MINIMISATION', 'FAIL', { minimisation: { purpose: 'CONFIRM_MINIMAL_SET', variable: 'paymentDelayMs', conditionDecision: 'RETAINED' }, browser: 'chromium', viewport: 'desktop', paymentDelayMs: 1200, doubleSubmit: true, duplicateSubmissionBug: true }),
   ];
 
   async listProjects() {
@@ -155,10 +158,12 @@ export class MockInvestigationApi implements InvestigationApi {
       id: item.experimentId ?? `experiment_${index + 1}`,
       investigationId: item.investigationId,
       worldId: item.id,
-      status: index < 7 || index === 7 || index === 8 || index === 9 || index === 10 ? 'PASSED' : 'FAILED',
+      status: item.businessOutcome === 'PASS' ? 'PASSED' : item.businessOutcome === 'FAIL' ? 'FAILED' : 'ERROR',
+      executionState: item.executionState,
+      businessOutcome: item.businessOutcome,
       kind: item.configuration && typeof item.configuration === 'object' && !Array.isArray(item.configuration) && (item.configuration as Record<string, unknown>).origin === 'MINIMISATION' ? 'MINIMISATION' : 'INITIAL',
       attemptCount: 1,
-      latestAttempt: { id: `attempt_${index + 1}`, startedAt: item.startedAt, completedAt: item.completedAt, exitCode: index < 2 ? 0 : 2, durationMs: 2100 + index },
+      latestAttempt: { id: `attempt_${index + 1}`, startedAt: item.startedAt, completedAt: item.completedAt, exitCode: item.businessOutcome === 'PASS' ? 0 : item.businessOutcome === 'FAIL' ? 2 : 3, durationMs: 2100 + index },
       createdAt: item.createdAt,
       updatedAt: FIXED_TIME,
     }));
@@ -171,10 +176,10 @@ export class MockInvestigationApi implements InvestigationApi {
       status: 'COMPLETED',
       attempts: [{
         id: `attempt_${index + 1}`,
-        status: index < 7 ? 'PASSED' : index < 11 ? 'PASSED' : 'FAILED',
+        status: item.businessOutcome === 'PASS' ? 'PASSED' : item.businessOutcome === 'FAIL' ? 'FAILED' : 'ERROR',
         startedAt: item.startedAt,
         completedAt: item.completedAt,
-        exitCode: index < 7 ? 0 : 2,
+        exitCode: item.businessOutcome === 'PASS' ? 0 : item.businessOutcome === 'FAIL' ? 2 : 3,
         durationMs: 2100 + index,
         experiment: { investigationId: item.investigationId, worldId: item.id },
       }],
@@ -316,7 +321,7 @@ export class MockInvestigationApi implements InvestigationApi {
     return investigationProgressSchema.parse({
       id,
       status: 'COMPLETED',
-      progress: { totalWorlds: 13, queued: 0, running: 0, passed: 7, failed: 6, flaky: 0 },
+      progress: { totalWorlds: 13, queued: 0, running: 0, passed: 13, failed: 0, flaky: 0 },
       recentEvents: [
         { id: 'event_final_report_completed', investigationId: id, type: 'final_report_completed', message: 'Final evidence report completed.', createdAt: FIXED_TIME, metadata: { finalReportEvidenceId: 'cmrola2p000fgrurbry3xvnhj' } },
         { id: 'event_minimisation_completed', investigationId: id, type: 'minimisation_completed', message: 'Minimisation completed.', createdAt: FIXED_TIME, metadata: { minimisationRunId: 'min_run_179623b1052669254ba2' } },

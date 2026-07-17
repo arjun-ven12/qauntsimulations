@@ -75,7 +75,15 @@ export interface PersistedLaunchSnapshot {
 export interface InvestigationProgressRecord {
   id: string;
   status: string;
-  worlds: Array<{ id: string }>;
+  worlds: Array<{
+    id: string;
+    status: string;
+    experiments: Array<{
+      status: string;
+      evaluations: Array<{ passed: boolean; executionAttemptId: string | null }>;
+      attempts: Array<{ id: string; status: string; result: unknown; completedAt: Date | null }>;
+    }>;
+  }>;
   experiments: Array<{ status: string }>;
   events: Array<{ id: string; type: string; occurredAt: Date; data: unknown }>;
   findingsCount: number;
