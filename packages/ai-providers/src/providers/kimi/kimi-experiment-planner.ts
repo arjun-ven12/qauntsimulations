@@ -63,12 +63,15 @@ export function normalizeKimiPlannerError(error: unknown): { code: string; messa
   if (error instanceof KimiResponseError) return { code: error.code, message: error.message };
   if (error instanceof SyntaxError) return { code: 'MALFORMED_RESPONSE', message: 'Kimi returned invalid JSON.' };
   if (error instanceof ZodError) return { code: 'PLAN_SCHEMA_INVALID', message: 'Kimi output did not match the experiment-plan schema.' };
-  const candidate = error as { status?: unknown; name?: unknown };
+  const candidate = error as { status?: unknown; name?: unknown; message?: unknown; cause?: { code?: unknown; name?: unknown; message?: unknown } };
   const status = typeof candidate?.status === 'number' ? candidate.status : undefined;
   const name = typeof candidate?.name === 'string' ? candidate.name : '';
+  const timeoutEvidence = [name, candidate?.message, candidate?.cause?.code, candidate?.cause?.name, candidate?.cause?.message]
+    .filter((value): value is string => typeof value === 'string')
+    .some((value) => /timeout|timed out|etimedout|und_err_connect_timeout/i.test(value));
   if (status === 401 || status === 403) return { code: 'AUTHENTICATION_ERROR', message: 'Kimi authentication failed.' };
   if (status === 429) return { code: 'RATE_LIMITED', message: 'Kimi rate limit was reached.' };
-  if (name.includes('Timeout') || name === 'AbortError') return { code: 'TIMEOUT', message: 'Kimi planner request timed out.' };
+  if (timeoutEvidence || name === 'AbortError') return { code: 'TIMEOUT', message: 'Kimi planner request timed out.' };
   if (status !== undefined && status >= 500) return { code: 'PROVIDER_UNAVAILABLE', message: 'Kimi is temporarily unavailable.' };
   return { code: 'UNKNOWN_PROVIDER_ERROR', message: 'Kimi planner request failed.' };
 }

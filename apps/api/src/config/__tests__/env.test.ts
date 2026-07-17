@@ -122,7 +122,7 @@ describe('API environment security', () => {
       MOONSHOT_API_KEY: 'test-key',
       KIMI_MODEL: 'sponsor-kimi-model',
     });
-    expect(configured.KIMI_BASE_URL).toBe('https://api.moonshot.cn/v1');
+    expect(configured.KIMI_BASE_URL).toBe('https://api.moonshot.ai/v1');
     expect(configured.KIMI_MODEL).toBe('sponsor-kimi-model');
     expect(configured.KIMI_TIMEOUT_MS).toBe(60_000);
     expect(Object.keys(configured)).not.toContain('PUBLIC_MOONSHOT_API_KEY');
