@@ -17,6 +17,10 @@ import type { WorkerJobFactoryService } from './worker-job-factory.service.js';
 
 type OrchestrationRepository = Pick<InvestigationRepository, 'orchestrationContext' | 'queueInitialWorlds' | 'eligibleAdaptiveFindings' | 'createAdaptiveWorlds' | 'adaptiveWorldResults' | 'updateFindingAfterAdaptive' | 'eligibleMinimisationFindings' | 'transitionToMinimising' | 'completeMinimisationStage' | 'createMinimisationRun' | 'createMinimisationCandidateWorld' | 'minimisationWorldResult' | 'updateMinimisationCandidate' | 'completeMinimisation' | 'recordMinimisationEvent' | 'transitionToRunning' | 'transitionToObserving' | 'transitionToAdapting' | 'transitionToReproducing' | 'completeAdaptiveStage' | 'beginWorld' | 'completeExecution' | 'failExecution' | 'finishInvestigation' | 'failInvestigation' | 'isCancelled' | 'recordExecutionEvent' | 'recordFleetEvent'>;
 
+export interface InvestigationTerminalListener {
+  synchronizeSafely(investigationId: string): Promise<void>;
+}
+
 export interface DaytonaFleetOrchestratorOptions {
   perInvestigationLimit: number;
   serverWideLimit: number;
@@ -114,7 +118,12 @@ export class InvestigationOrchestratorService {
     private readonly minimisationOptions: MinimisationOptions = defaultMinimisationOptions,
     private readonly minimisationPlans = new DeterministicMinimisationPlanService(),
     private readonly finalReports?: FinalEvidenceReportService,
+    private terminalListener?: InvestigationTerminalListener,
   ) {}
+
+  setTerminalListener(listener: InvestigationTerminalListener): void {
+    this.terminalListener = listener;
+  }
 
   start(investigationId: string): void {
     if (this.active.has(investigationId)) return;
@@ -123,7 +132,10 @@ export class InvestigationOrchestratorService {
         logger.error({ err: error, investigationId, provider: this.executor.provider, status: 'FAILED' }, 'Investigation orchestration failed');
         await this.repository.failInvestigation(investigationId, error);
       })
-      .finally(() => this.active.delete(investigationId));
+      .finally(async () => {
+        await this.terminalListener?.synchronizeSafely(investigationId);
+        this.active.delete(investigationId);
+      });
     this.active.set(investigationId, task);
   }
 
@@ -145,8 +157,10 @@ export class InvestigationOrchestratorService {
     if (await this.repository.isCancelled(investigationId)) return;
     if (executions.length > 0 && executions.every(({ result }) => result === false)) throw new Error('All workers failed to produce a processable result');
     await this.repository.transitionToObserving(investigationId);
-    if (this.adaptiveOptions.enabled) await this.runAdaptiveReproduction(context);
-    if (this.minimisationOptions.enabled) await this.runMinimisation(context);
+    if (!isRepairVerification(context)) {
+      if (this.adaptiveOptions.enabled) await this.runAdaptiveReproduction(context);
+      if (this.minimisationOptions.enabled) await this.runMinimisation(context);
+    }
     if (await this.repository.isCancelled(investigationId)) return;
     await this.repository.finishInvestigation(investigationId);
     logger.info({ investigationId, provider: this.executor.provider, status: 'COMPLETED' }, 'Investigation completed');
@@ -626,4 +640,8 @@ export class InvestigationOrchestratorService {
   private logCompletion(execution: PersistedWorldExecution, result: WorkerResult): void {
     logger.info({ investigationId: execution.investigationId, worldId: execution.worldId, experimentId: execution.experimentId, workerId: execution.workerId, provider: execution.provider, status: result.status, durationMs: result.durationMs }, 'Worker completed');
   }
+}
+
+function isRepairVerification(context: InvestigationOrchestrationContext): boolean {
+  return (context.plan as unknown as { executionMode?: unknown }).executionMode === 'REPAIR_VERIFICATION';
 }

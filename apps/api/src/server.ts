@@ -52,6 +52,10 @@ import { ProjectService } from './modules/projects/projects.service.js';
 import { ScenarioController } from './modules/scenarios/scenarios.controller.js';
 import { ScenarioRepository } from './modules/scenarios/scenarios.repository.js';
 import { ScenarioService } from './modules/scenarios/scenarios.service.js';
+import { RepairVerificationController } from './modules/repair-verification/repair-verification.controller.js';
+import { RepairVerificationExecutionService } from './modules/repair-verification/repair-verification-execution.service.js';
+import { PrismaRepairVerificationReadRepository } from './modules/repair-verification/repair-verification.repository.js';
+import { RepairVerificationDomainService } from './modules/repair-verification/repair-verification.service.js';
 
 const rootEnvPath = fileURLToPath(new URL('../../../.env', import.meta.url));
 loadEnvFile(rootEnvPath);
@@ -76,6 +80,7 @@ const evidenceRoot = isAbsolute(env.EVIDENCE_LOCAL_PATH)
   ? env.EVIDENCE_LOCAL_PATH
   : resolve(repositoryRoot, env.EVIDENCE_LOCAL_PATH);
 const investigationRepository = new InvestigationRepository(database);
+const repairVerificationRepository = new PrismaRepairVerificationReadRepository(database);
 const openAIPlannerModel = env.OPENAI_PLANNER_MODEL ?? env.OPENAI_MODEL_PLANNER;
 let selectedPlanner: ExperimentPlanner | undefined;
 const plannerModel: string | undefined = env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_MODEL : env.PLANNER_PROVIDER === 'openai' ? openAIPlannerModel : undefined;
@@ -195,6 +200,19 @@ const investigationOrchestrator = new InvestigationOrchestratorService(
   undefined,
   new FinalEvidenceReportService(evidenceRoot),
 );
+const repairVerificationExecution = new RepairVerificationExecutionService(
+  repairVerificationRepository,
+  investigationOrchestrator,
+);
+investigationOrchestrator.setTerminalListener(repairVerificationExecution);
+const repairVerificationController = new RepairVerificationController(
+  new RepairVerificationDomainService(
+    repairVerificationRepository,
+    undefined,
+    undefined,
+    repairVerificationExecution,
+  ),
+);
 await new ExecutionCleanupService(investigationRepository).run();
 
 const app = createApplication({
@@ -227,6 +245,7 @@ const app = createApplication({
         new EvidenceContentService(evidenceRoot, env.FINAL_REPORT_CONTENT_MAX_BYTES),
       ),
     ),
+    repairVerifications: repairVerificationController,
   },
 });
 const server = app.listen(env.PORT, () => logger.info({ port: env.PORT }, 'TaskOS API listening'));

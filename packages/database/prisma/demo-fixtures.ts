@@ -18,6 +18,15 @@ export const demoProductFixtureIds = {
   scenario: 'scenario_duplicate_submission',
   invariant: 'invariant_single_checkout_submission',
   orderInvariant: 'invariant_no_duplicate_order',
+  investigation: 'investigation_demo_checkout_failure',
+  experimentPlan: 'experiment_plan_demo_checkout_failure',
+  failingWorld: 'world_demo_checkout_failure',
+  passingWorld: 'world_demo_checkout_control',
+  failingExperiment: 'experiment_demo_checkout_failure',
+  passingExperiment: 'experiment_demo_checkout_control',
+  failingAttempt: 'attempt_demo_checkout_failure',
+  passingAttempt: 'attempt_demo_checkout_control',
+  finding: 'finding_demo_duplicate_checkout',
 } as const;
 
 export const demoProjectFixture = {
@@ -69,7 +78,7 @@ export const demoProjectSafetyFixture = {
 export const demoEnvironmentFixture = {
   name: 'Local Demo Store',
   description: 'Local deterministic storefront with resettable synthetic checkout data.',
-  type: 'LOCAL',
+  type: 'DEMO',
   baseUrl: 'http://localhost:5174',
   apiBaseUrl: 'http://localhost:5174/api',
   healthCheckUrl: 'http://localhost:5174/products/test-product',

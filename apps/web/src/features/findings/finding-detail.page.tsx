@@ -3,6 +3,9 @@ import { PageHeading } from '../../components/page-heading.js';
 import { FindingDetailSections, PanelState, RuntimeNav, StatusBadge } from '../runtime/runtime-components.js';
 import { boundedRange, causalConditions, formatDate, formatValue, humanize, shortId } from '../runtime/runtime-normalizers.js';
 import { useFindingDetail, useInvestigationEvidence, useInvestigationExperiments, useInvestigationProgress, useInvestigationWorlds } from '../runtime/use-runtime-queries.js';
+import { useAuthStore } from '../../stores/auth.store.js';
+import { isActiveRepairVerification } from '../repair-verification/repair-verification-api.js';
+import { useRepairVerifications } from '../repair-verification/use-repair-verification.js';
 
 export function FindingDetailPage() {
   const { investigationId, findingId } = useParams();
@@ -14,6 +17,8 @@ export function FindingDetailPage() {
   const worlds = useInvestigationWorlds(investigationId, status);
   const experiments = useInvestigationExperiments(investigationId, status);
   const evidence = useInvestigationEvidence(investigationId, status);
+  const repairVerifications = useRepairVerifications(findingId);
+  const editable = useAuthStore((state) => state.permissions.includes('EDIT_PROJECTS'));
 
   if (finding.isLoading) return <PanelState title="Loading finding">Loading finding detail, minimisation metadata, and linked evidence…</PanelState>;
   if (finding.error || !finding.data) {
@@ -34,6 +39,14 @@ export function FindingDetailPage() {
         action={<Link className="rounded-lg bg-cyan px-4 py-2 font-bold text-ink" to={`/investigations/${investigationId}/findings`}>Back to findings</Link>}
       />
       <RuntimeNav investigationId={investigationId} />
+      <section className="card mb-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div><h2 className="font-bold">Repair Verification</h2><p className="mt-1 text-sm text-slate-400">Replay the bounded persisted repair plan against an authorised target Environment.</p></div>
+          {editable ? <Link className="rounded-lg bg-cyan px-4 py-2 text-sm font-bold text-ink" to={`/investigations/${investigationId}/findings/${findingId}/repair-verifications/new`}>Verify repair</Link> : <span className="text-sm text-slate-400">Edit access required</span>}
+        </div>
+        {repairVerifications.data?.[0] ? <div className="mt-4 flex flex-wrap items-center gap-3 text-sm"><StatusBadge tone={repairVerifications.data[0].executionStatus === 'COMPLETED' ? 'green' : repairVerifications.data[0].executionStatus === 'FAILED' ? 'red' : 'slate'}>{repairVerifications.data[0].executionStatus}</StatusBadge><span>{repairVerifications.data[0].verificationResult?.replaceAll('_', ' ') ?? (isActiveRepairVerification(repairVerifications.data[0].executionStatus) ? 'Verification in progress' : 'No conclusive result')}</span><Link className="text-cyan underline" to={`/investigations/${investigationId}/findings/${findingId}/repair-verifications/${repairVerifications.data[0].repairVerificationId}`}>Open verification</Link></div> : null}
+        {repairVerifications.isError ? <p className="mt-3 text-sm text-slate-400">Repair Verification history is unavailable right now.</p> : null}
+      </section>
       <div className="mb-5 grid gap-4 lg:grid-cols-4">
         <div className="card"><div className="text-xs text-slate-500">Investigation</div><div className="mt-1 font-mono text-sm" title={investigationId}>{shortId(investigationId, 12)}</div></div>
         <div className="card"><div className="text-xs text-slate-500">Status</div><div className="mt-1"><StatusBadge tone={progress.data?.status === 'COMPLETED' ? 'green' : 'slate'}>{progress.data?.status ?? 'Unknown'}</StatusBadge></div></div>

@@ -31,6 +31,7 @@ import {
 } from '../features/invariants/index.js';
 import { ScenarioCreatePage } from '../features/scenarios/index.js';
 import { VerifyRepairPage } from '../features/repairs/verify-repair.page.js';
+import { RepairVerificationCreatePage, RepairVerificationDetailPage } from '../features/repair-verification/repair-verification.page.js';
 import { AppLayout } from '../layouts/app-layout.js';
 import { GuestRoute, RouteGuard } from '../routes/route-guard.js';
 
@@ -70,6 +71,8 @@ export const authenticatedRoutes: RouteObject[] = [
     element: <InvestigationFindingsPage />,
   },
   { path: '/investigations/:investigationId/findings/:findingId', element: <FindingDetailPage /> },
+  { path: '/investigations/:investigationId/findings/:findingId/repair-verifications/new', element: <RepairVerificationCreatePage /> },
+  { path: '/investigations/:investigationId/findings/:findingId/repair-verifications/:verificationId', element: <RepairVerificationDetailPage /> },
   { path: '/repairs/:repairId/verify', element: <VerifyRepairPage /> },
   { path: '/settings/organisation', element: <OrganisationPage /> },
   { path: '/invitations', element: <InvitationsPage /> },
