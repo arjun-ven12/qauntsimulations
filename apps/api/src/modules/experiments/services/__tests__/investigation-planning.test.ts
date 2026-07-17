@@ -57,6 +57,16 @@ class FakePlanner implements ExperimentPlanner {
   }
 }
 
+class FakeKimiPlanner implements ExperimentPlanner {
+  readonly provider = 'KIMI' as const;
+  request?: PlannerRequest;
+  constructor(private readonly output: unknown = generatedPlan) {}
+  async generatePlan(request: PlannerRequest, _context: PlannerContext) {
+    this.request = request;
+    return { provider: 'KIMI' as const, status: 'VALIDATING' as const, model: 'kimi-k2.6', output: generatedExperimentPlanSchema.parse(this.output), durationMs: 9, usage: { providerRequestCount: 1 } };
+  }
+}
+
 describe('InvestigationPlanningService', () => {
   it('uses deterministic planning by default', async () => {
     const result = await new InvestigationPlanningService(options).plan(demoCreateInvestigationInput, scope);
@@ -73,6 +83,28 @@ describe('InvestigationPlanningService', () => {
     expect(result.plannerStatus).toBe('ACCEPTED');
     expect(result.plan.worlds).toHaveLength(4);
     expect(result.plan.planner?.usage).toMatchObject({ totalTokens: 30 });
+  });
+
+  it('selects Kimi explicitly and preserves Kimi provenance', async () => {
+    const kimi = new FakeKimiPlanner();
+    const result = await new InvestigationPlanningService({ ...options, requestedProvider: 'kimi', model: 'kimi-k2.6' }, undefined, kimi).plan(demoCreateInvestigationInput, scope);
+    expect(result.effectiveProvider).toBe('KIMI');
+    expect(result.plan.planner).toMatchObject({ requestedProvider: 'KIMI', effectiveProvider: 'KIMI', model: 'kimi-k2.6', plannerStatus: 'ACCEPTED' });
+    expect(kimi.request?.controls.maximumWorlds).toBe(demoCreateInvestigationInput.scenario.controls.maximumWorlds);
+  });
+
+  it('uses deterministic fallback when selected Kimi configuration is missing', async () => {
+    const result = await new InvestigationPlanningService({ ...options, requestedProvider: 'kimi' }).plan(demoCreateInvestigationInput, scope);
+    expect(result).toMatchObject({ requestedProvider: 'KIMI', effectiveProvider: 'FALLBACK', plannerStatus: 'FALLBACK_USED' });
+    expect(result.plan.planner?.fallbackReason).toBe('Kimi planner is not configured.');
+  });
+
+  it('falls back instead of partially accepting unsupported Kimi dimensions', async () => {
+    const unsupported = { ...generatedPlan, worlds: generatedPlan.worlds.map((world, index) => index === 1 ? { ...world, browser: 'safari' } : world) };
+    const result = await new InvestigationPlanningService({ ...options, requestedProvider: 'kimi' }, undefined, new FakeKimiPlanner(unsupported)).plan(demoCreateInvestigationInput, scope);
+    expect(result).toMatchObject({ requestedProvider: 'KIMI', effectiveProvider: 'FALLBACK', plannerStatus: 'FALLBACK_USED' });
+    expect(result.fallbackReason).toContain('PLAN_SAFETY_INVALID');
+    expect(result.fallbackReason).toContain('Unsupported browser');
   });
 
   it('falls back when OpenAI is missing or fails in fallback mode', async () => {

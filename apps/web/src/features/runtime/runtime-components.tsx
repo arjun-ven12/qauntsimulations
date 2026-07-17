@@ -35,6 +35,7 @@ import {
   progressCopy,
   progressPercentage,
   providerFromPlan,
+  plannerProviderLabel,
   reproductionSteps,
   runtimeMatrix,
   safeEventMetadata,
@@ -112,7 +113,7 @@ export function InvestigationOverviewHeader({ progress, plan, workerProvider }: 
           </div>
           <h2 className="mt-4 text-2xl font-black">Investigation {shortId(progress.id, 12)}</h2>
           <p className="mt-2 text-sm text-slate-400">
-            Planner: {humanize(provider.effective)} · Worker: {workerProvider ?? 'Not recorded'} · Findings: {progress.findingsCount.toLocaleString()} · Worlds: {progress.progress.totalWorlds.toLocaleString()}
+            Planner: {plannerProviderLabel(provider.effective)} · Worker: {workerProvider ?? 'Not recorded'} · Findings: {progress.findingsCount.toLocaleString()} · Worlds: {progress.progress.totalWorlds.toLocaleString()}
           </p>
           <p className="mt-1 text-xs text-slate-500">Raw status: {progress.status}</p>
         </div>
@@ -195,12 +196,18 @@ export function ExperimentPlanPanel({ plan }: { plan: ExperimentPlanResponse | n
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-bold">Experiment plan</h2>
         <div className="flex flex-wrap gap-2">
-          <StatusBadge tone="cyan">{humanize(provider.effective)}</StatusBadge>
+          <StatusBadge tone="cyan">{plannerProviderLabel(provider.effective)}</StatusBadge>
           <StatusBadge>{humanize(provider.status)}</StatusBadge>
         </div>
       </div>
       <p className="mt-4 text-slate-300">{plan.objective}</p>
       <p className="mt-3 text-sm text-slate-400">{plan.planningExplanation}</p>
+      <dl className="mt-4 grid gap-3 md:grid-cols-4">
+        <div><dt className="text-xs text-slate-500">Planner requested</dt><dd className="font-bold">{plannerProviderLabel(provider.requested)}</dd></div>
+        <div><dt className="text-xs text-slate-500">Executed plan source</dt><dd className="font-bold">{plannerProviderLabel(provider.effective)}</dd></div>
+        <div><dt className="text-xs text-slate-500">Model</dt><dd className="font-bold">{provider.model ?? 'Not applicable'}</dd></div>
+        <div><dt className="text-xs text-slate-500">Fallback used</dt><dd className="font-bold">{provider.fallbackUsed ? 'Yes' : 'No'}</dd></div>
+      </dl>
       {fallback ? <p className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">{fallback}</p> : null}
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <Metric label="Proposed worlds" value={plan.maximumWorldCount} />

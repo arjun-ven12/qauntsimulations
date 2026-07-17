@@ -18,7 +18,7 @@ export const apiEnvironmentSchema = z
     COOKIE_SECURE: booleanString.default('false'),
     BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
     AI_PROVIDER: z.enum(['openai', 'kimi', 'mock']).default('openai'),
-    PLANNER_PROVIDER: z.enum(['deterministic', 'openai']).default('deterministic'),
+    PLANNER_PROVIDER: z.enum(['deterministic', 'openai', 'kimi']).default('deterministic'),
     PLANNER_FALLBACK_ENABLED: booleanString.default('true'),
     PLANNER_MAX_WORLDS: z.coerce.number().int().min(1).max(20).default(8),
     PLANNER_MAX_VARIABLES: z.coerce.number().int().min(1).max(12).default(6),
@@ -34,8 +34,11 @@ export const apiEnvironmentSchema = z
     OPENAI_MODEL_EXPLANATION: z.string().default('gpt-5-mini'),
     OPENAI_MODEL_VISION: z.string().default('gpt-5-mini'),
     KIMI_API_KEY: z.string().optional(),
-    KIMI_BASE_URL: z.string().url().default('https://api.moonshot.ai/v1'),
-    KIMI_MODEL: z.string().optional(),
+    MOONSHOT_API_KEY: z.string().optional(),
+    KIMI_BASE_URL: z.string().url().default('https://api.moonshot.cn/v1'),
+    KIMI_MODEL: z.string().default('kimi-k2.6'),
+    KIMI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(60_000),
+    KIMI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(500).max(10_000).default(3_000),
     EVIDENCE_STORAGE_PROVIDER: z.enum(['local', 'object']).default('local'),
     EVIDENCE_LOCAL_PATH: z.string().default('./storage/evidence'),
     WORKER_EXECUTION_PROVIDER: z.enum(['local', 'daytona']).default('local'),
@@ -110,6 +113,13 @@ export const apiEnvironmentSchema = z
         code: 'custom',
         path: ['OPENAI_PLANNER_MODEL'],
         message: 'OPENAI_PLANNER_MODEL is required when PLANNER_PROVIDER=openai',
+      });
+    }
+    if (environment.PLANNER_PROVIDER === 'kimi' && !environment.PLANNER_FALLBACK_ENABLED && !environment.MOONSHOT_API_KEY) {
+      context.addIssue({
+        code: 'custom',
+        path: ['MOONSHOT_API_KEY'],
+        message: 'MOONSHOT_API_KEY is required when PLANNER_PROVIDER=kimi and PLANNER_FALLBACK_ENABLED=false',
       });
     }
     if (environment.DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION > environment.DAYTONA_MAX_CONCURRENT_SANDBOXES) {

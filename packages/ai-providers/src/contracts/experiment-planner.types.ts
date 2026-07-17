@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import type { generatedExperimentPlanSchema } from '../schemas/generated-experiment-plan.schema.js';
 
-export type PlannerProvider = 'DETERMINISTIC' | 'OPENAI' | 'FALLBACK';
+export type PlannerProvider = 'DETERMINISTIC' | 'OPENAI' | 'KIMI' | 'FALLBACK';
 export type PlannerStatus =
   | 'PENDING'
   | 'GENERATING'
@@ -17,8 +17,14 @@ export type GeneratedExperimentPlan = z.infer<typeof generatedExperimentPlanSche
 export interface PlannerRequest {
   scenarioPrompt: string;
   project: { id: string; name: string };
-  environment: { id: string; name: string };
-  journey: { id: string; name: string; supportedVariables: string[] };
+  environment: {
+    id: string;
+    name: string;
+    type?: string;
+    origin?: string;
+    capabilities?: { allowedActions?: string[]; payment?: Record<string, unknown>; reset?: Record<string, unknown> };
+  };
+  journey: { id: string; name: string; supportedVariables: string[]; supportedActionTypes?: string[]; steps?: unknown[] };
   controls: {
     allowedBrowsers: string[];
     allowedViewports: string[];
@@ -28,6 +34,14 @@ export interface PlannerRequest {
   };
   invariants: Array<{ id: string; name: string; description?: string }>;
   supportedFaults: Array<{ id: string; type: string; allowedValues: unknown }>;
+  safety?: {
+    domainAllowlist: string[];
+    allowedHttpMethods: string[];
+    permitCheckoutSubmission: boolean;
+    permitMockPayment: boolean;
+    permitTestOrderCreation: boolean;
+    prohibitedActions: string[];
+  };
 }
 
 export interface PlannerContext {

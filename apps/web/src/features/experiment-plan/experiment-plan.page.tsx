@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { PageHeading } from '../../components/page-heading.js';
 import { ExperimentPlanPanel, PanelState, RuntimeNav } from '../runtime/runtime-components.js';
-import { humanize, providerFromPlan } from '../runtime/runtime-normalizers.js';
+import { humanize, plannerProviderLabel, providerFromPlan } from '../runtime/runtime-normalizers.js';
 import { useExperimentPlan, useInvestigationProgress } from '../runtime/use-runtime-queries.js';
 
 export function ExperimentPlanPage() {
@@ -27,8 +27,8 @@ export function ExperimentPlanPage() {
       <section className="card mt-5">
         <h2 className="font-bold">Planner provenance</h2>
         <dl className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl bg-slate-950 p-3"><dt className="text-xs text-slate-500">Requested provider</dt><dd className="mt-1 font-bold">{humanize(providers.requested)}</dd></div>
-          <div className="rounded-xl bg-slate-950 p-3"><dt className="text-xs text-slate-500">Effective provider</dt><dd className="mt-1 font-bold">{humanize(providers.effective)}</dd></div>
+          <div className="rounded-xl bg-slate-950 p-3"><dt className="text-xs text-slate-500">Requested provider</dt><dd className="mt-1 font-bold">{plannerProviderLabel(providers.requested)}</dd></div>
+          <div className="rounded-xl bg-slate-950 p-3"><dt className="text-xs text-slate-500">Effective provider</dt><dd className="mt-1 font-bold">{plannerProviderLabel(providers.effective)}</dd></div>
           <div className="rounded-xl bg-slate-950 p-3"><dt className="text-xs text-slate-500">Planner status</dt><dd className="mt-1 font-bold">{humanize(providers.status)}</dd></div>
         </dl>
       </section>

@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { MockInvestigationApi, MOCK_INVESTIGATION_ID } from '../../services/api/mock-investigation-api.js';
-import { CompletedRunSummary, EventTimeline, EvidenceSummary, InvestigationOverviewHeader, LiveFindingSummary, ProgressSummary, WorkerPanel, WorldMatrix, WorldTable } from '../runtime/runtime-components.js';
+import { CompletedRunSummary, EventTimeline, EvidenceSummary, ExperimentPlanPanel, InvestigationOverviewHeader, LiveFindingSummary, ProgressSummary, WorkerPanel, WorldMatrix, WorldTable } from '../runtime/runtime-components.js';
 import { polling } from '../runtime/use-runtime-queries.js';
 import { cleanupWarning, plannerLabels, providerLabel, timingLabels } from './live-worldlab.page.js';
 
@@ -62,6 +62,21 @@ describe('LiveWorldLabPage runtime metadata helpers', () => {
       ),
     ).toEqual(['Planner: FALLBACK', 'Plan status: PARTIALLY ACCEPTED']);
     expect(plannerLabels(event())).toEqual([]);
+  });
+
+  it('renders Kimi planner and deterministic fallback provenance explicitly', () => {
+    const base = {
+      objective: 'Safe plan', journeyId: 'journey', scenarioId: 'scenario', worldPack: 'v1', selectedVariables: [], initialWorldCount: 0,
+      maximumWorldCount: 4, maximumConcurrentWorkers: 2, timeoutSeconds: 0, retryCount: 0, safetyConstraints: [], invariants: [], worlds: [],
+    };
+    const kimi = renderToStaticMarkup(<ExperimentPlanPanel plan={{ ...base, plannerMetadata: { requestedProvider: 'KIMI', effectiveProvider: 'KIMI', plannerStatus: 'ACCEPTED', model: 'kimi-k2.6' } }} />);
+    expect(kimi).toContain('Kimi AI');
+    expect(kimi).toContain('kimi-k2.6');
+    expect(kimi).toContain('Fallback used');
+    expect(kimi).toContain('No');
+    const fallback = renderToStaticMarkup(<ExperimentPlanPanel plan={{ ...base, plannerMetadata: { requestedProvider: 'KIMI', effectiveProvider: 'FALLBACK', plannerStatus: 'FALLBACK_USED', fallbackReason: 'Kimi planner request timed out.' } }} />);
+    expect(fallback).toContain('Deterministic fallback');
+    expect(fallback).toContain('Kimi planner request timed out.');
   });
 
   it('renders the completed 13-world runtime experience without report-body content', async () => {

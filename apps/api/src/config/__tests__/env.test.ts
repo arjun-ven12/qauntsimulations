@@ -113,4 +113,35 @@ describe('API environment security', () => {
       OPENAI_PLANNER_MODEL: 'gpt-5-mini',
     }).success).toBe(true);
   });
+
+  it('validates explicit Kimi planner configuration and safe defaults', () => {
+    const configured = apiEnvironmentSchema.parse({
+      ...requiredEnvironment,
+      PLANNER_PROVIDER: 'kimi',
+      PLANNER_FALLBACK_ENABLED: 'false',
+      MOONSHOT_API_KEY: 'test-key',
+      KIMI_MODEL: 'sponsor-kimi-model',
+    });
+    expect(configured.KIMI_BASE_URL).toBe('https://api.moonshot.cn/v1');
+    expect(configured.KIMI_MODEL).toBe('sponsor-kimi-model');
+    expect(configured.KIMI_TIMEOUT_MS).toBe(60_000);
+    expect(Object.keys(configured)).not.toContain('PUBLIC_MOONSHOT_API_KEY');
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      PLANNER_PROVIDER: 'kimi',
+      PLANNER_FALLBACK_ENABLED: 'false',
+    }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      PLANNER_PROVIDER: 'kimi',
+      PLANNER_FALLBACK_ENABLED: 'false',
+      MOONSHOT_API_KEY: 'test-key',
+      KIMI_TIMEOUT_MS: '121000',
+    }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, PLANNER_PROVIDER: 'unknown' }).success).toBe(false);
+  });
+
+  it('does not select Kimi merely because its key exists', () => {
+    expect(apiEnvironmentSchema.parse({ ...requiredEnvironment, MOONSHOT_API_KEY: 'test-key' }).PLANNER_PROVIDER).toBe('deterministic');
+  });
 });
