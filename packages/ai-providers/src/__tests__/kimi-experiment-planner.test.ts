@@ -51,6 +51,7 @@ describe('KimiExperimentPlanner', () => {
     ['authentication', { status: 401 }, 'AUTHENTICATION_ERROR'],
     ['rate limit', { status: 429 }, 'RATE_LIMITED'],
     ['timeout', { name: 'APIConnectionTimeoutError' }, 'TIMEOUT'],
+    ['nested connection timeout', { name: 'Error', cause: { code: 'UND_ERR_CONNECT_TIMEOUT' } }, 'TIMEOUT'],
     ['provider outage', { status: 500 }, 'PROVIDER_UNAVAILABLE'],
   ])('normalizes %s without leaking raw provider data', async (_label, providerError, expectedCode) => {
     const client = new KimiClient({ apiKey: 'never-leak-me', baseUrl: 'https://api.moonshot.ai/v1' }, async () => { throw { ...providerError, body: 'never-leak-me raw body' }; });
