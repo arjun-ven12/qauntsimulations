@@ -2,10 +2,11 @@ import { createInvestigationInputSchema, type CreateInvestigationInput } from '@
 import { ApplicationError } from '../../core/errors/application-error.js';
 import type { InvestigationPlanningService } from '../experiments/services/investigation-planning.service.js';
 import type { InvestigationOrchestratorService } from '../execution/investigation-orchestrator.service.js';
+import type { EvidenceContentService } from './evidence-content.service.js';
 import { mapEvidenceList, mapExperimentList, mapFindingDetail, mapFindingList, mapProgress, mapWorkerList, mapWorldList } from './investigations.mapper.js';
 import type { InvestigationRepository } from './investigations.repository.js';
 
-type InvestigationServiceRepository = Pick<InvestigationRepository, 'validateCreationScope' | 'create' | 'persistPlan' | 'progress' | 'listWorlds' | 'listExperiments' | 'listWorkers' | 'listEvidence' | 'listFindings' | 'getFinding' | 'cancel' | 'orchestrationContext' | 'failInvestigation'>;
+type InvestigationServiceRepository = Pick<InvestigationRepository, 'validateCreationScope' | 'create' | 'persistPlan' | 'progress' | 'listWorlds' | 'listExperiments' | 'listWorkers' | 'listEvidence' | 'listFindings' | 'getFinding' | 'getEvidenceArtifact' | 'cancel' | 'orchestrationContext' | 'failInvestigation'>;
 type InvestigationStarter = Pick<InvestigationOrchestratorService, 'start'>;
 
 export class InvestigationService {
@@ -13,6 +14,7 @@ export class InvestigationService {
     private readonly repository: InvestigationServiceRepository,
     private readonly planner: InvestigationPlanningService,
     private readonly orchestrator: InvestigationStarter,
+    private readonly evidenceContent?: EvidenceContentService,
   ) {}
 
   async create(organisationId: string, raw: unknown, projectId?: string) {
@@ -54,6 +56,13 @@ export class InvestigationService {
     const finding = await this.repository.getFinding(organisationId, id, findingId);
     if (!finding) throw new ApplicationError('FINDING_NOT_FOUND', 'Finding was not found', 404);
     return mapFindingDetail(finding);
+  }
+  async evidenceContentForArtifact(organisationId: string, id: string, evidenceId: string) {
+    await this.requireProgress(organisationId, id);
+    const artifact = await this.repository.getEvidenceArtifact(organisationId, id, evidenceId);
+    if (!artifact) throw new ApplicationError('EVIDENCE_NOT_FOUND', 'Evidence artifact was not found', 404);
+    if (!this.evidenceContent) throw new ApplicationError('EVIDENCE_CONTENT_UNAVAILABLE', 'Evidence content access is unavailable', 500);
+    return this.evidenceContent.readFinalReport(id, artifact);
   }
   async cancel(organisationId: string, id: string) { if (!(await this.repository.cancel(organisationId, id))) throw new ApplicationError('INVESTIGATION_NOT_CANCELLABLE', 'Investigation was not found or is already terminal', 409); return this.get(organisationId, id); }
   async plan(organisationId: string, id: string) { await this.requireProgress(organisationId, id); return (await this.repository.orchestrationContext(id))?.plan ?? null; }

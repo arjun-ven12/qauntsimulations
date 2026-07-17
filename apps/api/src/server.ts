@@ -36,6 +36,7 @@ import { InvestigationService } from './modules/investigations/investigations.se
 import { InvitationController } from './modules/invitations/invitation.controller.js';
 import { PrismaInvitationRepository } from './modules/invitations/invitation.repository.js';
 import { InvitationService } from './modules/invitations/invitation.service.js';
+import { EvidenceContentService } from './modules/investigations/evidence-content.service.js';
 import { JourneyController } from './modules/journeys/journeys.controller.js';
 import { JourneyRepository } from './modules/journeys/journeys.repository.js';
 import { JourneyService } from './modules/journeys/journeys.service.js';
@@ -201,6 +202,7 @@ const app = createApplication({
         investigationRepository,
         investigationPlanningService,
         investigationOrchestrator,
+        new EvidenceContentService(evidenceRoot, env.FINAL_REPORT_CONTENT_MAX_BYTES),
       ),
     ),
   },

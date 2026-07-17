@@ -12,6 +12,8 @@ export const apiErrorKindSchema = z.enum([
   'INVALID_JSON',
   'SCHEMA_MISMATCH',
   'TIMEOUT',
+  'CONTENT_TOO_LARGE',
+  'UNSUPPORTED_CONTENT',
   'HTTP',
 ]);
 export type ApiErrorKind = z.infer<typeof apiErrorKindSchema>;
@@ -152,6 +154,19 @@ export const evidenceArtifactResponseSchema = z.object({
 });
 export type EvidenceArtifactResponse = z.infer<typeof evidenceArtifactResponseSchema>;
 
+export const evidenceTextContentResponseSchema = z.object({
+  evidenceId: z.string(),
+  investigationId: z.string(),
+  type: z.literal('FINAL_REPORT'),
+  format: z.enum(['MARKDOWN', 'JSON', 'TEXT']),
+  filename: z.string(),
+  contentType: z.string(),
+  sizeBytes: z.number().int().nonnegative(),
+  checksum: z.string().optional(),
+  content: z.string(),
+}).refine((response) => !JSON.stringify(response).includes('/Users/') && !/C:\\Users\\/i.test(JSON.stringify(response)), 'Report content response must not expose local filesystem paths');
+export type EvidenceTextContentResponse = z.infer<typeof evidenceTextContentResponseSchema>;
+
 export const findingDetailSchema = z.object({
   id: z.string(),
   investigationId: z.string(),
@@ -185,6 +200,7 @@ export interface InvestigationApi {
   getExperiments(investigationId: string): Promise<InvestigationExperiment[]>;
   getWorkers(investigationId: string): Promise<InvestigationWorker[]>;
   getEvidence(investigationId: string): Promise<EvidenceArtifactResponse[]>;
+  getEvidenceTextContent(investigationId: string, evidenceId: string): Promise<EvidenceTextContentResponse>;
   listProjects(): Promise<Project[]>;
   createProject(input: {
     name: string;

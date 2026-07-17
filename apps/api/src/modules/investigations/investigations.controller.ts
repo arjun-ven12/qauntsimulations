@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from 'express';
+import type { EvidenceTextContentResponse } from './evidence-content.service.js';
 import type { InvestigationService } from './investigations.service.js';
 
 export class InvestigationController {
@@ -11,6 +12,17 @@ export class InvestigationController {
   experiments = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.experiments(request.auth!.organisationId!, String(request.params.investigationId))); } catch (error) { next(error); } };
   workers = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.workers(request.auth!.organisationId!, String(request.params.investigationId))); } catch (error) { next(error); } };
   evidence = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.evidence(request.auth!.organisationId!, String(request.params.investigationId))); } catch (error) { next(error); } };
+  evidenceContent = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      const content: EvidenceTextContentResponse = await this.service.evidenceContentForArtifact(request.auth!.organisationId!, String(request.params.investigationId), String(request.params.evidenceId));
+      response
+        .set('Cache-Control', 'private, max-age=60')
+        .set('X-Content-Type-Options', 'nosniff')
+        .json(content);
+    } catch (error) {
+      next(error);
+    }
+  };
   findings = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.findings(request.auth!.organisationId!, String(request.params.investigationId))); } catch (error) { next(error); } };
   finding = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.finding(request.auth!.organisationId!, String(request.params.investigationId), String(request.params.findingId))); } catch (error) { next(error); } };
   cancel = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.cancel(request.auth!.organisationId!, String(request.params.investigationId))); } catch (error) { next(error); } };

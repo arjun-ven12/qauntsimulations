@@ -27,6 +27,7 @@ import type {
 import type { WorkerExecutionProvider } from '../execution/worker-executor.types.js';
 import type { AdaptiveReproductionPlan } from '../experiments/services/adaptive-reproduction-plan.service.js';
 import type { DeterministicWorldDefinition } from '../experiments/services/deterministic-experiment-plan.service.js';
+import { aggregateMinimisationDelayBounds } from './minimisation-bounds.js';
 
 const json = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 const messageData = (message: string, metadata: Record<string, unknown> = {}): Prisma.InputJsonValue => json({ message, ...metadata });
@@ -424,12 +425,24 @@ export class InvestigationRepository {
         supportingEvidenceIds: json(input.evidenceArtifactIds),
         completedAt: new Date(),
       } });
+      const candidates = await transaction.minimisationCandidate.findMany({
+        where: { minimisationRunId: input.runId },
+        select: { variableName: true, candidateValue: true, result: true },
+      });
+      const bounds = aggregateMinimisationDelayBounds({
+        existingPassingDelayMs: existingRun?.knownPassingDelayMs ?? null,
+        existingFailingDelayMs: existingRun?.knownFailingDelayMs ?? null,
+        candidates,
+      });
+      if (bounds.contradictory) {
+        throw new Error('Contradictory minimisation delay bounds detected');
+      }
       await transaction.minimisationRun.update({ where: { id: input.runId }, data: {
         currentRetainedConditions: json(input.retainedConditions),
         removedConditions: json(input.removedConditions),
         inconclusiveConditions: json(input.inconclusiveConditions),
-        ...(input.delayRange.lowerPassingBoundMs !== undefined ? { knownPassingDelayMs: input.delayRange.lowerPassingBoundMs } : {}),
-        ...(input.delayRange.upperFailingBoundMs !== undefined ? { knownFailingDelayMs: input.delayRange.upperFailingBoundMs } : {}),
+        ...(bounds.knownPassingDelayMs !== undefined ? { knownPassingDelayMs: bounds.knownPassingDelayMs } : {}),
+        ...(bounds.knownFailingDelayMs !== undefined ? { knownFailingDelayMs: bounds.knownFailingDelayMs } : {}),
         generatedCandidateWorldIds: json([...new Set([...generated, ...(candidate?.worldId ? [candidate.worldId] : [])])]),
         completedTrials: { increment: candidate?.completedAt ? 0 : 1 },
       } });
@@ -942,10 +955,44 @@ export class InvestigationRepository {
     return this.database.world.findMany({ where: { investigationId: id, investigation: { organisationId } }, orderBy: { createdAt: 'asc' }, include: { experiments: { orderBy: { createdAt: 'asc' }, take: 1, include: { attempts: { orderBy: { attempt: 'desc' }, take: 1, select: { workerId: true, startedAt: true, completedAt: true } } } } } });
   }
   async listExperiments(organisationId: string, id: string) {
-    return this.database.experiment.findMany({ where: { investigationId: id, investigation: { organisationId } }, orderBy: { createdAt: 'asc' }, include: { _count: { select: { attempts: true } }, attempts: { orderBy: { attempt: 'desc' }, take: 1 } } });
+    return this.database.experiment.findMany({
+      where: { investigationId: id, investigation: { organisationId } },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        _count: { select: { attempts: true } },
+        attempts: {
+          orderBy: { attempt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            startedAt: true,
+            completedAt: true,
+            exitCode: true,
+            durationMs: true,
+          },
+        },
+      },
+    });
   }
   async listWorkers(organisationId: string, id: string) {
-    return this.database.worker.findMany({ where: { organisationId, attempts: { some: { experiment: { investigationId: id } } } }, orderBy: { createdAt: 'asc' }, include: { attempts: { where: { experiment: { investigationId: id } }, include: { experiment: { select: { worldId: true, investigationId: true } } } } } });
+    return this.database.worker.findMany({
+      where: { organisationId, attempts: { some: { experiment: { investigationId: id } } } },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        attempts: {
+          where: { experiment: { investigationId: id } },
+          select: {
+            id: true,
+            status: true,
+            startedAt: true,
+            completedAt: true,
+            exitCode: true,
+            durationMs: true,
+            experiment: { select: { worldId: true, investigationId: true } },
+          },
+        },
+      },
+    });
   }
   async listEvidence(organisationId: string, id: string) {
     return this.database.evidenceArtifact.findMany({ where: { experiment: { investigationId: id, investigation: { organisationId } } }, orderBy: { createdAt: 'asc' } });
@@ -959,7 +1006,30 @@ export class InvestigationRepository {
       include: {
         evidence: { include: { artifact: true } },
         reproductions: { orderBy: { createdAt: 'asc' } },
+        minimisationRuns: {
+          orderBy: { startedAt: 'desc' },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            completedTrials: true,
+            currentRetainedConditions: true,
+            removedConditions: true,
+            inconclusiveConditions: true,
+            knownPassingDelayMs: true,
+            knownFailingDelayMs: true,
+            finalReportEvidenceId: true,
+          },
+        },
         minimalReproduction: true,
+      },
+    });
+  }
+  async getEvidenceArtifact(organisationId: string, investigationId: string, evidenceId: string) {
+    return this.database.evidenceArtifact.findFirst({
+      where: {
+        id: evidenceId,
+        experiment: { investigationId, investigation: { organisationId } },
       },
     });
   }

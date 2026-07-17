@@ -81,6 +81,7 @@ export const apiEnvironmentSchema = z
     MINIMISATION_CONFIRM_FINAL_SET: booleanString.default('true'),
     MINIMISATION_CONFIDENCE_MAX: z.coerce.number().min(0).max(1).default(0.97),
     FINAL_REPORT_ENABLED: booleanString.default('true'),
+    FINAL_REPORT_CONTENT_MAX_BYTES: z.coerce.number().int().min(1).max(10_000_000).default(1_048_576),
   })
   .superRefine((environment, context) => {
     if (environment.NODE_ENV === 'production' && !environment.COOKIE_SECURE) {

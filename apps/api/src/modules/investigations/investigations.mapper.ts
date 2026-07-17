@@ -1,5 +1,8 @@
 import { findingSchema, investigationProgressSchema, type InvestigationProgress } from '@taskos/shared-types';
 import type { InvestigationProgressRecord } from './investigations.types.js';
+import { sanitizeRuntimePublicMetadata } from './runtime-public-sanitizer.js';
+
+const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
 const publicStatus = (status: string): InvestigationProgress['status'] => {
   if (status === 'PLANNING') return 'PLANNING';
@@ -36,7 +39,7 @@ export function mapProgress(record: InvestigationProgressRecord): InvestigationP
         message: typeof message === 'string' ? message : event.type.replaceAll('_', ' '),
         createdAt: event.occurredAt.toISOString(),
         ...(typeof worldId === 'string' ? { worldId } : {}),
-        ...(Object.keys(metadata).length ? { metadata } : {}),
+        ...(Object.keys(metadata).length ? { metadata: sanitizeRuntimePublicMetadata(metadata) } : {}),
       };
     }),
     findingsCount: record.findingsCount,
@@ -50,31 +53,56 @@ interface WorldListRecord {
 export function mapWorldList(records: WorldListRecord[]) {
   return records.map((world) => {
     const experiment = world.experiments[0]; const attempt = experiment?.attempts[0];
-    const configuration = world.configuration && typeof world.configuration === 'object' && !Array.isArray(world.configuration) ? world.configuration as Record<string, unknown> : {};
+    const configuration = world.configuration && typeof world.configuration === 'object' && !Array.isArray(world.configuration) ? sanitizeRuntimePublicMetadata(world.configuration) as Record<string, unknown> : {};
     return { id: world.id, investigationId: world.investigationId, name: typeof configuration.name === 'string' ? configuration.name : 'World', status: world.status, reason: world.reason, configuration, ...(experiment ? { experimentId: experiment.id } : {}), ...(attempt?.workerId ? { workerId: attempt.workerId } : {}), createdAt: world.createdAt.toISOString(), ...(attempt?.startedAt ? { startedAt: attempt.startedAt.toISOString() } : {}), ...(attempt?.completedAt ? { completedAt: attempt.completedAt.toISOString() } : {}) };
   });
 }
 
 interface ExperimentListRecord { id: string; investigationId: string; worldId: string; status: string; kind: string; createdAt: Date; updatedAt: Date; _count: { attempts: number }; attempts: Array<{ id: string; startedAt: Date | null; completedAt: Date | null; exitCode: number | null; durationMs: number | null }> }
-export function mapExperimentList(records: ExperimentListRecord[]) { return records.map((record) => ({ id: record.id, investigationId: record.investigationId, worldId: record.worldId, status: record.status, kind: record.kind, attemptCount: record._count.attempts, latestAttempt: record.attempts[0] ? { ...record.attempts[0], startedAt: record.attempts[0].startedAt?.toISOString(), completedAt: record.attempts[0].completedAt?.toISOString() } : undefined, createdAt: record.createdAt.toISOString(), updatedAt: record.updatedAt.toISOString() })); }
+export function mapExperimentList(records: ExperimentListRecord[]) { return records.map((record) => {
+  const latest = record.attempts[0];
+  return {
+    id: record.id,
+    investigationId: record.investigationId,
+    worldId: record.worldId,
+    status: record.status,
+    kind: record.kind,
+    attemptCount: record._count.attempts,
+    latestAttempt: latest ? {
+      id: latest.id,
+      startedAt: latest.startedAt?.toISOString(),
+      completedAt: latest.completedAt?.toISOString(),
+      exitCode: latest.exitCode,
+      durationMs: latest.durationMs,
+    } : undefined,
+    createdAt: record.createdAt.toISOString(),
+    updatedAt: record.updatedAt.toISOString(),
+  };
+}); }
 
 interface WorkerListRecord { id: string; status: string; providerId: string | null; createdAt: Date; updatedAt: Date; attempts: Array<{ id: string; status: string; startedAt: Date | null; completedAt: Date | null; exitCode: number | null; durationMs: number | null; experiment: { worldId: string; investigationId: string } }> }
-export function mapWorkerList(records: WorkerListRecord[]) { return records.map((worker) => ({ id: worker.id, provider: worker.providerId ?? 'LOCAL', status: worker.status, attempts: worker.attempts.map((attempt) => ({ ...attempt, startedAt: attempt.startedAt?.toISOString(), completedAt: attempt.completedAt?.toISOString() })), createdAt: worker.createdAt.toISOString(), updatedAt: worker.updatedAt.toISOString() })); }
+export function mapWorkerList(records: WorkerListRecord[]) { return records.map((worker) => ({
+  id: worker.id,
+  provider: worker.providerId ?? 'LOCAL',
+  status: worker.status,
+  attempts: worker.attempts.map((attempt) => ({
+    id: attempt.id,
+    status: attempt.status,
+    startedAt: attempt.startedAt?.toISOString(),
+    completedAt: attempt.completedAt?.toISOString(),
+    exitCode: attempt.exitCode,
+    durationMs: attempt.durationMs,
+    experiment: {
+      worldId: attempt.experiment.worldId,
+      investigationId: attempt.experiment.investigationId,
+    },
+  })),
+  createdAt: worker.createdAt.toISOString(),
+  updatedAt: worker.updatedAt.toISOString(),
+})); }
 
 interface EvidenceListRecord { id: string; experimentId: string; type: string; storageKey: string; mimeType: string; sizeBytes: bigint; checksum: string | null; redacted: boolean; createdAt: Date; metadata: unknown }
-const localPathKeys = new Set(['path', 'absolutePath', 'localPath', 'filesystemPath', 'filePath']);
-function sanitizeEvidenceMetadata(metadata: unknown): unknown {
-  if (Array.isArray(metadata)) return metadata.map((value) => sanitizeEvidenceMetadata(value));
-  if (!metadata || typeof metadata !== 'object') {
-    if (typeof metadata === 'string' && (/\/Users\//.test(metadata) || /^[A-Za-z]:[\\/]/.test(metadata))) return '[redacted-local-path]';
-    return metadata;
-  }
-  return Object.fromEntries(Object.entries(metadata as Record<string, unknown>).flatMap(([key, value]) => {
-    if (localPathKeys.has(key) && typeof value === 'string') return [];
-    return [[key, sanitizeEvidenceMetadata(value)]];
-  }));
-}
-export function mapEvidenceList(records: EvidenceListRecord[]) { return records.map((artifact) => ({ id: artifact.id, experimentId: artifact.experimentId, type: artifact.type, path: artifact.storageKey, mimeType: artifact.mimeType, sizeBytes: Number(artifact.sizeBytes), checksum: artifact.checksum, redacted: artifact.redacted, metadata: sanitizeEvidenceMetadata(artifact.metadata), createdAt: artifact.createdAt.toISOString() })); }
+export function mapEvidenceList(records: EvidenceListRecord[]) { return records.map((artifact) => ({ id: artifact.id, experimentId: artifact.experimentId, type: artifact.type, path: artifact.storageKey, mimeType: artifact.mimeType, sizeBytes: Number(artifact.sizeBytes), checksum: artifact.checksum, redacted: artifact.redacted, metadata: sanitizeRuntimePublicMetadata(artifact.metadata), createdAt: artifact.createdAt.toISOString() })); }
 
 interface FindingListRecord { id: string; investigationId: string; title: string; summary: string; severity: string; confidence: string; reproductionCount: number; causalConditions: unknown; createdAt: Date; updatedAt: Date }
 export function mapFindingList(records: FindingListRecord[]) { return records.map((finding) => findingSchema.parse({ ...finding, causalConditions: finding.causalConditions, createdAt: finding.createdAt.toISOString(), updatedAt: finding.updatedAt.toISOString() })); }
@@ -82,10 +110,50 @@ export function mapFindingList(records: FindingListRecord[]) { return records.ma
 interface FindingDetailRecord extends FindingListRecord {
   evidence: Array<{ artifact: EvidenceListRecord }>;
   reproductions: Array<{ id: string; experimentId: string; reproduced: boolean; createdAt: Date }>;
+  minimisationRuns: Array<{
+    id: string;
+    status: string;
+    completedTrials: number;
+    currentRetainedConditions: unknown;
+    removedConditions: unknown;
+    inconclusiveConditions: unknown;
+    knownPassingDelayMs: number | null;
+    knownFailingDelayMs: number | null;
+    finalReportEvidenceId: string | null;
+  }>;
   minimalReproduction: { id: string; journeySteps: unknown; worldConfiguration: unknown; scriptArtifactId: string | null; createdAt: Date; updatedAt: Date } | null;
 }
 export function mapFindingDetail(finding: FindingDetailRecord) {
-  const summary = findingSchema.parse({ ...finding, causalConditions: finding.causalConditions, createdAt: finding.createdAt.toISOString(), updatedAt: finding.updatedAt.toISOString() });
+  const latestMinimisationRun = finding.minimisationRuns[0];
+  const causalConditions = record(finding.causalConditions);
+  const minimisation = record(causalConditions.minimisation);
+  const enrichedConditions = latestMinimisationRun
+    ? {
+        ...causalConditions,
+        minimisationRun: sanitizeRuntimePublicMetadata({
+          id: latestMinimisationRun.id,
+          status: latestMinimisationRun.status,
+          completedTrials: latestMinimisationRun.completedTrials,
+          retainedConditions: latestMinimisationRun.currentRetainedConditions,
+          removedConditions: latestMinimisationRun.removedConditions,
+          inconclusiveConditions: latestMinimisationRun.inconclusiveConditions,
+          knownPassingDelayMs: latestMinimisationRun.knownPassingDelayMs,
+          knownFailingDelayMs: latestMinimisationRun.knownFailingDelayMs,
+          finalReportEvidenceId: latestMinimisationRun.finalReportEvidenceId,
+        }),
+        minimisation: {
+          ...minimisation,
+          retainedConditions: minimisation.retainedConditions ?? latestMinimisationRun.currentRetainedConditions,
+          removedConditions: minimisation.removedConditions ?? latestMinimisationRun.removedConditions,
+          inconclusiveConditions: minimisation.inconclusiveConditions ?? latestMinimisationRun.inconclusiveConditions,
+          boundedRange: minimisation.boundedRange ?? {
+            ...(latestMinimisationRun.knownPassingDelayMs !== null ? { lowerPassingBoundMs: latestMinimisationRun.knownPassingDelayMs } : {}),
+            ...(latestMinimisationRun.knownFailingDelayMs !== null ? { upperFailingBoundMs: latestMinimisationRun.knownFailingDelayMs } : {}),
+          },
+        },
+      }
+    : causalConditions;
+  const summary = findingSchema.parse({ ...finding, causalConditions: enrichedConditions, createdAt: finding.createdAt.toISOString(), updatedAt: finding.updatedAt.toISOString() });
   return {
     ...summary,
     evidence: mapEvidenceList(finding.evidence.map(({ artifact }) => artifact)),
@@ -93,6 +161,8 @@ export function mapFindingDetail(finding: FindingDetailRecord) {
     minimalReproduction: finding.minimalReproduction
       ? {
           ...finding.minimalReproduction,
+          journeySteps: sanitizeRuntimePublicMetadata(finding.minimalReproduction.journeySteps),
+          worldConfiguration: sanitizeRuntimePublicMetadata(finding.minimalReproduction.worldConfiguration),
           createdAt: finding.minimalReproduction.createdAt.toISOString(),
           updatedAt: finding.minimalReproduction.updatedAt.toISOString(),
         }
