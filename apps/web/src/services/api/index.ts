@@ -15,5 +15,7 @@ export type {
   InvestigationExperiment,
   InvestigationWorker,
   InvestigationWorld,
+  PublicBusinessOutcome,
+  PublicWorldExecutionState,
 } from './investigation-api.js';
 export { InvestigationApiError } from './investigation-api.js';
