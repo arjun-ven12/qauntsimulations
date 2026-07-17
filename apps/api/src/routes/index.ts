@@ -10,6 +10,8 @@ import type { EnvironmentController } from '../modules/environments/environments
 import { createEnvironmentRouter } from '../modules/environments/environments.routes.js';
 import type { JourneyController } from '../modules/journeys/journeys.controller.js';
 import { createJourneyRouter } from '../modules/journeys/journeys.routes.js';
+import type { InvariantController } from '../modules/invariants/invariants.controller.js';
+import { createInvariantRouter } from '../modules/invariants/invariants.routes.js';
 import type { ProjectController } from '../modules/projects/projects.controller.js';
 import { createProjectRouter } from '../modules/projects/projects.routes.js';
 import type { OrganisationController } from '../modules/organisations/organisation.controller.js';
@@ -24,6 +26,7 @@ export interface ProtectedControllers {
   projects: ProjectController;
   environments: EnvironmentController;
   journeys: JourneyController;
+  invariants: InvariantController;
   scenarios: ScenarioController;
   investigations: InvestigationController;
   organisations: OrganisationController;
@@ -47,7 +50,10 @@ export function createProtectedRouter(
   );
   router.use('/projects/:projectId/journeys', createJourneyRouter(controllers.journeys));
   router.use('/projects/:projectId/scenarios', createScenarioRouter(controllers.scenarios));
-  router.use('/projects/:projectId/invariants', createNotImplementedRouter('Invariant management'));
+  router.use(
+    '/projects/:projectId/invariants',
+    createInvariantRouter(controllers.invariants),
+  );
   router.use(
     '/projects/:projectId/investigations',
     createProjectInvestigationRouter(controllers.investigations),

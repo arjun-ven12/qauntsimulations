@@ -33,6 +33,9 @@ import { WorkerExecutorFactory } from './modules/execution/worker-executor.facto
 import { InvestigationController } from './modules/investigations/investigations.controller.js';
 import { InvestigationRepository } from './modules/investigations/investigations.repository.js';
 import { InvestigationService } from './modules/investigations/investigations.service.js';
+import { InvariantController } from './modules/invariants/invariants.controller.js';
+import { InvariantRepository } from './modules/invariants/invariants.repository.js';
+import { InvariantService } from './modules/invariants/invariants.service.js';
 import { InvitationController } from './modules/invitations/invitation.controller.js';
 import { PrismaInvitationRepository } from './modules/invitations/invitation.repository.js';
 import { InvitationService } from './modules/invitations/invitation.service.js';
@@ -195,6 +198,9 @@ const app = createApplication({
     ),
     invitations: invitationController,
     journeys: new JourneyController(new JourneyService(new JourneyRepository(database))),
+    invariants: new InvariantController(
+      new InvariantService(new InvariantRepository(database)),
+    ),
     scenarios: new ScenarioController(new ScenarioService(new ScenarioRepository(database))),
     investigations: new InvestigationController(
       new InvestigationService(

@@ -23,6 +23,12 @@ import {
   JourneysPage,
   NewJourneyPage,
 } from '../features/journeys/index.js';
+import {
+  InvariantOverviewPage,
+  InvariantSettingsPage,
+  InvariantsPage,
+  NewInvariantPage,
+} from '../features/invariants/index.js';
 import { VerifyRepairPage } from '../features/repairs/verify-repair.page.js';
 import { AppLayout } from '../layouts/app-layout.js';
 import { GuestRoute, RouteGuard } from '../routes/route-guard.js';
@@ -63,6 +69,13 @@ export const router = createBrowserRouter([
       {
         path: '/projects/:projectId/journeys/:journeyId/settings',
         element: <JourneySettingsPage />,
+      },
+      { path: '/projects/:projectId/invariants', element: <InvariantsPage /> },
+      { path: '/projects/:projectId/invariants/new', element: <NewInvariantPage /> },
+      { path: '/projects/:projectId/invariants/:invariantId', element: <InvariantOverviewPage /> },
+      {
+        path: '/projects/:projectId/invariants/:invariantId/settings',
+        element: <InvariantSettingsPage />,
       },
       { path: '/projects/:projectId/investigations/new', element: <NewInvestigationPage /> },
       { path: '/investigations/:investigationId', element: <LiveWorldLabPage /> },
