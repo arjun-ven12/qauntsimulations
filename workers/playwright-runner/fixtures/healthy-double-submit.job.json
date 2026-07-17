@@ -1,0 +1,36 @@
+{
+  "workerId": "local-worker-healthy-double-submit",
+  "experimentId": "healthy-double-submit-experiment",
+  "worldId": "healthy-double-submit-world",
+  "target": { "baseUrl": "http://localhost:5174", "journeyPath": "/products/test-product" },
+  "testSetup": {
+    "reset": { "method": "POST", "path": "/api/test/reset" },
+    "configuration": { "method": "POST", "path": "/api/test/config", "body": { "duplicateSubmissionBug": false, "paymentDelayMs": 1200 } }
+  },
+  "browser": { "engine": "chromium", "viewport": "desktop", "headless": true },
+  "journey": {
+    "id": "commerce-checkout",
+    "name": "Complete test checkout",
+    "steps": [
+      { "type": "goto", "path": "/products/test-product", "name": "Open product" },
+      { "type": "waitFor", "selector": "[data-testid=\"product-page\"]" },
+      { "type": "click", "selector": "[data-testid=\"add-to-cart\"]", "name": "Add product to cart", "screenshotCheckpoint": true },
+      { "type": "click", "selector": "[data-testid=\"open-cart\"]", "name": "Open cart" },
+      { "type": "waitFor", "selector": "[data-testid=\"cart-item\"]" },
+      { "type": "click", "selector": "[data-testid=\"checkout-button\"]", "name": "Open checkout" },
+      { "type": "waitFor", "selector": "[data-testid=\"checkout-form\"]" },
+      { "type": "fill", "selector": "[data-testid=\"email-input\"]", "value": "test@taskos.dev", "name": "Enter email" },
+      { "type": "submitPayment", "selector": "[data-testid=\"pay-button\"]", "name": "Submit payment", "screenshotCheckpoint": true },
+      { "type": "waitFor", "selector": "[data-testid=\"order-confirmation\"]", "timeoutMs": 10000, "name": "Wait for confirmation" },
+      { "type": "assertVisible", "selector": "[data-testid=\"order-id\"]" }
+    ],
+    "successCondition": { "type": "visible", "selector": "[data-testid=\"order-confirmation\"]" }
+  },
+  "world": { "userProfile": "impatient", "networkProfile": "normal", "latencyMs": 0, "doubleSubmit": true, "doubleSubmitIntervalMs": 100, "clearStorageBeforeRun": true, "paymentUrlPatterns": ["/api/payments"], "orderUrlPatterns": ["/api/orders"], "randomSeed": 202, "reason": "Verify that the healthy store suppresses repeated payment submission." },
+  "invariants": [
+    { "id": "no-duplicate-payment", "type": "NO_DUPLICATE_PAYMENT", "severity": "CRITICAL", "config": { "requestPatterns": ["/api/payments"], "methods": ["POST"] } },
+    { "id": "no-duplicate-order", "type": "NO_DUPLICATE_ORDER", "severity": "HIGH", "config": { "requestPatterns": ["/api/orders"], "methods": ["POST"], "orderIdSelector": "[data-testid=\"order-id\"]" } }
+  ],
+  "evidence": { "outputDirectory": "./artifacts/demo-store/healthy-double-submit", "screenshots": true, "trace": true, "console": true, "network": true, "video": false },
+  "limits": { "timeoutMs": 45000 }
+}

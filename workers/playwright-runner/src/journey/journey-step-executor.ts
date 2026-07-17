@@ -6,7 +6,7 @@ export class JourneyStepExecutor {
     try {
       let interactionTimestamps: string[] | undefined; let interactionIntervalMs: number | undefined;
       if (step.type === 'goto') { try { await this.page.goto(new URL(step.path, base).toString(), { waitUntil: 'domcontentloaded' }); } catch (error) { throw new NavigationError(`Unable to navigate to ${step.path}`, { cause: error }); } }
-      else if (step.type === 'click') { const result = await this.interactions.click(this.page.locator(step.selector), step.selector); interactionTimestamps = result.timestamps; interactionIntervalMs = result.intervalMs; }
+      else if (step.type === 'click' || step.type === 'submitPayment') { const result = await this.interactions.click(this.page.locator(step.selector), step.selector, step.type === 'submitPayment'); interactionTimestamps = result.timestamps; interactionIntervalMs = result.intervalMs; }
       else if (step.type === 'doubleClick') { const first = nowIso(); await this.page.locator(step.selector).dblclick(); interactionTimestamps = [first, nowIso()]; }
       else if (step.type === 'fill') await this.page.locator(step.selector).fill(step.value);
       else if (step.type === 'waitFor') await this.page.locator(step.selector).waitFor({ state: 'visible', ...(step.timeoutMs ? { timeout: step.timeoutMs } : {}) });

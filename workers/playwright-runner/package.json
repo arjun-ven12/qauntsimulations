@@ -1,6 +1,6 @@
 {
-  "name": "@taskos/playwright-runner", "version": "0.1.0", "private": true, "type": "module", "bin": { "taskos-worker": "dist/cli.js" },
-  "scripts": { "start": "tsx src/cli.ts", "dev": "tsx src/cli.ts", "build": "tsc -b tsconfig.json", "typecheck": "tsc -b tsconfig.json --pretty false", "test": "vitest run --config vitest.config.ts", "fixtures:validate": "vitest run --config vitest.config.ts tests/schemas/worker-job.test.ts" },
+  "name": "@taskos/playwright-runner", "version": "0.1.0", "private": true, "type": "module", "main": "./dist/index.js", "types": "./dist/index.d.ts", "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } }, "bin": { "taskos-worker": "dist/cli.js" },
+  "scripts": { "start": "tsx src/cli.ts", "dev": "tsx src/cli.ts", "build": "tsc -b tsconfig.json && node scripts/build-portable-bundle.mjs", "typecheck": "tsc -b tsconfig.json --pretty false", "test": "vitest run --config vitest.config.ts", "fixtures:validate": "vitest run --config vitest.config.ts tests/schemas/worker-job.test.ts" },
   "dependencies": { "@playwright/test": "^1.52.0", "@taskos/execution-contracts": "workspace:*", "zod": "^3.25.67" },
-  "devDependencies": { "tsx": "^4.20.3", "vitest": "^3.2.3" }
+  "devDependencies": { "esbuild": "^0.27.0", "tsx": "^4.20.3", "vitest": "^3.2.3" }
 }

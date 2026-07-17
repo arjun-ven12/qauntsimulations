@@ -54,18 +54,6 @@ export function createProtectedRouter(
   );
   router.use('/projects', createProjectRouter(controllers.projects));
   router.use('/investigations', createInvestigationRouter(controllers.investigations));
-  router.use(
-    '/investigations/:investigationId/experiments',
-    createNotImplementedRouter('Experiment listing'),
-  );
-  router.use(
-    '/investigations/:investigationId/workers',
-    createNotImplementedRouter('Worker listing'),
-  );
-  router.use(
-    '/investigations/:investigationId/evidence',
-    createNotImplementedRouter('Evidence listing'),
-  );
   router.use('/findings', createNotImplementedRouter('Finding detail and reproduction'));
   router.use('/repairs', createNotImplementedRouter('Repair verification'));
   router.get('/world-packs', (_request, response) =>

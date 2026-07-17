@@ -381,34 +381,44 @@ model Experiment {
 }
 
 model Worker {
-  id              String             @id @default(cuid())
+  id              String                @id @default(cuid())
   organisationId  String
   providerId      String?
-  status          WorkerStatus       @default(IDLE)
+  status          WorkerStatus          @default(IDLE)
   lastHeartbeatAt DateTime?
-  metadata        Json               @default("{}")
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  organisation    Organisation       @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  metadata        Json                  @default("{}")
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  organisation    Organisation          @relation(fields: [organisationId], references: [id], onDelete: Cascade)
   attempts        ExecutionAttempt[]
+  evaluations     InvariantEvaluation[]
 
   @@index([organisationId, status])
 }
 
 model ExecutionAttempt {
-  id           String             @id @default(cuid())
-  experimentId String
-  workerId     String?
-  attempt      Int
-  status       ExperimentStatus   @default(QUEUED)
-  startedAt    DateTime?
-  completedAt  DateTime?
-  error        Json?
-  metrics      Json               @default("{}")
-  createdAt    DateTime           @default(now())
-  experiment   Experiment         @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  worker       Worker?            @relation(fields: [workerId], references: [id], onDelete: SetNull)
-  artifacts    EvidenceArtifact[]
+  id                   String                @id @default(cuid())
+  experimentId         String
+  workerId             String?
+  attempt              Int
+  status               ExperimentStatus      @default(QUEUED)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  error                Json?
+  metrics              Json                  @default("{}")
+  provider             String                @default("LOCAL")
+  exitCode             Int?
+  durationMs           Int?
+  result               Json?
+  resultPath           String?
+  evidenceManifestPath String?
+  stdoutSummary        String?
+  stderrSummary        String?
+  createdAt            DateTime              @default(now())
+  experiment           Experiment            @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  worker               Worker?               @relation(fields: [workerId], references: [id], onDelete: SetNull)
+  artifacts            EvidenceArtifact[]
+  evaluations          InvariantEvaluation[]
 
   @@unique([experimentId, attempt])
 }
@@ -448,22 +458,31 @@ model EvidenceArtifact {
 }
 
 model InvariantEvaluation {
-  id           String     @id @default(cuid())
-  experimentId String
-  invariantId  String
-  passed       Boolean
-  expected     Json
-  observed     Json
-  explanation  String?
-  createdAt    DateTime   @default(now())
-  experiment   Experiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  invariant    Invariant  @relation(fields: [invariantId], references: [id], onDelete: Restrict)
+  id                 String            @id @default(cuid())
+  experimentId       String
+  invariantId        String
+  executionAttemptId String?
+  workerId           String?
+  passed             Boolean
+  expected           Json
+  observed           Json
+  confidence         Float             @default(0)
+  evidenceReferences Json              @default("[]")
+  explanation        String?
+  createdAt          DateTime          @default(now())
+  experiment         Experiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  invariant          Invariant         @relation(fields: [invariantId], references: [id], onDelete: Restrict)
+  executionAttempt   ExecutionAttempt? @relation(fields: [executionAttemptId], references: [id], onDelete: SetNull)
+  worker             Worker?           @relation(fields: [workerId], references: [id], onDelete: SetNull)
 
   @@index([experimentId, passed])
+  @@index([executionAttemptId])
+  @@index([workerId])
 }
 
 model Finding {
   id                  String               @id @default(cuid())
+  fingerprint         String?              @unique
   organisationId      String
   projectId           String
   investigationId     String
@@ -805,18 +824,25 @@ enum AIProvider {
 }
 
 enum InvestigationEventType {
+  investigation_created
   plan_created
   world_generated
+  world_queued
+  worker_started
+  worker_completed
+  worker_failed
   worker_queued
   sandbox_provisioning
   sandbox_ready
   experiment_started
   evidence_captured
   invariant_violated
+  finding_created
   follow_up_generated
   reproduction_started
   finding_confirmed
   minimisation_started
   investigation_completed
   investigation_failed
+  investigation_cancelled
 }

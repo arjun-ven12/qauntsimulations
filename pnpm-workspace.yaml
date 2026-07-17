@@ -9,6 +9,7 @@ allowBuilds:
   bcrypt: true
   esbuild: true
   prisma: true
+  protobufjs: true
 
 onlyBuiltDependencies:
   - '@prisma/client'
@@ -16,3 +17,4 @@ onlyBuiltDependencies:
   - bcrypt
   - esbuild
   - prisma
+  - protobufjs

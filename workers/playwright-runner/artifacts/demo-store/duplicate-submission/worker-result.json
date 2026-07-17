@@ -1,0 +1,133 @@
+{
+  "workerId": "local-worker-duplicate",
+  "experimentId": "duplicate-submission-experiment",
+  "worldId": "duplicate-submission-world",
+  "status": "INVARIANT_VIOLATION",
+  "startedAt": "2026-07-15T06:58:43.661Z",
+  "completedAt": "2026-07-15T06:58:45.911Z",
+  "durationMs": 2250,
+  "journey": {
+    "completed": true,
+    "completedSteps": 11,
+    "totalSteps": 11
+  },
+  "invariantEvaluations": [
+    {
+      "invariantId": "no-duplicate-payment",
+      "type": "NO_DUPLICATE_PAYMENT",
+      "passed": false,
+      "expected": {
+        "maximumPaymentRequests": 1
+      },
+      "observed": {
+        "paymentRequests": 2,
+        "requestIds": [
+          "90832cf4-b58c-4249-a9c6-d22b8a935c93",
+          "85dba4d6-5e2d-47ae-bd97-616e2a078081"
+        ],
+        "timestamps": [
+          "2026-07-15T06:58:44.389Z",
+          "2026-07-15T06:58:44.499Z"
+        ],
+        "correlations": [
+          "checkout_attempt_001",
+          "checkout_attempt_002"
+        ],
+        "actionTimestamps": [
+          "2026-07-15T06:58:44.358Z",
+          "2026-07-15T06:58:44.492Z"
+        ]
+      },
+      "confidence": 0.98,
+      "evidenceReferences": [
+        "network-event:90832cf4-b58c-4249-a9c6-d22b8a935c93",
+        "network-event:85dba4d6-5e2d-47ae-bd97-616e2a078081",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/network/network.json"
+      ],
+      "explanation": "Observed 2 qualifying payment requests for one deterministic checkout attempt."
+    },
+    {
+      "invariantId": "no-duplicate-order",
+      "type": "NO_DUPLICATE_ORDER",
+      "passed": false,
+      "expected": {
+        "maximumOrders": 1
+      },
+      "observed": {
+        "orderRequests": 2,
+        "requestIds": [
+          "d659350a-db04-45e5-b5d8-ca5d594615d2",
+          "ed504676-6bab-4aac-92cc-9f91a4c1e514"
+        ],
+        "orderIds": [
+          "ord_001",
+          "ord_002"
+        ],
+        "timestamps": [
+          "2026-07-15T06:58:45.602Z",
+          "2026-07-15T06:58:45.708Z"
+        ],
+        "correlations": [
+          "pay_001",
+          "pay_002"
+        ]
+      },
+      "confidence": 0.99,
+      "evidenceReferences": [
+        "network-event:d659350a-db04-45e5-b5d8-ca5d594615d2",
+        "network-event:ed504676-6bab-4aac-92cc-9f91a4c1e514",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/001-initial.png",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/004-add-product-to-cart.png",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/010-submit-payment-before.png",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/010-submit-payment-after.png",
+        "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/998-final.png"
+      ],
+      "explanation": "Observed 2 qualifying order-creation requests and 2 distinct order identifiers."
+    }
+  ],
+  "metrics": {
+    "requestCount": 32,
+    "failedRequestCount": 0,
+    "checkoutInteractionCount": 2,
+    "paymentRequestCount": 2,
+    "successfulPaymentResponseCount": 2,
+    "orderRequestCount": 2,
+    "successfulOrderResponseCount": 2,
+    "consoleErrorCount": 0
+  },
+  "firstDivergence": {
+    "category": "INTERACTION",
+    "timestamp": "2026-07-15T06:58:44.492Z",
+    "summary": "Second payment click occurred while the first payment request was pending.",
+    "evidenceReferences": [
+      "journey-action:8",
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/010-submit-payment-after.png"
+    ]
+  },
+  "evidence": {
+    "manifestPath": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/manifest.json",
+    "tracePath": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/trace/trace.zip",
+    "screenshotPaths": [
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/001-initial.png",
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/004-add-product-to-cart.png",
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/010-submit-payment-before.png",
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/010-submit-payment-after.png",
+      "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/screenshots/998-final.png"
+    ],
+    "consoleLogPath": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/console/console.json",
+    "networkLogPath": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/duplicate-submission/network/network.json"
+  },
+  "appliedFaults": [
+    {
+      "type": "REPEATED_SUBMISSION",
+      "parameters": {
+        "selector": "[data-testid=\"pay-button\"]",
+        "firstClickAt": "2026-07-15T06:58:44.358Z",
+        "secondClickAt": "2026-07-15T06:58:44.492Z",
+        "configuredIntervalMs": 100,
+        "actualIntervalMs": 134
+      },
+      "appliedAt": "2026-07-15T06:58:44.492Z"
+    }
+  ]
+}

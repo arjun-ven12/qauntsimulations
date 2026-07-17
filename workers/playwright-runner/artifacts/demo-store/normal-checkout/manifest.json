@@ -1,0 +1,230 @@
+{
+  "workerId": "local-worker-normal",
+  "worldId": "normal-checkout-world",
+  "experimentId": "normal-checkout-experiment",
+  "startedAt": "2026-07-15T06:57:51.229Z",
+  "completedAt": "2026-07-15T06:57:52.591Z",
+  "browser": {
+    "playwrightVersion": "1.61.1",
+    "engine": "chromium",
+    "version": "149.0.7827.55",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "headless": true
+  },
+  "world": {
+    "userProfile": "normal",
+    "networkProfile": "normal",
+    "latencyMs": 0,
+    "doubleSubmit": false,
+    "doubleSubmitIntervalMs": 100,
+    "clearStorageBeforeRun": true,
+    "paymentUrlPatterns": [
+      "/api/payments"
+    ],
+    "orderUrlPatterns": [
+      "/api/orders"
+    ],
+    "randomSeed": 101,
+    "reason": "Healthy deterministic checkout baseline."
+  },
+  "randomSeed": 101,
+  "appliedFaults": [],
+  "setupOperations": [
+    {
+      "type": "RESET",
+      "method": "POST",
+      "path": "/api/test/reset",
+      "url": "http://localhost:5174/api/test/reset",
+      "startedAt": "2026-07-15T06:57:51.230Z",
+      "completedAt": "2026-07-15T06:57:51.250Z",
+      "statusCode": 200,
+      "succeeded": true,
+      "response": {
+        "ok": true,
+        "resetAt": "2026-07-15T06:57:51.244Z"
+      }
+    },
+    {
+      "type": "CONFIGURATION",
+      "method": "POST",
+      "path": "/api/test/config",
+      "url": "http://localhost:5174/api/test/config",
+      "startedAt": "2026-07-15T06:57:51.250Z",
+      "completedAt": "2026-07-15T06:57:51.253Z",
+      "statusCode": 200,
+      "succeeded": true,
+      "response": {
+        "duplicateSubmissionBug": false,
+        "paymentDelayMs": 0
+      }
+    }
+  ],
+  "journeyStepsAttempted": [
+    {
+      "stepIndex": 0,
+      "type": "goto",
+      "name": "Open product",
+      "startedAt": "2026-07-15T06:57:52.062Z",
+      "completedAt": "2026-07-15T06:57:52.155Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 1,
+      "type": "waitFor",
+      "selector": "[data-testid=\"product-page\"]",
+      "startedAt": "2026-07-15T06:57:52.155Z",
+      "completedAt": "2026-07-15T06:57:52.165Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 2,
+      "type": "click",
+      "name": "Add product to cart",
+      "selector": "[data-testid=\"add-to-cart\"]",
+      "startedAt": "2026-07-15T06:57:52.165Z",
+      "completedAt": "2026-07-15T06:57:52.228Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:57:52.165Z"
+      ]
+    },
+    {
+      "stepIndex": 3,
+      "type": "click",
+      "name": "Open cart",
+      "selector": "[data-testid=\"open-cart\"]",
+      "startedAt": "2026-07-15T06:57:52.293Z",
+      "completedAt": "2026-07-15T06:57:52.322Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:57:52.293Z"
+      ]
+    },
+    {
+      "stepIndex": 4,
+      "type": "waitFor",
+      "selector": "[data-testid=\"cart-item\"]",
+      "startedAt": "2026-07-15T06:57:52.322Z",
+      "completedAt": "2026-07-15T06:57:52.348Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 5,
+      "type": "click",
+      "name": "Open checkout",
+      "selector": "[data-testid=\"checkout-button\"]",
+      "startedAt": "2026-07-15T06:57:52.348Z",
+      "completedAt": "2026-07-15T06:57:52.389Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:57:52.348Z"
+      ]
+    },
+    {
+      "stepIndex": 6,
+      "type": "waitFor",
+      "selector": "[data-testid=\"checkout-form\"]",
+      "startedAt": "2026-07-15T06:57:52.389Z",
+      "completedAt": "2026-07-15T06:57:52.414Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 7,
+      "type": "fill",
+      "name": "Enter email",
+      "selector": "[data-testid=\"email-input\"]",
+      "startedAt": "2026-07-15T06:57:52.414Z",
+      "completedAt": "2026-07-15T06:57:52.425Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 8,
+      "type": "submitPayment",
+      "name": "Submit payment",
+      "selector": "[data-testid=\"pay-button\"]",
+      "startedAt": "2026-07-15T06:57:52.449Z",
+      "completedAt": "2026-07-15T06:57:52.475Z",
+      "status": "COMPLETED",
+      "interactionTimestamps": [
+        "2026-07-15T06:57:52.449Z"
+      ]
+    },
+    {
+      "stepIndex": 9,
+      "type": "waitFor",
+      "name": "Wait for confirmation",
+      "selector": "[data-testid=\"order-confirmation\"]",
+      "startedAt": "2026-07-15T06:57:52.502Z",
+      "completedAt": "2026-07-15T06:57:52.507Z",
+      "status": "COMPLETED"
+    },
+    {
+      "stepIndex": 10,
+      "type": "assertVisible",
+      "selector": "[data-testid=\"order-id\"]",
+      "startedAt": "2026-07-15T06:57:52.507Z",
+      "completedAt": "2026-07-15T06:57:52.509Z",
+      "status": "COMPLETED"
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/001-initial.png",
+      "mimeType": "image/png",
+      "sizeBytes": 175501
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/004-add-product-to-cart.png",
+      "mimeType": "image/png",
+      "sizeBytes": 175358
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/010-submit-payment-before.png",
+      "mimeType": "image/png",
+      "sizeBytes": 34932
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/010-submit-payment-after.png",
+      "mimeType": "image/png",
+      "sizeBytes": 35434
+    },
+    {
+      "type": "SCREENSHOT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/screenshots/998-final.png",
+      "mimeType": "image/png",
+      "sizeBytes": 23800
+    },
+    {
+      "type": "TRACE",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/trace/trace.zip",
+      "mimeType": "application/zip",
+      "sizeBytes": 180952
+    },
+    {
+      "type": "CONSOLE_LOG",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/console/console.json",
+      "mimeType": "application/json",
+      "sizeBytes": 1925
+    },
+    {
+      "type": "NETWORK_LOG",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/network/network.json",
+      "mimeType": "application/json",
+      "sizeBytes": 12576
+    },
+    {
+      "type": "WORKER_RESULT",
+      "path": "/Users/arjunaravapalli/quant simulation/quant simulation 1.0/qauntsimulations/workers/playwright-runner/artifacts/demo-store/normal-checkout/worker-result.json",
+      "mimeType": "application/json"
+    }
+  ],
+  "outcome": "PASSED",
+  "evidenceErrors": []
+}

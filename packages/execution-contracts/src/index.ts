@@ -9,6 +9,7 @@ const journeyStepMetadataSchema = z.object({
 export const journeyStepSchema = z.discriminatedUnion('type', [
   journeyStepMetadataSchema.extend({ type: z.literal('goto'), path: z.string().min(1) }),
   journeyStepMetadataSchema.extend({ type: z.literal('click'), selector: z.string().min(1) }),
+  journeyStepMetadataSchema.extend({ type: z.literal('submitPayment'), selector: z.string().min(1) }),
   journeyStepMetadataSchema.extend({ type: z.literal('doubleClick'), selector: z.string().min(1) }),
   journeyStepMetadataSchema.extend({ type: z.literal('fill'), selector: z.string().min(1), value: z.string() }),
   journeyStepMetadataSchema.extend({ type: z.literal('waitFor'), selector: z.string().min(1), timeoutMs: z.number().int().positive().optional() }),
@@ -41,7 +42,14 @@ export const workerJobSchema = z.object({
   workerId: z.string().min(1),
   experimentId: z.string().min(1),
   worldId: z.string().min(1),
-  target: z.object({ baseUrl: z.string().url(), journeyPath: z.string().optional() }),
+  target: z.object({ baseUrl: z.string().url(), apiBaseUrl: z.string().url().optional(), journeyPath: z.string().optional() }),
+  testSetup: z.object({
+    reset: z.object({ method: z.literal('POST'), path: z.literal('/api/test/reset') }).optional(),
+    configuration: z.object({
+      method: z.literal('POST'), path: z.literal('/api/test/config'),
+      body: z.object({ duplicateSubmissionBug: z.boolean(), paymentDelayMs: z.number().int().min(0).max(10_000) }).strict(),
+    }).optional(),
+  }).optional(),
   browser: z.object({
     engine: z.enum(['chromium', 'webkit', 'firefox']),
     viewport: viewportSchema,
@@ -63,6 +71,7 @@ export const workerJobSchema = z.object({
     paymentDelayMs: z.number().int().nonnegative().optional(),
     retryIntervalMs: z.number().int().nonnegative().optional(),
     doubleSubmit: z.boolean(),
+    doubleSubmitIntervalMs: z.number().int().min(0).max(5_000).default(100),
     clearStorageBeforeRun: z.boolean().optional(),
     expireSessionAtStep: z.number().int().nonnegative().optional(),
     submitSelector: z.string().min(1).optional(),
@@ -90,7 +99,8 @@ export const networkEventSchema = z.object({
   id: z.string(), url: z.string(), method: z.string(), requestTimestamp: z.string().datetime(),
   responseTimestamp: z.string().datetime().optional(), durationMs: z.number().nonnegative().optional(),
   statusCode: z.number().int().optional(), failureReason: z.string().optional(), resourceType: z.string(),
-  isPaymentRequest: z.boolean(), isOrderRequest: z.boolean(),
+  isPaymentRequest: z.boolean(), isOrderRequest: z.boolean(), correlationKey: z.string().optional(),
+  selectedRequestFields: z.record(z.unknown()).optional(), selectedResponseFields: z.record(z.unknown()).optional(),
 });
 export type NetworkEvent = z.infer<typeof networkEventSchema>;
 
@@ -110,6 +120,9 @@ export type InvariantEvaluationResult = z.infer<typeof invariantEvaluationResult
 export const appliedFaultSchema = z.object({ type: z.string(), parameters: z.record(z.unknown()), appliedAt: z.string().datetime() });
 export type AppliedFault = z.infer<typeof appliedFaultSchema>;
 
+export const setupOperationSchema = z.object({ type: z.enum(['RESET', 'CONFIGURATION']), method: z.literal('POST'), path: z.string(), url: z.string().url(), startedAt: z.string().datetime(), completedAt: z.string().datetime(), statusCode: z.number().int(), succeeded: z.boolean(), response: z.unknown().optional() });
+export type SetupOperation = z.infer<typeof setupOperationSchema>;
+
 export const workerResultSchema = z.object({
   workerId: z.string(), experimentId: z.string(), worldId: z.string(),
   status: z.enum(['PASSED', 'FAILED', 'INVARIANT_VIOLATION', 'TIMED_OUT', 'RUNNER_ERROR']),
@@ -119,8 +132,8 @@ export const workerResultSchema = z.object({
     failedStep: z.object({ index: z.number().int().nonnegative(), name: z.string().optional(), type: z.string(), selector: z.string().optional(), error: z.string() }).optional(),
   }),
   invariantEvaluations: z.array(invariantEvaluationResultSchema),
-  metrics: z.object({ requestCount: z.number().int().nonnegative(), failedRequestCount: z.number().int().nonnegative(), paymentRequestCount: z.number().int().nonnegative(), orderRequestCount: z.number().int().nonnegative(), consoleErrorCount: z.number().int().nonnegative() }),
-  firstDivergence: z.object({ category: z.enum(['JOURNEY', 'NETWORK', 'CONSOLE', 'INVARIANT']), timestamp: z.string().datetime(), summary: z.string(), evidenceReferences: z.array(z.string()) }).optional(),
+  metrics: z.object({ requestCount: z.number().int().nonnegative(), failedRequestCount: z.number().int().nonnegative(), checkoutInteractionCount: z.number().int().nonnegative(), paymentRequestCount: z.number().int().nonnegative(), successfulPaymentResponseCount: z.number().int().nonnegative(), orderRequestCount: z.number().int().nonnegative(), successfulOrderResponseCount: z.number().int().nonnegative(), consoleErrorCount: z.number().int().nonnegative() }),
+  firstDivergence: z.object({ category: z.enum(['INTERACTION', 'JOURNEY', 'NETWORK', 'CONSOLE', 'INVARIANT']), timestamp: z.string().datetime(), summary: z.string(), evidenceReferences: z.array(z.string()) }).optional(),
   evidence: z.object({ manifestPath: z.string(), tracePath: z.string().optional(), videoPath: z.string().optional(), screenshotPaths: z.array(z.string()), consoleLogPath: z.string().optional(), networkLogPath: z.string().optional() }),
   appliedFaults: z.array(appliedFaultSchema),
   error: z.object({ code: z.string(), message: z.string(), stack: z.string().optional() }).optional(),
@@ -131,6 +144,7 @@ export const evidenceManifestSchema = z.object({
   workerId: z.string(), worldId: z.string(), experimentId: z.string(), startedAt: z.string().datetime(), completedAt: z.string().datetime(),
   browser: z.object({ playwrightVersion: z.string(), engine: z.enum(['chromium', 'webkit', 'firefox']), version: z.string(), viewport: z.object({ width: z.number(), height: z.number() }), headless: z.boolean() }),
   world: workerJobSchema.shape.world, randomSeed: z.number().int(), appliedFaults: z.array(appliedFaultSchema),
+  setupOperations: z.array(setupOperationSchema),
   journeyStepsAttempted: z.array(journeyActionSchema), artifacts: z.array(z.object({ type: z.string(), path: z.string(), mimeType: z.string().optional(), sizeBytes: z.number().int().nonnegative().optional() })),
   outcome: workerResultSchema.shape.status, errorSummary: z.string().optional(), evidenceErrors: z.array(z.string()).default([]),
 });
