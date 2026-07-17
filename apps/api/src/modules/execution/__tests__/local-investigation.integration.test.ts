@@ -8,7 +8,7 @@ import { createDatabaseClient } from '@taskos/database';
 import { demoCreateInvestigationInput, investigationProgressSchema } from '@taskos/shared-types';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { LocalEvidenceMetadataService } from '../../evidence/local-evidence-metadata.service.js';
-import { DeterministicExperimentPlanService } from '../../experiments/services/deterministic-experiment-plan.service.js';
+import { InvestigationPlanningService } from '../../experiments/services/investigation-planning.service.js';
 import { InvestigationRepository } from '../../investigations/investigations.repository.js';
 import { InvestigationService } from '../../investigations/investigations.service.js';
 import { InvestigationOrchestratorService } from '../investigation-orchestrator.service.js';
@@ -31,7 +31,7 @@ suite('full local investigation orchestration', () => {
     if (!process.env.DATABASE_URL) loadEnvFile(resolve(repositoryRoot, '.env'));
     const database = createDatabaseClient(); const evidenceRoot = await mkdtemp(resolve(tmpdir(), 'taskos-investigation-')); const repository = new InvestigationRepository(database);
     const orchestrator = new InvestigationOrchestratorService(repository, new LocalPlaywrightWorkerExecutor(evidenceRoot), new WorkerJobFactoryService(evidenceRoot, resolve(repositoryRoot, 'demo/fixtures/checkout-journey.json')), new LocalEvidenceMetadataService(evidenceRoot));
-    const service = new InvestigationService(repository, new DeterministicExperimentPlanService(2), orchestrator);
+    const service = new InvestigationService(repository, new InvestigationPlanningService({ requestedProvider: 'deterministic', fallbackEnabled: true, maximumWorlds: 8, maximumVariables: 6, maximumAssumptions: 10, maximumWarnings: 20, timeoutMs: 30_000, maxProviderAttempts: 1, maxOutputTokens: 3_000 }), orchestrator);
     let investigationId: string | undefined; let workerIds: string[] = [];
     try {
       const created = await service.create('organisation_demo_taskos', demoCreateInvestigationInput); investigationId = created.id;

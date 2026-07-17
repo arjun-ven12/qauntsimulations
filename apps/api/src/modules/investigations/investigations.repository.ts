@@ -29,17 +29,30 @@ export class InvestigationRepository {
 
   async validateCreationScope(organisationId: string, input: CreateInvestigationInput): Promise<InvestigationCreationScope | null> {
     const [project, environment, journey, scenario, invariants] = await Promise.all([
-      this.database.project.findFirst({ where: { id: input.projectId, organisationId, deletedAt: null }, select: { id: true } }),
-      this.database.environment.findFirst({ where: { id: input.environmentId, projectId: input.projectId, deletedAt: null }, select: { id: true, baseUrl: true } }),
-      this.database.journey.findFirst({ where: { id: input.journeyId, projectId: input.projectId, deletedAt: null }, select: { id: true } }),
+      this.database.project.findFirst({ where: { id: input.projectId, organisationId, deletedAt: null }, select: { id: true, name: true } }),
+      this.database.environment.findFirst({ where: { id: input.environmentId, projectId: input.projectId, deletedAt: null }, select: { id: true, name: true, baseUrl: true } }),
+      this.database.journey.findFirst({ where: { id: input.journeyId, projectId: input.projectId, deletedAt: null }, select: { id: true, name: true } }),
       this.database.scenario.findFirst({ where: { id: 'scenario_duplicate_submission', projectId: input.projectId, deletedAt: null }, select: { id: true } }),
-      this.database.invariant.findMany({ where: { id: { in: input.invariantIds }, projectId: input.projectId, organisationId, deletedAt: null }, select: { id: true } }),
+      this.database.invariant.findMany({ where: { id: { in: input.invariantIds }, projectId: input.projectId, organisationId, deletedAt: null }, select: { id: true, name: true, description: true } }),
     ]);
     if (!project || !environment?.baseUrl || !journey || !scenario || invariants.length !== input.invariantIds.length) return null;
-    return { organisationId, scenarioId: scenario.id, environmentBaseUrl: environment.baseUrl, invariantIds: invariants.map(({ id }) => id) };
+    return {
+      organisationId,
+      scenarioId: scenario.id,
+      environmentBaseUrl: environment.baseUrl,
+      projectName: project.name,
+      environmentName: environment.name,
+      journeyName: journey.name,
+      invariantIds: invariants.map(({ id }) => id),
+      invariants: invariants.map((invariant) => ({
+        id: invariant.id,
+        name: invariant.name,
+        ...(invariant.description ? { description: invariant.description } : {}),
+      })),
+    };
   }
 
-  async create(input: CreateInvestigationInput, scope: InvestigationCreationScope, plan: DeterministicExperimentPlan): Promise<string> {
+  async create(input: CreateInvestigationInput, scope: InvestigationCreationScope): Promise<string> {
     return this.database.$transaction(async (transaction) => {
       const investigation = await transaction.investigation.create({ data: {
         organisationId: scope.organisationId,
@@ -51,21 +64,47 @@ export class InvestigationRepository {
         status: 'PLANNING',
         startedAt: new Date(),
       } });
-      await transaction.experimentPlan.create({ data: {
-        investigationId: investigation.id,
-        journeyId: input.journeyId,
-        scenarioId: scope.scenarioId,
-        provider: 'MOCK',
-        plan: json(plan),
-        planningExplanation: plan.planningExplanation,
-        estimatedComputeUnits: 0,
-      } });
       await transaction.investigationEvent.create({ data: {
         investigationId: investigation.id,
         type: 'investigation_created',
-        data: messageData('Investigation created and deterministic planning requested.', { status: 'PLANNING' }),
+        data: messageData('Investigation created and experiment planning requested.', { status: 'PLANNING' }),
       } });
       return investigation.id;
+    });
+  }
+
+  async persistPlan(input: CreateInvestigationInput, scope: InvestigationCreationScope, investigationId: string, plan: DeterministicExperimentPlan): Promise<string> {
+    return this.database.$transaction(async (transaction) => {
+      const existing = await transaction.experimentPlan.findFirst({ where: { investigationId }, orderBy: { version: 'desc' } });
+      if (existing) return existing.id;
+      const planner = plan.planner;
+      await transaction.investigationEvent.createMany({ data: [
+        { investigationId, type: 'planner_started', data: messageData('Experiment planner started.', { plannerStatus: 'PENDING', requestedProvider: planner?.requestedProvider ?? 'DETERMINISTIC' }) },
+        { investigationId, type: 'planner_request_created', data: messageData('Planner request created from validated investigation input.', { plannerVersion: planner?.version, maximumWorlds: input.scenario.controls.maximumWorlds }) },
+      ] });
+      if (planner?.requestedProvider === 'OPENAI') {
+        await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_provider_request_started', data: messageData('OpenAI planner request started.', { requestedProvider: 'OPENAI', model: planner.model }) } });
+        await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_provider_request_completed', data: messageData('OpenAI planner request completed.', { requestedProvider: 'OPENAI', model: planner.model, generationDurationMs: planner.generationDurationMs, usage: planner.usage }) } });
+        await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_output_received', data: messageData('Planner structured output received.', { requestedProvider: 'OPENAI', model: planner.model }) } });
+      }
+      await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_validation_started', data: messageData('Planner validation started.', { plannerStatus: 'VALIDATING' }) } });
+      if (planner?.plannerStatus === 'FALLBACK_USED') {
+        await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_plan_rejected', data: messageData('Planner output rejected; deterministic fallback will be used.', { plannerStatus: 'REJECTED', fallbackReason: planner.fallbackReason, rejectedWorldCount: planner.rejectedWorldCount }) } });
+        await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_fallback_used', data: messageData('Deterministic fallback planner used.', { requestedProvider: planner.requestedProvider, effectiveProvider: planner.effectiveProvider, plannerStatus: 'FALLBACK_USED', fallbackReason: planner.fallbackReason }) } });
+      } else {
+        await transaction.investigationEvent.create({ data: { investigationId, type: planner?.plannerStatus === 'PARTIALLY_ACCEPTED' ? 'planner_plan_partially_accepted' : 'planner_plan_accepted', data: messageData('Planner plan accepted.', { plannerStatus: planner?.plannerStatus ?? 'ACCEPTED', effectiveProvider: planner?.effectiveProvider ?? 'DETERMINISTIC', acceptedWorldCount: planner?.acceptedWorldCount ?? plan.worlds.length, rejectedWorldCount: planner?.rejectedWorldCount ?? 0, warningCount: planner?.warnings.length ?? 0 }) } });
+      }
+      const persisted = await transaction.experimentPlan.create({ data: {
+        investigationId,
+        journeyId: input.journeyId,
+        scenarioId: scope.scenarioId,
+        provider: planner?.effectiveProvider === 'OPENAI' ? 'OPENAI' : 'MOCK',
+        plan: json(plan),
+        planningExplanation: plan.planningExplanation,
+        estimatedComputeUnits: planner?.usage && typeof planner.usage === 'object' && 'totalTokens' in planner.usage && typeof planner.usage.totalTokens === 'number' ? planner.usage.totalTokens : 0,
+      } });
+      await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_completed', data: messageData('Experiment planner completed.', { plannerStatus: planner?.plannerStatus ?? 'ACCEPTED', effectiveProvider: planner?.effectiveProvider ?? 'DETERMINISTIC', planId: persisted.id, acceptedWorldCount: planner?.acceptedWorldCount ?? plan.worlds.length, rejectedWorldCount: planner?.rejectedWorldCount ?? 0 }) } });
+      return persisted.id;
     });
   }
 

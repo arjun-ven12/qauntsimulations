@@ -44,6 +44,23 @@ export interface DeterministicExperimentPlan {
   maximumConcurrentWorkers: number;
   worlds: DeterministicWorldDefinition[];
   planningExplanation: string;
+  planner?: {
+    version: string;
+    requestedProvider: 'DETERMINISTIC' | 'OPENAI';
+    effectiveProvider: 'DETERMINISTIC' | 'OPENAI' | 'FALLBACK';
+    plannerStatus: string;
+    model?: string;
+    assumptions: string[];
+    warnings: string[];
+    rejectedPlanItems: unknown[];
+    normalizedFields: unknown[];
+    acceptedWorldCount: number;
+    rejectedWorldCount: number;
+    fallbackReason?: string;
+    generationDurationMs?: number;
+    validationDurationMs?: number;
+    usage?: unknown;
+  };
 }
 
 const initialWorlds: Omit<DeterministicWorldDefinition, 'creationOrder' | 'randomSeed'>[] = [

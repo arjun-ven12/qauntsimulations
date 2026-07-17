@@ -33,6 +33,8 @@ PLANNING → QUEUED → RUNNING → OBSERVING → ADAPTING → REPRODUCING → O
 ```
 
 `InvestigationProgress` contains `id`, `status`, `progress`, `recentEvents`, and `findingsCount`.
+
+Runtime Prompt 7 allows initial planning provenance to be `DETERMINISTIC`, `OPENAI`, or `FALLBACK`. Planner status metadata may include `PENDING`, `GENERATING`, `VALIDATING`, `ACCEPTED`, `PARTIALLY_ACCEPTED`, `REJECTED`, `FALLBACK_USED`, or `FAILED`. Model output is never converted directly into `WorkerJob`; it is schema-validated, policy-validated, normalized, persisted as planner metadata, and then converted into runtime-owned world definitions.
 Events use ISO-8601 `createdAt` strings, extensible string event types, human-readable messages,
 optional world IDs, and optional JSON-safe metadata.
 

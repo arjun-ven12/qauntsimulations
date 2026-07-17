@@ -158,4 +158,4 @@ It verifies that initial worlds and adaptive worlds run in isolated Daytona sand
 
 ## Prompt 7 handoff
 
-Prompt 7 may add structured AI-generated candidate plans, but it should keep the deterministic validation layer, bounded world limits, one-stage guard, and rule-based fallback described here.
+Prompt 7 adds structured AI-generated initial candidate plans. Adaptive reproduction remains deterministic: OpenAI may propose only the initial bounded world set, and this module still owns exact reproduction, controls, comparison worlds, confidence updates, and failure-region estimates.

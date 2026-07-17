@@ -1,0 +1,12 @@
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_started';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_request_created';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_provider_request_started';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_provider_request_completed';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_output_received';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_validation_started';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_plan_accepted';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_plan_partially_accepted';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_plan_rejected';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_fallback_used';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_completed';
+ALTER TYPE "InvestigationEventType" ADD VALUE IF NOT EXISTS 'planner_failed';

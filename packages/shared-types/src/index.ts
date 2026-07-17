@@ -310,6 +310,12 @@ export const investigationEventTypeSchema = z.enum([
   'plan_created', 'world_generated', 'worker_queued', 'sandbox_provisioning', 'sandbox_ready',
   'experiment_started', 'evidence_captured', 'invariant_violated', 'follow_up_generated',
   'reproduction_started', 'finding_confirmed', 'minimisation_started',
+  'minimisation_plan_created', 'minimisation_candidate_generated',
+  'minimisation_candidate_started', 'minimisation_candidate_completed',
+  'minimisation_condition_removed', 'minimisation_condition_retained',
+  'minimisation_range_updated', 'minimal_reproduction_found', 'final_report_started',
+  'final_report_completed', 'minimisation_completed', 'minimisation_inconclusive',
+  'minimisation_cancelled',
   'investigation_completed', 'investigation_failed',
 ]);
 
@@ -339,7 +345,7 @@ export type Experiment = z.infer<typeof experimentSchema>;
 export const workerProgressSchema = z.object({ workerId: idSchema, status: z.enum(['IDLE', 'QUEUED', 'PROVISIONING', 'READY', 'RUNNING', 'COMPLETED', 'FAILED', 'TERMINATED']), progress: z.number().min(0).max(100), message: z.string().optional() });
 export type WorkerProgress = z.infer<typeof workerProgressSchema>;
 
-export const evidenceArtifactSchema = timestampsSchema.extend({ id: idSchema, experimentId: idSchema, type: z.enum(['SCREENSHOT', 'VIDEO', 'TRACE', 'CONSOLE_LOG', 'NETWORK_LOG', 'DOM_SNAPSHOT', 'WORKER_RESULT', 'ENVIRONMENT_MANIFEST', 'MINIMAL_REPRODUCTION']), path: z.string(), mimeType: z.string(), sizeBytes: z.number().int().nonnegative(), redacted: z.boolean() });
+export const evidenceArtifactSchema = timestampsSchema.extend({ id: idSchema, experimentId: idSchema, type: z.enum(['SCREENSHOT', 'VIDEO', 'TRACE', 'CONSOLE_LOG', 'NETWORK_LOG', 'DOM_SNAPSHOT', 'WORKER_RESULT', 'ENVIRONMENT_MANIFEST', 'MINIMAL_REPRODUCTION', 'FINAL_REPORT']), path: z.string(), mimeType: z.string(), sizeBytes: z.number().int().nonnegative(), redacted: z.boolean() });
 export type EvidenceArtifact = z.infer<typeof evidenceArtifactSchema>;
 
 export const findingSchema = timestampsSchema.extend({ id: idSchema, investigationId: idSchema, title: z.string(), summary: z.string(), severity: z.enum(['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL']), confidence: z.enum(['POSSIBLE', 'PROBABLE', 'CONFIRMED']), reproductionCount: z.number().int().nonnegative(), causalConditions: z.record(z.unknown()) });
