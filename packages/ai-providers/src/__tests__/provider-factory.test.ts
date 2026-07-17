@@ -11,7 +11,7 @@ describe('createAIProvider', () => {
   });
 
   it('creates Kimi only when explicitly selected and fully configured', () => {
-    const kimi = { apiKey: 'test', baseUrl: 'https://api.moonshot.cn/v1', model: 'kimi-k2.6' };
+    const kimi = { apiKey: 'test', baseUrl: 'https://api.moonshot.ai/v1', model: 'kimi-k2.6' };
     expect(createAIProvider({ provider: 'kimi', kimi }).name).toBe('KIMI');
     expect(createAIProvider({ provider: 'mock', kimi }).name).toBe('MOCK');
     expect(createAIProvider({ provider: 'kimi', kimi: { baseUrl: kimi.baseUrl, model: kimi.model } }).name).toBe('MOCK');

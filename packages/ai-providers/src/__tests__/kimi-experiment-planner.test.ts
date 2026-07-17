@@ -28,13 +28,14 @@ function completion(content: string): ChatCompletion {
 describe('KimiExperimentPlanner', () => {
   it('constructs a bounded OpenAI-compatible request and accepts validated JSON', async () => {
     let captured: KimiCompletionRequest | undefined;
-    const client = new KimiClient({ apiKey: 'constructor-only-secret', baseUrl: 'https://api.moonshot.cn/v1' }, async (input) => {
+    const client = new KimiClient({ apiKey: 'constructor-only-secret', baseUrl: 'https://api.moonshot.ai/v1' }, async (input) => {
       captured = input;
       return completion(JSON.stringify(plan));
     });
     const result = await new KimiExperimentPlanner(client, 'sponsor-model').generatePlan(request, { plannerVersion: 'v1', timeoutMs: 60_000, maxOutputTokens: 3_000, maxAttempts: 1 });
     expect(result).toMatchObject({ provider: 'KIMI', status: 'VALIDATING', model: 'sponsor-model', usage: { providerRequestCount: 1 } });
-    expect(captured).toMatchObject({ model: 'sponsor-model', temperature: 0, max_tokens: 3_000, response_format: { type: 'json_object' } });
+    expect(captured).toMatchObject({ model: 'sponsor-model', max_tokens: 3_000, response_format: { type: 'json_object' } });
+    expect(captured).not.toHaveProperty('temperature');
     const serializedMessages = JSON.stringify(captured?.messages);
     expect(serializedMessages).toContain('maximumWorlds');
     expect(serializedMessages).toContain('domainAllowlist');
@@ -52,7 +53,7 @@ describe('KimiExperimentPlanner', () => {
     ['timeout', { name: 'APIConnectionTimeoutError' }, 'TIMEOUT'],
     ['provider outage', { status: 500 }, 'PROVIDER_UNAVAILABLE'],
   ])('normalizes %s without leaking raw provider data', async (_label, providerError, expectedCode) => {
-    const client = new KimiClient({ apiKey: 'never-leak-me', baseUrl: 'https://api.moonshot.cn/v1' }, async () => { throw { ...providerError, body: 'never-leak-me raw body' }; });
+    const client = new KimiClient({ apiKey: 'never-leak-me', baseUrl: 'https://api.moonshot.ai/v1' }, async () => { throw { ...providerError, body: 'never-leak-me raw body' }; });
     const result = await new KimiExperimentPlanner(client, 'kimi-k2.6').generatePlan(request, { plannerVersion: 'v1', timeoutMs: 1_000, maxOutputTokens: 500, maxAttempts: 1 });
     expect(result.error?.code).toBe(expectedCode);
     expect(JSON.stringify(result)).not.toContain('never-leak-me');
@@ -63,7 +64,7 @@ describe('KimiExperimentPlanner', () => {
     ['not json', 'MALFORMED_RESPONSE'],
     ['{"objective":true}', 'PLAN_SCHEMA_INVALID'],
   ])('rejects invalid output safely', async (content, expectedCode) => {
-    const client = new KimiClient({ apiKey: 'test', baseUrl: 'https://api.moonshot.cn/v1' }, async () => completion(content));
+    const client = new KimiClient({ apiKey: 'test', baseUrl: 'https://api.moonshot.ai/v1' }, async () => completion(content));
     const result = await new KimiExperimentPlanner(client, 'kimi-k2.6').generatePlan(request, { plannerVersion: 'v1', timeoutMs: 1_000, maxOutputTokens: 500, maxAttempts: 1 });
     expect(result.error?.code).toBe(expectedCode);
   });

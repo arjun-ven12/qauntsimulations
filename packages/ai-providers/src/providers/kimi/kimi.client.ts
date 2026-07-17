@@ -50,7 +50,6 @@ export class KimiClient {
           { role: 'system', content: instructions },
           { role: 'user', content: JSON.stringify(input) },
         ],
-        temperature: 0,
         max_tokens: options.maxOutputTokens,
         response_format: { type: 'json_object' },
       },

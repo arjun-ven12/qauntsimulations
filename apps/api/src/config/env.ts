@@ -35,7 +35,7 @@ export const apiEnvironmentSchema = z
     OPENAI_MODEL_VISION: z.string().default('gpt-5-mini'),
     KIMI_API_KEY: z.string().optional(),
     MOONSHOT_API_KEY: z.string().optional(),
-    KIMI_BASE_URL: z.string().url().default('https://api.moonshot.cn/v1'),
+    KIMI_BASE_URL: z.string().url().default('https://api.moonshot.ai/v1'),
     KIMI_MODEL: z.string().default('kimi-k2.6'),
     KIMI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(60_000),
     KIMI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(500).max(10_000).default(3_000),
