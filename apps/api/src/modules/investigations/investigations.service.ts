@@ -1,5 +1,6 @@
 import { createInvestigationInputSchema, type CreateInvestigationInput } from '@taskos/shared-types';
 import { ApplicationError } from '../../core/errors/application-error.js';
+import type { AuthContext } from '../auth/auth.types.js';
 import type { InvestigationPlanningService } from '../experiments/services/investigation-planning.service.js';
 import type { InvestigationOrchestratorService } from '../execution/investigation-orchestrator.service.js';
 import type { EvidenceContentService } from './evidence-content.service.js';
@@ -17,11 +18,28 @@ export class InvestigationService {
     private readonly evidenceContent?: EvidenceContentService,
   ) {}
 
-  async create(organisationId: string, raw: unknown, projectId?: string) {
+  async preflight(context: AuthContext, raw: unknown, projectId?: string) {
+    const organisationId = this.requireOrganisation(context);
     const candidate = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
     const input = createInvestigationInputSchema.parse({ ...candidate, ...(projectId ? { projectId } : {}) });
-    const scope = await this.repository.validateCreationScope(organisationId, input);
-    if (!scope) throw new ApplicationError('INVALID_INVESTIGATION_SCOPE', 'Project, environment, journey, scenario, or invariant is missing or unavailable to this organisation', 404);
+    const scope = await this.repository.validateCreationScope(organisationId, context.userId, input);
+    if (!scope) throw new ApplicationError('INVALID_INVESTIGATION_SCOPE', 'Project, environment, journey, or invariant is missing or unavailable to this organisation', 404);
+    return {
+      status: 'READY' as const,
+      projectId: input.projectId,
+      environmentId: input.environmentId,
+      journeyId: input.journeyId,
+      invariantIds: input.invariantIds,
+      validation: scope.launch.validation,
+    };
+  }
+
+  async create(context: AuthContext, raw: unknown, projectId?: string) {
+    const organisationId = this.requireOrganisation(context);
+    const candidate = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+    const input = createInvestigationInputSchema.parse({ ...candidate, ...(projectId ? { projectId } : {}) });
+    const scope = await this.repository.validateCreationScope(organisationId, context.userId, input);
+    if (!scope) throw new ApplicationError('INVALID_INVESTIGATION_SCOPE', 'Project, environment, journey, or invariant is missing or unavailable to this organisation', 404);
     const id = await this.repository.create(input, scope);
     try {
       const planning = await this.planner.plan(input, {
@@ -34,6 +52,7 @@ export class InvestigationService {
         scenarioId: scope.scenarioId,
         invariantIds: scope.invariantIds,
         invariants: scope.invariants,
+        launch: scope.launch,
       });
       await this.repository.persistPlan(input, scope, id, planning.plan);
     } catch (error) {
@@ -71,6 +90,11 @@ export class InvestigationService {
     const record = await this.repository.progress(organisationId, id);
     if (!record) throw new ApplicationError('INVESTIGATION_NOT_FOUND', 'Investigation was not found', 404);
     return record;
+  }
+
+  private requireOrganisation(context: AuthContext) {
+    if (!context.organisationId) throw new ApplicationError('ORGANISATION_REQUIRED', 'An organisation context is required', 403);
+    return context.organisationId;
   }
 }
 

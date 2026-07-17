@@ -13,6 +13,7 @@ import type {
   DeterministicWorldDefinition,
 } from './deterministic-experiment-plan.service.js';
 import { DeterministicExperimentPlanService } from './deterministic-experiment-plan.service.js';
+import type { PersistedLaunchSnapshot } from '../../investigations/investigations.types.js';
 
 export interface PlanningScope {
   projectId: string;
@@ -24,6 +25,7 @@ export interface PlanningScope {
   scenarioId: string;
   invariantIds: string[];
   invariants: Array<{ id: string; name: string; description?: string }>;
+  launch?: PersistedLaunchSnapshot;
 }
 
 export interface PlannerValidationResult {
@@ -187,6 +189,7 @@ export class InvestigationPlanningService {
   ): InvestigationPlanningResult {
     const validationStarted = Date.now();
     const plan = this.deterministicPlanner.generate(input, scope);
+    if (scope.launch) plan.launch = scope.launch;
     const validation = this.validateDeterministicPlan(plan, input);
     const validationDurationMs = Date.now() - validationStarted + priorValidationDurationMs;
     const plannerStatus: PlannerStatus = effectiveProvider === 'FALLBACK' ? 'FALLBACK_USED' : 'ACCEPTED';
@@ -340,6 +343,7 @@ export class InvestigationPlanningService {
       maximumConcurrentWorkers: Math.min(2, input.scenario.controls.maximumConcurrentWorkers),
       worlds: validation.acceptedWorlds,
       planningExplanation: output.explanation,
+      ...(scope.launch ? { launch: scope.launch } : {}),
       planner: {
         version: experimentPlannerPromptVersion,
         requestedProvider: 'OPENAI',

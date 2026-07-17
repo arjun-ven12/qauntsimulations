@@ -582,7 +582,19 @@ export class InvestigationOrchestratorService {
     signal?: AbortSignal,
     emitFleetEvent?: (event: FleetEvent) => Promise<void>,
   ) {
-    const job = await this.jobs.create({ investigationId: context.id, worldId: execution.worldId, experimentId: execution.experimentId, workerId: execution.workerId, environmentBaseUrl: execution.environmentBaseUrl, invariantId: execution.invariantId, world: execution.world });
+    const job = await this.jobs.create({
+      investigationId: context.id,
+      worldId: execution.worldId,
+      experimentId: execution.experimentId,
+      workerId: execution.workerId,
+      environmentBaseUrl: execution.environmentBaseUrl,
+      ...(execution.environmentApiBaseUrl ? { environmentApiBaseUrl: execution.environmentApiBaseUrl } : {}),
+      invariantId: execution.invariantId,
+      world: execution.world,
+      journey: execution.journey,
+      invariants: execution.invariants,
+      launch: execution.launch,
+    });
     const response = await this.executor.execute(job, {
       investigationId: context.id,
       worldId: execution.worldId,

@@ -1,4 +1,5 @@
 import type { CreateInvestigationInput } from '@taskos/shared-types';
+import type { PersistedLaunchSnapshot } from '../../investigations/investigations.types.js';
 
 export interface DeterministicWorldDefinition {
   key: string;
@@ -58,6 +59,7 @@ export interface DeterministicExperimentPlan {
   maximumConcurrentWorkers: number;
   worlds: DeterministicWorldDefinition[];
   planningExplanation: string;
+  launch?: PersistedLaunchSnapshot;
   planner?: {
     version: string;
     requestedProvider: 'DETERMINISTIC' | 'OPENAI';

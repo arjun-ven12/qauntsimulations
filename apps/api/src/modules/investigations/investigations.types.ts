@@ -7,18 +7,69 @@ import type { FinalFindingReport } from '../experiments/services/final-evidence-
 import type { MinimisationCandidateDefinition, MinimisationPlan, ConditionDecision, CandidateResult, DelayRange } from '../experiments/services/minimisation.service.js';
 import type { ReproductionComparisonResult } from '../experiments/services/reproduction-comparison.service.js';
 import type { DeterministicExperimentPlan, DeterministicWorldDefinition } from '../experiments/services/deterministic-experiment-plan.service.js';
+import type { RuntimeJourney } from '../journeys/journeys.types.js';
+import type { RuntimeInvariantDefinition } from '../invariants/invariants.types.js';
 
 export type { CreateInvestigationInput };
 
 export interface InvestigationCreationScope {
   organisationId: string;
   scenarioId: string;
+  safetyPolicyId?: string;
   environmentBaseUrl: string;
+  environmentApiBaseUrl?: string;
   projectName: string;
   environmentName: string;
   journeyName: string;
   invariantIds: string[];
   invariants: Array<{ id: string; name: string; description?: string }>;
+  launch: PersistedLaunchSnapshot;
+}
+
+export interface PersistedLaunchSnapshot {
+  inputSource: 'PERSISTED_CONFIGURATION';
+  actorUserId: string;
+  launchedAt: string;
+  scenario: {
+    prompt: string;
+    controls: CreateInvestigationInput['scenario']['controls'];
+  };
+  environment: {
+    id: string;
+    name: string;
+    type: string;
+    baseUrl: string;
+    apiBaseUrl?: string;
+    reset?: {
+      mode: string;
+      endpoint?: string;
+      method?: string;
+      beforeEachWorld?: boolean;
+      expectedStatus?: number;
+    };
+    payment?: {
+      mode?: string;
+      delayMs?: number;
+      result?: string;
+    };
+    testData?: Record<string, unknown>;
+    allowedActions?: string[];
+  };
+  journey: RuntimeJourney;
+  invariants: RuntimeInvariantDefinition[];
+  safety: {
+    policyId?: string;
+    domainAllowlist: string[];
+    allowedHttpMethods: string[];
+    permitCheckoutSubmission: boolean;
+    permitMockPayment: boolean;
+    permitTestOrderCreation: boolean;
+    prohibitedActions: string[];
+  };
+  validation: {
+    status: 'READY';
+    warnings: Array<{ code: string; field: string; message: string; blocking: false }>;
+  };
 }
 
 export interface InvestigationProgressRecord {
@@ -35,7 +86,11 @@ export interface PersistedWorldExecution {
   organisationId: string;
   projectId: string;
   environmentBaseUrl: string;
+  environmentApiBaseUrl?: string;
   invariantId: string;
+  journey: RuntimeJourney;
+  invariants: RuntimeInvariantDefinition[];
+  launch: PersistedLaunchSnapshot;
   worldId: string;
   experimentId: string;
   workerId: string;
@@ -78,6 +133,7 @@ export interface InvestigationOrchestrationContext {
   journeyId: string;
   scenarioId: string;
   environmentBaseUrl: string;
+  environmentApiBaseUrl?: string;
   planId: string;
   plan: DeterministicExperimentPlan;
 }

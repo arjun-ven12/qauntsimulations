@@ -1,7 +1,13 @@
 import { dirname, join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type { DatabaseClient, Prisma } from '@taskos/database';
 import type { CreateInvestigationInput } from '@taskos/shared-types';
+import { ApplicationError } from '../../core/errors/application-error.js';
+import { hasOrganisationPermission } from '../organisations/organisation.permissions.js';
 import type { DeterministicExperimentPlan } from '../experiments/services/deterministic-experiment-plan.service.js';
+import { readJourneyConfiguration, toRuntimeJourney } from '../journeys/journeys.mapper.js';
+import { persistedInvariantAssertionSchema } from '../invariants/invariants.schema.js';
+import { mapPersistedInvariantToRuntimeDefinition } from '../invariants/invariants.mapper.js';
 import type {
   AdaptiveFindingCandidate,
   AdaptiveFindingUpdateInput,
@@ -34,6 +40,7 @@ const messageData = (message: string, metadata: Record<string, unknown> = {}): P
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const stringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 const numberValue = (value: unknown): number | undefined => typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+const supportedJourneyActions = new Set(['GOTO', 'CLICK', 'FILL', 'WAIT_FOR', 'ASSERT_VISIBLE', 'NAVIGATE', 'WAIT', 'ASSERT']);
 
 const minimisationRunRecord = (run: {
   id: string;
@@ -57,42 +64,300 @@ const minimisationRunRecord = (run: {
   ...(run.finalReportEvidenceId ? { finalReportEvidenceId: run.finalReportEvidenceId } : {}),
 });
 
+interface LaunchSafetyConfiguration {
+  allowedHttpMethods: string[];
+  permitCheckoutSubmission: boolean;
+  permitMockPayment: boolean;
+  permitTestOrderCreation: boolean;
+}
+
+function parseLaunchSafety(value: unknown): LaunchSafetyConfiguration | null {
+  const configuration = record(value);
+  const allowedHttpMethods = stringArray(configuration.allowedHttpMethods);
+  if (!allowedHttpMethods.length) return null;
+  const permitOrderCreation = configuration.permitTestOrderCreation ?? configuration.permitOrderCreation;
+  if (
+    typeof configuration.permitCheckoutSubmission !== 'boolean' ||
+    typeof configuration.permitMockPayment !== 'boolean' ||
+    typeof permitOrderCreation !== 'boolean'
+  ) return null;
+  return {
+    allowedHttpMethods,
+    permitCheckoutSubmission: configuration.permitCheckoutSubmission,
+    permitMockPayment: configuration.permitMockPayment,
+    permitTestOrderCreation: permitOrderCreation,
+  };
+}
+
+function validateEnvironmentSafety(
+  environment: { baseUrl: string; apiBaseUrl: string | null },
+  configuration: Record<string, unknown>,
+  allowlist: string[],
+  safety: LaunchSafetyConfiguration,
+): void {
+  const reset = record(configuration.reset);
+  const payment = record(configuration.payment);
+  const allowedActions = stringArray(configuration.allowedActions);
+  const hostCandidates = [environment.baseUrl, environment.apiBaseUrl, stringValue(reset.endpoint)].filter(
+    (value): value is string => Boolean(value),
+  );
+  const allowedHosts = new Set(allowlist.map((host) => host.toLowerCase()));
+  for (const candidate of hostCandidates) {
+    const host = new URL(candidate, environment.baseUrl).hostname.toLowerCase();
+    if (!allowedHosts.has(host)) {
+      throw new ApplicationError('PROJECT_SAFETY_BLOCKED', `Environment host ${host} is not allowed by Project Safety`, 403);
+    }
+  }
+  for (const method of [stringValue(reset.method)].filter((value): value is string => Boolean(value))) {
+    if (!safety.allowedHttpMethods.includes(method)) {
+      throw new ApplicationError('PROJECT_SAFETY_BLOCKED', `${method} is not allowed by Project Safety`, 403);
+    }
+  }
+  if (allowedActions.includes('PERFORM_CHECKOUT') && !safety.permitCheckoutSubmission) {
+    throw new ApplicationError('PROJECT_SAFETY_BLOCKED', 'Checkout submission is blocked by Project Safety', 403);
+  }
+  if ((allowedActions.includes('SUBMIT_MOCK_PAYMENT') || payment.mode === 'MOCK') && !safety.permitMockPayment) {
+    throw new ApplicationError('PROJECT_SAFETY_BLOCKED', 'Mock payment is blocked by Project Safety', 403);
+  }
+  if (allowedActions.includes('CREATE_TEST_ORDER') && !safety.permitTestOrderCreation) {
+    throw new ApplicationError('PROJECT_SAFETY_BLOCKED', 'Test order creation is blocked by Project Safety', 403);
+  }
+}
+
+function validateJourneySafety(
+  journey: { steps: Array<{ order: number; action: string; selector: string | null; value: string | null; metadata: unknown }> },
+  startPath: string,
+  environmentBaseUrl: string,
+  allowlist: string[],
+  prohibitedActions: string[],
+  safety: LaunchSafetyConfiguration,
+): void {
+  const allowedHosts = new Set(allowlist.map((host) => host.toLowerCase()));
+  validateNavigation(startPath, environmentBaseUrl, allowedHosts);
+  const ordered = [...journey.steps].sort((left, right) => left.order - right.order);
+  ordered.forEach((step, index) => {
+    if (step.order !== index) throw new ApplicationError('JOURNEY_NOT_READY', 'Journey steps must be ordered contiguously', 422);
+    if (!supportedJourneyActions.has(step.action)) throw new ApplicationError('JOURNEY_ACTION_UNSUPPORTED', `Unsupported Journey action: ${step.action}`, 422);
+    const action = normaliseJourneyAction(step.action);
+    if (action === 'GOTO') validateNavigation(requiredValue(step.value, 'GOTO requires a path'), environmentBaseUrl, allowedHosts);
+    if (['CLICK', 'FILL', 'WAIT_FOR', 'ASSERT_VISIBLE'].includes(action) && !step.selector) {
+      throw new ApplicationError('JOURNEY_NOT_READY', `${action} requires a selector`, 422);
+    }
+    if (action === 'FILL' && step.value === null) {
+      throw new ApplicationError('JOURNEY_NOT_READY', 'FILL requires a value', 422);
+    }
+    const signal = `${action} ${step.selector ?? ''} ${step.value ?? ''} ${JSON.stringify(record(step.metadata))}`.toLowerCase();
+    const checkout = /checkout-button|pay-button|\/checkout\b/.test(signal);
+    const payment = /pay-button|payment/.test(signal);
+    const order = /pay-button|create[^a-z]*order|order-confirmation|order-id/.test(signal);
+    if (checkout && !safety.permitCheckoutSubmission) throw new ApplicationError('PROJECT_SAFETY_BLOCKED', 'Checkout Journey action is blocked by Project Safety', 403);
+    if (payment && !safety.permitMockPayment) throw new ApplicationError('PROJECT_SAFETY_BLOCKED', 'Mock-payment Journey action is blocked by Project Safety', 403);
+    if (order && !safety.permitTestOrderCreation) throw new ApplicationError('PROJECT_SAFETY_BLOCKED', 'Test-order Journey action is blocked by Project Safety', 403);
+    for (const prohibited of prohibitedActions) {
+      const blocked = prohibited.toLowerCase();
+      if (
+        (blocked.includes('checkout') && checkout) ||
+        (blocked.includes('payment') && !blocked.includes('real payment') && payment) ||
+        (blocked.includes('order') && order)
+      ) {
+        throw new ApplicationError('PROJECT_SAFETY_BLOCKED', `Journey conflicts with prohibited action: ${prohibited}`, 403);
+      }
+    }
+  });
+}
+
+function runtimeEnvironmentConfiguration(configuration: Record<string, unknown>) {
+  const reset = record(configuration.reset);
+  const payment = record(configuration.payment);
+  const testData = record(configuration.testData);
+  const resetEndpoint = stringValue(reset.endpoint);
+  const resetMethod = stringValue(reset.method);
+  const paymentMode = stringValue(payment.mode);
+  const paymentResult = stringValue(payment.result);
+  return {
+    reset: {
+      mode: stringValue(reset.mode) ?? 'NONE',
+      ...(resetEndpoint ? { endpoint: resetEndpoint } : {}),
+      ...(resetMethod ? { method: resetMethod } : {}),
+      ...(typeof reset.beforeEachWorld === 'boolean' ? { beforeEachWorld: reset.beforeEachWorld } : {}),
+      ...(typeof reset.expectedStatus === 'number' ? { expectedStatus: reset.expectedStatus } : {}),
+    },
+    payment: {
+      ...(paymentMode ? { mode: paymentMode } : {}),
+      ...(typeof payment.delayMs === 'number' ? { delayMs: payment.delayMs } : {}),
+      ...(paymentResult ? { result: paymentResult } : {}),
+    },
+    testData,
+    allowedActions: stringArray(configuration.allowedActions),
+  };
+}
+
+function validateNavigation(target: string, baseUrl: string, allowedHosts: Set<string>): void {
+  if (/^(javascript|file|data|ftp):/i.test(target) || target.startsWith('//') || target.includes('\\')) {
+    throw new ApplicationError('JOURNEY_ACTION_UNSUPPORTED', 'Navigation target is not supported', 422);
+  }
+  const url = target.startsWith('/') ? new URL(target, baseUrl) : new URL(target);
+  if (!['http:', 'https:'].includes(url.protocol)) throw new ApplicationError('JOURNEY_ACTION_UNSUPPORTED', 'Only HTTP and HTTPS navigation is supported', 422);
+  if (!allowedHosts.has(url.hostname.toLowerCase())) {
+    throw new ApplicationError('PROJECT_SAFETY_BLOCKED', `Navigation host ${url.hostname.toLowerCase()} is not allowed by Project Safety`, 403);
+  }
+}
+
+function normaliseJourneyAction(action: string): string {
+  if (action === 'NAVIGATE') return 'GOTO';
+  if (action === 'WAIT') return 'WAIT_FOR';
+  if (action === 'ASSERT') return 'ASSERT_VISIBLE';
+  return action;
+}
+
+function requiredValue(value: string | null, message: string): string {
+  if (!value) throw new ApplicationError('JOURNEY_NOT_READY', message, 422);
+  return value;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function scenarioName(prompt: string): string {
+  return `Scenario launch ${new Date().toISOString()} ${prompt.trim().slice(0, 60)}`.slice(0, 180);
+}
+
 export class InvestigationRepository {
   constructor(private readonly database: DatabaseClient) {}
 
-  async validateCreationScope(organisationId: string, input: CreateInvestigationInput): Promise<InvestigationCreationScope | null> {
-    const [project, environment, journey, scenario, invariants] = await Promise.all([
-      this.database.project.findFirst({ where: { id: input.projectId, organisationId, deletedAt: null }, select: { id: true, name: true } }),
-      this.database.environment.findFirst({ where: { id: input.environmentId, projectId: input.projectId, deletedAt: null }, select: { id: true, name: true, baseUrl: true } }),
-      this.database.journey.findFirst({ where: { id: input.journeyId, projectId: input.projectId, deletedAt: null }, select: { id: true, name: true } }),
-      this.database.scenario.findFirst({ where: { id: 'scenario_duplicate_submission', projectId: input.projectId, deletedAt: null }, select: { id: true } }),
-      this.database.invariant.findMany({ where: { id: { in: input.invariantIds }, projectId: input.projectId, organisationId, deletedAt: null }, select: { id: true, name: true, description: true } }),
+  async validateCreationScope(organisationId: string, userId: string, input: CreateInvestigationInput): Promise<InvestigationCreationScope | null> {
+    const [membership, project, environment, journey, invariants] = await Promise.all([
+      this.database.organisationMember.findFirst({ where: { userId, organisationId, user: { deletedAt: null }, organisation: { deletedAt: null } }, select: { role: true } }),
+      this.database.project.findFirst({
+        where: { id: input.projectId, organisationId, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          safetyPolicies: {
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+            select: { id: true, domainAllowlist: true, blockedActions: true, configuration: true },
+          },
+        },
+      }),
+      this.database.environment.findFirst({
+        where: { id: input.environmentId, projectId: input.projectId, deletedAt: null },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          baseUrl: true,
+          apiBaseUrl: true,
+          validationStatus: true,
+          configuration: true,
+        },
+      }),
+      this.database.journey.findFirst({
+        where: { id: input.journeyId, projectId: input.projectId, deletedAt: null },
+        include: { steps: { orderBy: { order: 'asc' } } },
+      }),
+      this.database.invariant.findMany({
+        where: { id: { in: input.invariantIds }, projectId: input.projectId, organisationId, deletedAt: null },
+        orderBy: { id: 'asc' },
+      }),
     ]);
-    if (!project || !environment?.baseUrl || !journey || !scenario || invariants.length !== input.invariantIds.length) return null;
+    if (!project) return null;
+    if (!membership || !hasOrganisationPermission(membership.role, 'EDIT_PROJECTS') || membership.role === 'VIEWER') {
+      throw new ApplicationError('INSUFFICIENT_PERMISSION', 'Your organisation role does not permit investigation launch', 403);
+    }
+    const safetyPolicy = project.safetyPolicies[0];
+    if (!safetyPolicy) {
+      throw new ApplicationError('PROJECT_SAFETY_BLOCKED', 'Project Safety must be configured before launch', 409);
+    }
+    const safety = parseLaunchSafety(safetyPolicy.configuration);
+    if (!safety) {
+      throw new ApplicationError('PROJECT_SAFETY_BLOCKED', 'Project Safety configuration is invalid', 409);
+    }
+    if (!environment) return null;
+    if (!environment.baseUrl) throw new ApplicationError('ENVIRONMENT_NOT_READY', 'Environment is missing a runtime base URL', 422);
+    if (environment.validationStatus !== 'READY') throw new ApplicationError('ENVIRONMENT_NOT_READY', `Environment status is ${environment.validationStatus}`, 422);
+    const environmentConfiguration = record(environment.configuration);
+    validateEnvironmentSafety(environment, environmentConfiguration, safetyPolicy.domainAllowlist, safety);
+    if (!journey) return null;
+    const journeyConfiguration = readJourneyConfiguration(journey);
+    if (!journeyConfiguration) throw new ApplicationError('JOURNEY_NOT_READY', 'Journey must use the Builder runtime contract before launch', 422);
+    if (journeyConfiguration.state !== 'ENABLED') throw new ApplicationError('JOURNEY_DISABLED', 'Journey must be enabled before launch', 422);
+    if (journeyConfiguration.validationStatus !== 'READY') throw new ApplicationError('JOURNEY_NOT_READY', `Journey validation status is ${journeyConfiguration.validationStatus}`, 422);
+    if (journeyConfiguration.environmentId !== environment.id) throw new ApplicationError('JOURNEY_ENVIRONMENT_MISMATCH', 'Journey is not configured for the selected Environment', 422);
+    validateJourneySafety(journey, journeyConfiguration.startPath, environment.baseUrl, safetyPolicy.domainAllowlist, safetyPolicy.blockedActions, safety);
+    const runtimeJourney = toRuntimeJourney(journey);
+    const invariantById = new Map(invariants.map((invariant) => [invariant.id, invariant]));
+    const orderedInvariants = input.invariantIds.map((id) => invariantById.get(id));
+    if (orderedInvariants.some((invariant) => !invariant)) return null;
+    const runtimeInvariants = orderedInvariants.map((invariant) => {
+      const assertion = persistedInvariantAssertionSchema.safeParse(invariant!.assertion);
+      if (!assertion.success) throw new ApplicationError('INVARIANT_NOT_READY', `Invariant ${invariant!.id} has invalid structured configuration`, 422);
+      if (!assertion.data.enabled) throw new ApplicationError('INVARIANT_DISABLED', `Invariant ${invariant!.id} is disabled`, 422);
+      return mapPersistedInvariantToRuntimeDefinition(invariant!);
+    });
+    const scenarioId = `scenario_launch_${randomUUID()}`;
+    const launchedAt = new Date().toISOString();
     return {
       organisationId,
-      scenarioId: scenario.id,
+      scenarioId,
+      safetyPolicyId: safetyPolicy.id,
       environmentBaseUrl: environment.baseUrl,
+      ...(environment.apiBaseUrl ? { environmentApiBaseUrl: environment.apiBaseUrl } : {}),
       projectName: project.name,
       environmentName: environment.name,
       journeyName: journey.name,
-      invariantIds: invariants.map(({ id }) => id),
-      invariants: invariants.map((invariant) => ({
-        id: invariant.id,
-        name: invariant.name,
-        ...(invariant.description ? { description: invariant.description } : {}),
+      invariantIds: input.invariantIds,
+      invariants: orderedInvariants.map((invariant) => ({
+        id: invariant!.id,
+        name: invariant!.name,
+        ...(invariant!.description ? { description: invariant!.description } : {}),
       })),
+      launch: {
+        inputSource: 'PERSISTED_CONFIGURATION',
+        actorUserId: userId,
+        launchedAt,
+        scenario: { prompt: input.scenario.prompt, controls: input.scenario.controls },
+        environment: {
+          id: environment.id,
+          name: environment.name,
+          type: String(environment.type),
+          baseUrl: environment.baseUrl,
+          ...(environment.apiBaseUrl ? { apiBaseUrl: environment.apiBaseUrl } : {}),
+          ...runtimeEnvironmentConfiguration(environmentConfiguration),
+        },
+        journey: runtimeJourney,
+        invariants: runtimeInvariants,
+        safety: {
+          policyId: safetyPolicy.id,
+          domainAllowlist: safetyPolicy.domainAllowlist,
+          allowedHttpMethods: safety.allowedHttpMethods,
+          permitCheckoutSubmission: safety.permitCheckoutSubmission,
+          permitMockPayment: safety.permitMockPayment,
+          permitTestOrderCreation: safety.permitTestOrderCreation,
+          prohibitedActions: safetyPolicy.blockedActions,
+        },
+        validation: { status: 'READY', warnings: [] },
+      },
     };
   }
 
   async create(input: CreateInvestigationInput, scope: InvestigationCreationScope): Promise<string> {
     return this.database.$transaction(async (transaction) => {
+      await transaction.scenario.create({ data: {
+        id: scope.scenarioId,
+        projectId: input.projectId,
+        name: scenarioName(input.scenario.prompt),
+        prompt: input.scenario.prompt,
+        controls: json(input.scenario.controls),
+      } });
       const investigation = await transaction.investigation.create({ data: {
         organisationId: scope.organisationId,
         projectId: input.projectId,
         environmentId: input.environmentId,
         journeyId: input.journeyId,
         scenarioId: scope.scenarioId,
+        ...(scope.safetyPolicyId ? { safetyPolicyId: scope.safetyPolicyId } : {}),
         name: `Checkout investigation: ${input.scenario.prompt.slice(0, 120)}`,
         status: 'PLANNING',
         startedAt: new Date(),
@@ -100,7 +365,15 @@ export class InvestigationRepository {
       await transaction.investigationEvent.create({ data: {
         investigationId: investigation.id,
         type: 'investigation_created',
-        data: messageData('Investigation created and experiment planning requested.', { status: 'PLANNING' }),
+        data: messageData('Investigation created from persisted Project configuration.', {
+          status: 'PLANNING',
+          projectId: input.projectId,
+          environmentId: input.environmentId,
+          journeyId: input.journeyId,
+          invariantIds: input.invariantIds,
+          scenarioId: scope.scenarioId,
+          inputSource: scope.launch.inputSource,
+        }),
       } });
       return investigation.id;
     });
@@ -149,7 +422,19 @@ export class InvestigationRepository {
     } });
     const persistedPlan = record?.plans[0];
     if (!record || !persistedPlan) return null;
-    return { id: record.id, organisationId: record.organisationId, projectId: record.projectId, environmentId: record.environmentId, journeyId: record.journeyId, scenarioId: record.scenarioId, environmentBaseUrl: record.environment.baseUrl, planId: persistedPlan.id, plan: persistedPlan.plan as unknown as DeterministicExperimentPlan };
+    const plan = persistedPlan.plan as unknown as DeterministicExperimentPlan;
+    return {
+      id: record.id,
+      organisationId: record.organisationId,
+      projectId: record.projectId,
+      environmentId: record.environmentId,
+      journeyId: record.journeyId,
+      scenarioId: record.scenarioId,
+      environmentBaseUrl: plan.launch?.environment.baseUrl ?? record.environment.baseUrl,
+      ...(plan.launch?.environment.apiBaseUrl ? { environmentApiBaseUrl: plan.launch.environment.apiBaseUrl } : {}),
+      planId: persistedPlan.id,
+      plan,
+    };
   }
 
   async queueInitialWorlds(context: InvestigationOrchestrationContext): Promise<CreatedWorldRecord[]> {
@@ -513,7 +798,26 @@ export class InvestigationRepository {
       } });
       const attempt = await transaction.executionAttempt.create({ data: { experimentId: record.experimentId, workerId: worker.id, attempt: attemptNumber, status: 'RUNNING', provider, startedAt: new Date(), metrics: json({ attemptNumber, maximumAttempts, queuedAt: new Date().toISOString() }) } });
       await transaction.investigationEvent.create({ data: { investigationId: context.id, type: 'worker_started', data: json({ message: `${record.definition.name} attempt ${attemptNumber} started.`, provider, status: 'RUNNING', worldId: record.id, experimentId: record.experimentId, workerId: worker.id, attemptId: attempt.id, attemptNumber, maximumAttempts }) } });
-      return { investigationId: context.id, organisationId: context.organisationId, projectId: context.projectId, environmentBaseUrl: context.environmentBaseUrl, invariantId: context.plan.invariantIds[0]!, worldId: record.id, experimentId: record.experimentId, workerId: worker.id, attemptId: attempt.id, world: record.definition, provider, attemptNumber, maximumAttempts };
+      if (!context.plan.launch) throw new Error('Persisted launch snapshot is missing');
+      return {
+        investigationId: context.id,
+        organisationId: context.organisationId,
+        projectId: context.projectId,
+        environmentBaseUrl: context.environmentBaseUrl,
+        ...(context.environmentApiBaseUrl ? { environmentApiBaseUrl: context.environmentApiBaseUrl } : {}),
+        invariantId: context.plan.invariantIds[0]!,
+        journey: context.plan.launch.journey,
+        invariants: context.plan.launch.invariants,
+        launch: context.plan.launch,
+        worldId: record.id,
+        experimentId: record.experimentId,
+        workerId: worker.id,
+        attemptId: attempt.id,
+        world: record.definition,
+        provider,
+        attemptNumber,
+        maximumAttempts,
+      };
     });
   }
 
