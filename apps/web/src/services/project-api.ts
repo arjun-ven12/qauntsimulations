@@ -41,7 +41,7 @@ export interface SafetyPolicy {
   allowedHttpMethods: Array<'GET' | 'POST' | 'OPTIONS' | 'PUT' | 'PATCH' | 'DELETE'>;
   permitCheckoutSubmission: boolean;
   permitMockPayment: boolean;
-  permitOrderCreation: boolean;
+  permitTestOrderCreation: boolean;
   restrictions: Record<string, boolean>;
   acknowledgedAt: string;
   updatedAt: string;
@@ -74,7 +74,7 @@ export interface UpdateSafetyInput {
   allowedHttpMethods: SafetyPolicy['allowedHttpMethods'];
   permitCheckoutSubmission: boolean;
   permitMockPayment: boolean;
-  permitOrderCreation: boolean;
+  permitTestOrderCreation: boolean;
   prohibitedActions: string[];
   acknowledgement: true;
 }
@@ -96,7 +96,7 @@ const summarySchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
-const safetySchema = z.object({
+const safetyWireSchema = z.object({
   id: z.string(),
   domainAllowlist: z.array(z.string()),
   prohibitedActions: z.array(z.string()),
@@ -108,6 +108,10 @@ const safetySchema = z.object({
   acknowledgedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
+const safetySchema = safetyWireSchema.transform(({ permitOrderCreation, ...policy }) => ({
+  ...policy,
+  permitTestOrderCreation: permitOrderCreation,
+}));
 const detailsSchema = summarySchema.omit({ safety: true }).extend({
   credentialReferences: z.array(
     z.object({
@@ -168,10 +172,11 @@ class HttpProjectApi {
   }
 
   async updateSafety(projectId: string, input: UpdateSafetyInput): Promise<SafetyPolicy> {
+    const { permitTestOrderCreation, ...rest } = input;
     return safetySchema.parse(
       await this.request(`/projects/${projectId}/safety`, {
         method: 'PATCH',
-        body: JSON.stringify(input),
+        body: JSON.stringify({ ...rest, permitOrderCreation: permitTestOrderCreation }),
       }),
     );
   }

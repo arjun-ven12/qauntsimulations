@@ -44,6 +44,9 @@ export function ProjectOverviewPage() {
             <Link className={primaryButton} to={`/projects/${projectId}/safety`}>
               <ShieldCheck aria-hidden="true" className="mr-2" size={17} /> Safety
             </Link>
+            <Link className={secondaryButton} to={`/projects/${projectId}/environments`}>
+              Environments
+            </Link>
           </div>
         }
         description={value.description || 'No project description.'}

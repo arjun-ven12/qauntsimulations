@@ -13,6 +13,10 @@ import { ProjectOverviewPage } from '../features/projects/project-overview.page.
 import { ProjectSettingsPage } from '../features/projects/project-settings.page.js';
 import { ProjectsPage } from '../features/projects/projects.page.js';
 import { SafetySettingsPage } from '../features/projects/safety-settings.page.js';
+import { EnvironmentsPage } from '../features/environments/environments.page.js';
+import { NewEnvironmentPage } from '../features/environments/new-environment.page.js';
+import { EnvironmentOverviewPage } from '../features/environments/environment-overview.page.js';
+import { EnvironmentSettingsPage } from '../features/environments/environment-settings.page.js';
 import { VerifyRepairPage } from '../features/repairs/verify-repair.page.js';
 import { AppLayout } from '../layouts/app-layout.js';
 import { GuestRoute, RouteGuard } from '../routes/route-guard.js';
@@ -43,6 +47,10 @@ export const router = createBrowserRouter([
       { path: '/projects/:projectId', element: <ProjectOverviewPage /> },
       { path: '/projects/:projectId/settings', element: <ProjectSettingsPage /> },
       { path: '/projects/:projectId/safety', element: <SafetySettingsPage /> },
+      { path: '/projects/:projectId/environments', element: <EnvironmentsPage /> },
+      { path: '/projects/:projectId/environments/new', element: <NewEnvironmentPage /> },
+      { path: '/projects/:projectId/environments/:environmentId', element: <EnvironmentOverviewPage /> },
+      { path: '/projects/:projectId/environments/:environmentId/settings', element: <EnvironmentSettingsPage /> },
       { path: '/projects/:projectId/investigations/new', element: <NewInvestigationPage /> },
       { path: '/investigations/:investigationId', element: <LiveWorldLabPage /> },
       { path: '/investigations/:investigationId/plan', element: <ExperimentPlanPage /> },

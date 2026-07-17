@@ -135,20 +135,29 @@ model Project {
 }
 
 model Environment {
-  id             String          @id @default(cuid())
-  projectId      String
-  name           String
-  type           EnvironmentType
-  baseUrl        String
-  manifest       Json            @default("{}")
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  deletedAt      DateTime?
-  project        Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  investigations Investigation[]
+  id               String                      @id @default(cuid())
+  projectId        String
+  name             String
+  description      String?
+  type             EnvironmentType
+  baseUrl          String
+  apiBaseUrl       String?
+  healthCheckUrl   String?
+  isDefault        Boolean                     @default(false)
+  validationStatus EnvironmentValidationStatus @default(NOT_VALIDATED)
+  lastValidatedAt  DateTime?
+  configuration    Json                        @default("{}")
+  manifest         Json                        @default("{}")
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+  deletedAt        DateTime?
+  project          Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  investigations   Investigation[]
 
   @@unique([projectId, name])
   @@index([projectId, type])
+  @@index([projectId, isDefault])
+  @@index([projectId, validationStatus])
 }
 
 // Only vault references or encrypted envelopes belong here; raw credentials must never be persisted.
@@ -745,6 +754,16 @@ enum EnvironmentType {
   STAGING
   PRODUCTION
   DEMO
+  LOCAL
+  PREVIEW
+  TEST_MIRROR
+}
+
+enum EnvironmentValidationStatus {
+  NOT_VALIDATED
+  INCOMPLETE
+  READY
+  VALIDATION_FAILED
 }
 
 enum InvestigationStatus {

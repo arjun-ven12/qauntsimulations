@@ -165,7 +165,7 @@ export function SafetySettingsPage() {
         allowedHttpMethods: value!.allowedHttpMethods,
         permitCheckoutSubmission: value!.permitCheckoutSubmission,
         permitMockPayment: value!.permitMockPayment,
-        permitOrderCreation: value!.permitOrderCreation,
+        permitTestOrderCreation: value!.permitTestOrderCreation,
         prohibitedActions: normalisedActions,
         acknowledgement: true,
       });
@@ -307,10 +307,12 @@ export function SafetySettingsPage() {
               onChange={(permitMockPayment) => setValue({ ...value, permitMockPayment })}
             />
             <SafetyToggle
-              checked={value.permitOrderCreation}
+              checked={value.permitTestOrderCreation}
               disabled={!canManage}
               label="Permit test order creation"
-              onChange={(permitOrderCreation) => setValue({ ...value, permitOrderCreation })}
+              onChange={(permitTestOrderCreation) =>
+                setValue({ ...value, permitTestOrderCreation })
+              }
             />
           </div>
         </section>
@@ -476,7 +478,7 @@ function policySignature(policy: SafetyPolicy) {
     allowedHttpMethods: policy.allowedHttpMethods,
     permitCheckoutSubmission: policy.permitCheckoutSubmission,
     permitMockPayment: policy.permitMockPayment,
-    permitOrderCreation: policy.permitOrderCreation,
+    permitTestOrderCreation: policy.permitTestOrderCreation,
     prohibitedActions: policy.prohibitedActions,
   });
 }
