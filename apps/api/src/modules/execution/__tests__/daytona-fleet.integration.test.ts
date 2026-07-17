@@ -87,7 +87,7 @@ suite('live Daytona fleet orchestration', () => {
       },
     );
     const service = new InvestigationService(repository, new InvestigationPlanningService({ requestedProvider: 'deterministic', fallbackEnabled: true, maximumWorlds: 8, maximumVariables: 6, maximumAssumptions: 10, maximumWarnings: 20, timeoutMs: 30_000, maxProviderAttempts: 1, maxOutputTokens: 3_000 }), orchestrator);
-    const created = await service.create('organisation_demo_taskos', demoCreateInvestigationInput);
+    const created = await service.create({ userId: 'user_demo_taskos', organisationId: 'organisation_demo_taskos', role: 'OWNER', tokenVersion: 0 }, demoCreateInvestigationInput);
     investigationId = created.id;
     const deadline = Date.now() + 390_000;
     let progress = created;

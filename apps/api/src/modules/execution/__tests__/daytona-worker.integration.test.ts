@@ -96,7 +96,7 @@ suite('live Daytona isolated worker execution', () => {
     let investigationId: string | undefined; let workerIds: string[] = [];
     try {
       const input = { ...demoCreateInvestigationInput, scenario: { ...demoCreateInvestigationInput.scenario, controls: { ...demoCreateInvestigationInput.scenario.controls, maximumWorlds: 1, maximumConcurrentWorkers: 1 } } };
-      const created = await service.create('organisation_demo_taskos', input); investigationId = created.id;
+      const created = await service.create({ userId: 'user_demo_taskos', organisationId: 'organisation_demo_taskos', role: 'OWNER', tokenVersion: 0 }, input); investigationId = created.id;
       const deadline = Date.now() + 240_000; let progress = created;
       while (!['COMPLETED', 'FAILED'].includes(progress.status) && Date.now() < deadline) { await new Promise((resolveWait) => setTimeout(resolveWait, 500)); progress = await service.get('organisation_demo_taskos', created.id); }
       expect(progress.status).toBe('COMPLETED');

@@ -34,7 +34,7 @@ suite('full local investigation orchestration', () => {
     const service = new InvestigationService(repository, new InvestigationPlanningService({ requestedProvider: 'deterministic', fallbackEnabled: true, maximumWorlds: 8, maximumVariables: 6, maximumAssumptions: 10, maximumWarnings: 20, timeoutMs: 30_000, maxProviderAttempts: 1, maxOutputTokens: 3_000 }), orchestrator);
     let investigationId: string | undefined; let workerIds: string[] = [];
     try {
-      const created = await service.create('organisation_demo_taskos', demoCreateInvestigationInput); investigationId = created.id;
+      const created = await service.create({ userId: 'user_demo_taskos', organisationId: 'organisation_demo_taskos', role: 'OWNER', tokenVersion: 0 }, demoCreateInvestigationInput); investigationId = created.id;
       const deadline = Date.now() + 75_000; let progress = created;
       while (!['COMPLETED', 'FAILED'].includes(progress.status) && Date.now() < deadline) { await new Promise((resolveWait) => setTimeout(resolveWait, 200)); progress = await service.get('organisation_demo_taskos', created.id); }
       expect(investigationProgressSchema.parse(progress)).toEqual(progress);

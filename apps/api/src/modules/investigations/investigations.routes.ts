@@ -5,6 +5,7 @@ import { createInvestigationSchema, createProjectInvestigationSchema } from './i
 
 export function createProjectInvestigationRouter(controller: InvestigationController) {
   const router = Router({ mergeParams: true });
+  router.post('/preflight', validateBody(createProjectInvestigationSchema), controller.preflightForProject);
   router.post('/', validateBody(createProjectInvestigationSchema), controller.createForProject);
   return router;
 }

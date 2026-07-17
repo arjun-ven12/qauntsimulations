@@ -11,7 +11,7 @@ import { errorHandler } from '../../../core/middleware/error-handler.js';
 import { EvidenceContentService } from '../evidence-content.service.js';
 import { InvestigationPlanningService } from '../../experiments/services/investigation-planning.service.js';
 import { InvestigationController } from '../investigations.controller.js';
-import { createInvestigationRouter } from '../investigations.routes.js';
+import { createInvestigationRouter, createProjectInvestigationRouter } from '../investigations.routes.js';
 import { InvestigationService } from '../investigations.service.js';
 
 function application(evidenceRoot?: string) {
@@ -21,7 +21,27 @@ function application(evidenceRoot?: string) {
   const markdownReportArtifact = { ...finalReportArtifact, id: 'evidence_markdown_report', storageKey: 'reports/investigation_api_test/final-report.md', mimeType: 'text/markdown', sizeBytes: 14n, metadata: { filename: 'final-report.md' } };
   const screenshotArtifact = { ...finalReportArtifact, id: 'evidence_screenshot', type: 'SCREENSHOT' as const, storageKey: 'screenshots/001.png', mimeType: 'image/png' };
   const repository = {
-    validateCreationScope: async (_organisationId: string, input: typeof demoCreateInvestigationInput) => input.projectId === 'project_demo_checkout' && input.environmentId === 'environment_demo_local' && input.journeyId === 'journey_checkout' && input.invariantIds.includes('invariant_single_checkout_submission') ? { organisationId: 'organisation_demo_taskos', scenarioId: 'scenario_duplicate_submission', environmentBaseUrl: 'http://localhost:5174', projectName: 'TaskOS Demo Commerce', environmentName: 'Demo', journeyName: 'Checkout', invariantIds: input.invariantIds, invariants: [{ id: 'invariant_single_checkout_submission', name: 'Single checkout submission' }] } : null,
+    validateCreationScope: async (_organisationId: string, _userId: string, input: typeof demoCreateInvestigationInput) => input.projectId === 'project_demo_checkout' && input.environmentId === 'environment_demo_local' && input.journeyId === 'journey_checkout' && input.invariantIds.includes('invariant_single_checkout_submission') ? {
+      organisationId: 'organisation_demo_taskos',
+      scenarioId: 'scenario_duplicate_submission',
+      environmentBaseUrl: 'http://localhost:5174',
+      projectName: 'TaskOS Demo Commerce',
+      environmentName: 'Demo',
+      journeyName: 'Checkout',
+      invariantIds: input.invariantIds,
+      invariants: [{ id: 'invariant_single_checkout_submission', name: 'Single checkout submission' }],
+      launch: {
+        inputSource: 'PERSISTED_CONFIGURATION' as const,
+        actorUserId: 'user_test',
+        launchedAt: createdAt.toISOString(),
+        scenario: { prompt: input.scenario.prompt, controls: input.scenario.controls },
+        environment: { id: input.environmentId, name: 'Demo', type: 'DEMO', baseUrl: 'http://localhost:5174' },
+        journey: { id: input.journeyId, name: 'Checkout', steps: [{ type: 'goto' as const, path: '/products/test-product' }], successCondition: { type: 'visible' as const, selector: '[data-testid="order-confirmation"]' } },
+        invariants: [{ id: 'invariant_single_checkout_submission', type: 'NO_DUPLICATE_PAYMENT' as const, severity: 'CRITICAL' as const, config: { requestPatterns: ['/api/payments'], methods: ['POST'] } }],
+        safety: { domainAllowlist: ['localhost'], allowedHttpMethods: ['GET', 'POST'], permitCheckoutSubmission: true, permitMockPayment: true, permitTestOrderCreation: true, prohibitedActions: [] },
+        validation: { status: 'READY' as const, warnings: [] },
+      },
+    } : null,
     create: async () => progressRecord.id,
     persistPlan: async () => 'plan_api_test',
     progress: async (_organisationId: string, id: string) => id === progressRecord.id ? progressRecord : null,
@@ -73,7 +93,8 @@ function application(evidenceRoot?: string) {
     issueAccessToken: () => '', issueRefreshToken: () => '', verifyRefreshToken: () => { throw new Error('unused'); }, hashToken: () => '',
     verifyAccessToken: (token) => { if (token !== 'valid') throw new Error('invalid'); return { userId: 'user_test', organisationId: 'organisation_demo_taskos', role: 'OWNER', tokenVersion: 0, issuedAt: 1, expiry: 2 }; },
   };
-  const app = express(); app.use(express.json()); app.use(requireAuth(tokens), requireOrganisation); app.use('/api/investigations', createInvestigationRouter(new InvestigationController(service))); app.use(errorHandler); return app;
+  const controller = new InvestigationController(service);
+  const app = express(); app.use(express.json()); app.use(requireAuth(tokens), requireOrganisation); app.use('/api/projects/:projectId/investigations', createProjectInvestigationRouter(controller)); app.use('/api/investigations', createInvestigationRouter(controller)); app.use(errorHandler); return app;
 }
 
 describe('investigation API', () => {
@@ -94,6 +115,23 @@ describe('investigation API', () => {
     const response = await request(application()).post('/api/investigations').set('authorization', 'Bearer valid').send(demoCreateInvestigationInput);
     expect(response.status).toBe(201);
     expect(investigationProgressSchema.parse(response.body).status).toBe('PLANNING');
+  });
+  it('preflights a project-scoped persisted launch without creating an investigation', async () => {
+    const response = await request(application()).post('/api/projects/project_demo_checkout/investigations/preflight').set('authorization', 'Bearer valid').send({
+      environmentId: demoCreateInvestigationInput.environmentId,
+      journeyId: demoCreateInvestigationInput.journeyId,
+      scenario: demoCreateInvestigationInput.scenario,
+      invariantIds: demoCreateInvestigationInput.invariantIds,
+    });
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      status: 'READY',
+      projectId: 'project_demo_checkout',
+      environmentId: 'environment_demo_local',
+      journeyId: 'journey_checkout',
+      invariantIds: ['invariant_single_checkout_submission'],
+      validation: { status: 'READY', warnings: [] },
+    });
   });
   it('rejects invalid scope and missing invariants', async () => {
     const invalidProject = await request(application()).post('/api/investigations').set('authorization', 'Bearer valid').send({ ...demoCreateInvestigationInput, projectId: 'missing' });
