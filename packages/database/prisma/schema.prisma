@@ -22,6 +22,8 @@ model User {
   refreshTokens               RefreshToken[]
   sentOrganisationInvitations OrganisationInvitation[] @relation("OrganisationInvitationInviter")
   auditLogs                   AuditLog[]               @relation("AuditActor")
+  createdRepairVerifications   RepairVerification[]     @relation("RepairVerificationCreator")
+  cancelledRepairVerifications RepairVerification[]     @relation("RepairVerificationCanceller")
 }
 
 model Organisation {
@@ -44,6 +46,7 @@ model Organisation {
   workers        Worker[]
   findings       Finding[]
   repairs        Repair[]
+  repairVerifications RepairVerification[]
 }
 
 model OrganisationMember {
@@ -129,6 +132,7 @@ model Project {
   investigations Investigation[]
   findings       Finding[]
   memory         MemoryRecord[]
+  repairVerifications RepairVerification[]
 
   @@unique([organisationId, name])
   @@index([organisationId, createdAt])
@@ -153,6 +157,7 @@ model Environment {
   deletedAt        DateTime?
   project          Project                     @relation(fields: [projectId], references: [id], onDelete: Cascade)
   investigations   Investigation[]
+  repairVerifications RepairVerification[]
 
   @@unique([projectId, name])
   @@index([projectId, type])
@@ -326,6 +331,8 @@ model Investigation {
   minimisationRuns MinimisationRun[]
   memory          MemoryRecord[]
   retrievalAudits PlanningRetrievalAudit[]
+  sourceRepairVerifications       RepairVerification[]     @relation("RepairVerificationOriginalInvestigation")
+  verificationRepairVerifications RepairVerification[]     @relation("RepairVerificationInvestigation")
 
   @@index([projectId, createdAt])
   @@index([organisationId, status])
@@ -519,6 +526,7 @@ model Finding {
   causalAsEffect      CausalRelationship[] @relation("CausalEffect")
   repairs             Repair[]
   memory              MemoryRecord[]
+  repairVerifications RepairVerification[]
 
   @@index([investigationId, severity])
 }
@@ -636,6 +644,8 @@ model CausalRelationship {
   @@unique([causeFindingId, effectFindingId])
 }
 
+// Legacy/inactive repair-verification persistence. The canonical v1 feature must use
+// RepairVerification and must not write to Repair, VerificationRun, or VerificationExperiment.
 model Repair {
   id               String            @id @default(cuid())
   organisationId   String
@@ -669,6 +679,55 @@ model VerificationExperiment {
   experiment        Experiment      @relation(fields: [experimentId], references: [id], onDelete: Cascade)
 
   @@id([verificationRunId, experimentId])
+}
+
+// Canonical Product-owned Repair Verification persistence for v1. Runtime execution remains
+// disabled until the later API and prepared-Investigation stages are explicitly implemented.
+model RepairVerification {
+  id                          String                             @id @default(cuid())
+  organisationId              String
+  projectId                   String
+  findingId                   String
+  originalInvestigationId     String
+  verificationInvestigationId String                             @unique
+  environmentId               String
+  createdByUserId             String?
+  cancelledByUserId           String?
+  notes                       String?
+  executionStatus             RepairVerificationExecutionStatus  @default(QUEUED)
+  verificationResult          RepairVerificationResult?
+  originalBusinessOutcome     RepairVerificationBusinessOutcome
+  repairedBusinessOutcome     RepairVerificationBusinessOutcome?
+  regressionControlOutcome    RepairVerificationBusinessOutcome?
+  planSnapshot                Json
+  comparisonSnapshot          Json?
+  idempotencyKey              String
+  requestFingerprint          String
+  failureCode                 String?
+  failureMessage              String?
+  inconclusiveReason          String?
+  cancellationReason          String?
+  startedAt                   DateTime?
+  completedAt                 DateTime?
+  cancelledAt                 DateTime?
+  createdAt                   DateTime                           @default(now())
+  updatedAt                   DateTime                           @updatedAt
+  organisation                Organisation                       @relation(fields: [organisationId], references: [id], onDelete: Restrict)
+  project                     Project                            @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  finding                     Finding                            @relation(fields: [findingId], references: [id], onDelete: Restrict)
+  originalInvestigation       Investigation                      @relation("RepairVerificationOriginalInvestigation", fields: [originalInvestigationId], references: [id], onDelete: Restrict)
+  verificationInvestigation   Investigation                      @relation("RepairVerificationInvestigation", fields: [verificationInvestigationId], references: [id], onDelete: Restrict)
+  environment                 Environment                        @relation(fields: [environmentId], references: [id], onDelete: Restrict)
+  createdBy                   User?                              @relation("RepairVerificationCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  cancelledBy                 User?                              @relation("RepairVerificationCanceller", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([organisationId, idempotencyKey])
+  @@index([organisationId, createdAt])
+  @@index([projectId, createdAt])
+  @@index([findingId, createdAt])
+  @@index([originalInvestigationId])
+  @@index([environmentId])
+  @@index([executionStatus, updatedAt])
 }
 
 // Retrieval is advisory: current execution evidence always outranks historical memory.
@@ -891,6 +950,27 @@ enum VerificationStatus {
   RUNNING
   PASSED
   FAILED
+  INCONCLUSIVE
+}
+
+enum RepairVerificationExecutionStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum RepairVerificationResult {
+  FIX_CONFIRMED
+  DEFECT_STILL_PRESENT
+  REGRESSION_DETECTED
+  INCONCLUSIVE
+}
+
+enum RepairVerificationBusinessOutcome {
+  PASS
+  FAIL
   INCONCLUSIVE
 }
 
