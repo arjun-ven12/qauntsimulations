@@ -2,10 +2,10 @@ import { createInvestigationInputSchema, type CreateInvestigationInput } from '@
 import { ApplicationError } from '../../core/errors/application-error.js';
 import type { InvestigationPlanningService } from '../experiments/services/investigation-planning.service.js';
 import type { InvestigationOrchestratorService } from '../execution/investigation-orchestrator.service.js';
-import { mapEvidenceList, mapExperimentList, mapFindingList, mapProgress, mapWorkerList, mapWorldList } from './investigations.mapper.js';
+import { mapEvidenceList, mapExperimentList, mapFindingDetail, mapFindingList, mapProgress, mapWorkerList, mapWorldList } from './investigations.mapper.js';
 import type { InvestigationRepository } from './investigations.repository.js';
 
-type InvestigationServiceRepository = Pick<InvestigationRepository, 'validateCreationScope' | 'create' | 'persistPlan' | 'progress' | 'listWorlds' | 'listExperiments' | 'listWorkers' | 'listEvidence' | 'listFindings' | 'cancel' | 'orchestrationContext' | 'failInvestigation'>;
+type InvestigationServiceRepository = Pick<InvestigationRepository, 'validateCreationScope' | 'create' | 'persistPlan' | 'progress' | 'listWorlds' | 'listExperiments' | 'listWorkers' | 'listEvidence' | 'listFindings' | 'getFinding' | 'cancel' | 'orchestrationContext' | 'failInvestigation'>;
 type InvestigationStarter = Pick<InvestigationOrchestratorService, 'start'>;
 
 export class InvestigationService {
@@ -49,6 +49,12 @@ export class InvestigationService {
   async workers(organisationId: string, id: string) { await this.requireProgress(organisationId, id); return mapWorkerList(await this.repository.listWorkers(organisationId, id)); }
   async evidence(organisationId: string, id: string) { await this.requireProgress(organisationId, id); return mapEvidenceList(await this.repository.listEvidence(organisationId, id)); }
   async findings(organisationId: string, id: string) { await this.requireProgress(organisationId, id); return mapFindingList(await this.repository.listFindings(organisationId, id)); }
+  async finding(organisationId: string, id: string, findingId: string) {
+    await this.requireProgress(organisationId, id);
+    const finding = await this.repository.getFinding(organisationId, id, findingId);
+    if (!finding) throw new ApplicationError('FINDING_NOT_FOUND', 'Finding was not found', 404);
+    return mapFindingDetail(finding);
+  }
   async cancel(organisationId: string, id: string) { if (!(await this.repository.cancel(organisationId, id))) throw new ApplicationError('INVESTIGATION_NOT_CANCELLABLE', 'Investigation was not found or is already terminal', 409); return this.get(organisationId, id); }
   async plan(organisationId: string, id: string) { await this.requireProgress(organisationId, id); return (await this.repository.orchestrationContext(id))?.plan ?? null; }
 

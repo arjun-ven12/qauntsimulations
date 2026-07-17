@@ -11,6 +11,15 @@ import type {
   InvestigationCreationScope,
   InvestigationOrchestrationContext,
   InvestigationProgressRecord,
+  CompleteMinimisationInput,
+  MinimisationCandidateCreationResult,
+  MinimisationCandidateDefinition,
+  MinimisationCandidateUpdateInput,
+  MinimisationFindingCandidate,
+  MinimisationPlan,
+  MinimisationPlanCreationResult,
+  MinimisationRunRecord,
+  MinimisationWorldResultRecord,
   PersistedExecutionEvent,
   PersistedFleetEvent,
   PersistedWorldExecution,
@@ -23,6 +32,29 @@ const json = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJso
 const messageData = (message: string, metadata: Record<string, unknown> = {}): Prisma.InputJsonValue => json({ message, ...metadata });
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const stringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+const numberValue = (value: unknown): number | undefined => typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+
+const minimisationRunRecord = (run: {
+  id: string;
+  status: string;
+  completedTrials: number;
+  currentRetainedConditions: unknown;
+  removedConditions: unknown;
+  inconclusiveConditions: unknown;
+  knownPassingDelayMs: number | null;
+  knownFailingDelayMs: number | null;
+  finalReportEvidenceId: string | null;
+}): MinimisationRunRecord => ({
+  id: run.id,
+  status: run.status,
+  completedTrials: run.completedTrials,
+  retainedConditions: record(run.currentRetainedConditions),
+  removedConditions: record(run.removedConditions),
+  inconclusiveConditions: record(run.inconclusiveConditions),
+  ...(run.knownPassingDelayMs !== null ? { knownPassingDelayMs: run.knownPassingDelayMs } : {}),
+  ...(run.knownFailingDelayMs !== null ? { knownFailingDelayMs: run.knownFailingDelayMs } : {}),
+  ...(run.finalReportEvidenceId ? { finalReportEvidenceId: run.finalReportEvidenceId } : {}),
+});
 
 export class InvestigationRepository {
   constructor(private readonly database: DatabaseClient) {}
@@ -110,13 +142,13 @@ export class InvestigationRepository {
 
   async orchestrationContext(id: string): Promise<InvestigationOrchestrationContext | null> {
     const record = await this.database.investigation.findUnique({ where: { id }, select: {
-      id: true, organisationId: true, projectId: true, journeyId: true, scenarioId: true,
+      id: true, organisationId: true, projectId: true, environmentId: true, journeyId: true, scenarioId: true,
       environment: { select: { baseUrl: true } },
       plans: { orderBy: { version: 'desc' }, take: 1, select: { id: true, plan: true } },
     } });
     const persistedPlan = record?.plans[0];
     if (!record || !persistedPlan) return null;
-    return { id: record.id, organisationId: record.organisationId, projectId: record.projectId, journeyId: record.journeyId, scenarioId: record.scenarioId, environmentBaseUrl: record.environment.baseUrl, planId: persistedPlan.id, plan: persistedPlan.plan as unknown as DeterministicExperimentPlan };
+    return { id: record.id, organisationId: record.organisationId, projectId: record.projectId, environmentId: record.environmentId, journeyId: record.journeyId, scenarioId: record.scenarioId, environmentBaseUrl: record.environment.baseUrl, planId: persistedPlan.id, plan: persistedPlan.plan as unknown as DeterministicExperimentPlan };
   }
 
   async queueInitialWorlds(context: InvestigationOrchestrationContext): Promise<CreatedWorldRecord[]> {
@@ -210,6 +242,206 @@ export class InvestigationRepository {
     if (changed.count === 1) {
       await this.database.investigationEvent.create({ data: { investigationId: id, type: 'follow_up_generated', data: messageData('Adaptive reproduction completed.', { phase: 'reproduction_completed', status: 'OBSERVING', findingId, reproductionRunId }) } });
     }
+  }
+
+  async eligibleMinimisationFindings(investigationId: string, limit: number, maximumTotalWorlds: number): Promise<MinimisationFindingCandidate[]> {
+    const investigation = await this.database.investigation.findUnique({
+      where: { id: investigationId },
+      select: { status: true, _count: { select: { worlds: true } } },
+    });
+    if (!investigation || investigation.status === 'CANCELLED' || investigation._count.worlds >= maximumTotalWorlds || limit <= 0) {
+      await this.database.investigationEvent.create({ data: { investigationId, type: 'minimisation_eligibility_checked', data: messageData('No minimisation candidates are eligible.', { phase: 'minimisation_eligibility_checked', candidateCount: 0 }) } });
+      return [];
+    }
+    const findings = await this.database.finding.findMany({
+      where: { investigationId, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+      include: {
+        conditions: true,
+        reproductions: { where: { reproduced: true }, orderBy: { createdAt: 'asc' }, take: 1 },
+        evidence: { select: { artifactId: true } },
+      },
+    });
+    const candidates: MinimisationFindingCandidate[] = [];
+    for (const finding of findings) {
+      if (candidates.length >= limit) break;
+      const conditions = record(finding.causalConditions);
+      if (finding.conditions.some(({ kind }) => kind === 'MINIMISATION_COMPLETED')) continue;
+      if (conditions.minimisationStatus === 'COMPLETED') continue;
+      const causalStatus = typeof conditions.causalStatus === 'string' ? conditions.causalStatus : 'UNCONFIRMED';
+      if (causalStatus !== 'REPRODUCED' && causalStatus !== 'SUPPORTED') continue;
+      const reproductionRunId = typeof conditions.latestReproductionRunId === 'string'
+        ? conditions.latestReproductionRunId
+        : finding.reproductions[0]?.id;
+      const sourceWorldId = typeof conditions.worldId === 'string' ? conditions.worldId : undefined;
+      const sourceExperimentId = typeof conditions.experimentId === 'string' ? conditions.experimentId : undefined;
+      if (!sourceWorldId || !sourceExperimentId || !reproductionRunId) continue;
+      if (!finding.reproductions.length) continue;
+      const world = await this.database.world.findUnique({ where: { id: sourceWorldId }, select: { configuration: true, status: true } });
+      const sourceWorld = record(world?.configuration) as unknown as DeterministicWorldDefinition;
+      if (!world || world.status === 'CANCELLED' || sourceWorld.origin === 'MINIMISATION') continue;
+      if (!sourceWorld.duplicateSubmissionBug || !sourceWorld.doubleSubmit) continue;
+      const evidenceArtifactIds = [...new Set([...finding.evidence.map(({ artifactId }) => artifactId), ...stringArray(conditions.evidenceArtifactIds)])];
+      if (evidenceArtifactIds.length === 0) continue;
+      candidates.push({
+        id: finding.id,
+        fingerprint: finding.fingerprint ?? finding.id,
+        title: finding.title,
+        summary: finding.summary,
+        severity: finding.severity,
+        confidence: finding.confidence,
+        reproductionCount: finding.reproductionCount,
+        causalConditions: conditions,
+        numericConfidence: numberValue(conditions.numericConfidence) ?? 0.75,
+        sourceWorldId,
+        sourceExperimentId,
+        sourceWorld,
+        reproductionRunId,
+        invariantEvaluationIds: stringArray(conditions.supportingInvariantEvaluationIds).length
+          ? stringArray(conditions.supportingInvariantEvaluationIds)
+          : stringArray(conditions.invariantEvaluationIds),
+        evidenceArtifactIds,
+      });
+    }
+    await this.database.investigationEvent.create({ data: { investigationId, type: 'minimisation_eligibility_checked', data: messageData(`${candidates.length} minimisation candidate(s) found.`, { phase: 'minimisation_eligibility_checked', candidateCount: candidates.length }) } });
+    return candidates;
+  }
+
+  async transitionToMinimising(id: string, findingId: string): Promise<void> {
+    const changed = await this.database.investigation.updateMany({ where: { id, status: 'OBSERVING' }, data: { status: 'MINIMISING' } });
+    if (changed.count !== 1) throw new Error('Investigation is not in OBSERVING state');
+    await this.database.investigationEvent.create({ data: { investigationId: id, type: 'minimisation_started', data: messageData('Deterministic failure-condition minimisation started.', { status: 'MINIMISING', findingId }) } });
+  }
+
+  async completeMinimisationStage(id: string, findingId: string, runId: string, status: 'COMPLETED' | 'INCONCLUSIVE' | 'CANCELLED'): Promise<void> {
+    const changed = await this.database.investigation.updateMany({ where: { id, status: 'MINIMISING' }, data: { status: 'OBSERVING' } });
+    if (changed.count === 1) {
+      await this.database.investigationEvent.create({ data: { investigationId: id, type: status === 'COMPLETED' ? 'minimisation_completed' : status === 'CANCELLED' ? 'minimisation_cancelled' : 'minimisation_inconclusive', data: messageData(`Minimisation ${status.toLowerCase()}.`, { phase: `minimisation_${status.toLowerCase()}`, status: 'OBSERVING', findingId, minimisationRunId: runId }) } });
+    }
+  }
+
+  async createMinimisationRun(plan: MinimisationPlan): Promise<MinimisationPlanCreationResult> {
+    return this.database.$transaction(async (transaction) => {
+      const existing = await transaction.minimisationRun.findUnique({ where: { id: plan.id } });
+      if (existing) return { run: minimisationRunRecord(existing), created: false };
+      const created = await transaction.minimisationRun.create({ data: {
+        id: plan.id,
+        investigationId: plan.investigationId,
+        findingId: plan.findingId,
+        sourceWorldId: plan.sourceWorldId,
+        reproductionRunId: plan.reproductionRunId,
+        status: 'RUNNING',
+        strategyVersion: plan.strategyVersion,
+        originalFailingConfiguration: json(plan.baselineFailingConfiguration),
+        currentRetainedConditions: json({}),
+        removedConditions: json({}),
+        inconclusiveConditions: json({}),
+        ...(plan.candidateVariables.find(({ name }) => name === 'paymentDelayMs')?.lowerKnownPassingValue !== undefined ? { knownPassingDelayMs: plan.candidateVariables.find(({ name }) => name === 'paymentDelayMs')!.lowerKnownPassingValue } : {}),
+        ...(plan.candidateVariables.find(({ name }) => name === 'paymentDelayMs')?.upperKnownFailingValue !== undefined ? { knownFailingDelayMs: plan.candidateVariables.find(({ name }) => name === 'paymentDelayMs')!.upperKnownFailingValue } : {}),
+        maximumTrials: plan.maximumTrials,
+      } });
+      await transaction.findingCondition.create({ data: { findingId: plan.findingId, kind: 'MINIMISATION_PLAN', condition: json(plan) } });
+      await transaction.investigationEvent.create({ data: { investigationId: plan.investigationId, type: 'minimisation_plan_created', data: messageData('Deterministic minimisation plan created.', { phase: 'minimisation_plan_created', findingId: plan.findingId, minimisationRunId: plan.id, generatedCandidateCount: plan.candidateVariables.length, maximumTrials: plan.maximumTrials }) } });
+      return { run: minimisationRunRecord(created), created: true };
+    });
+  }
+
+  async createMinimisationCandidateWorld(context: InvestigationOrchestrationContext, candidate: MinimisationCandidateDefinition): Promise<MinimisationCandidateCreationResult> {
+    return this.database.$transaction(async (transaction) => {
+      const existingCandidate = await transaction.minimisationCandidate.findUnique({ where: { id: candidate.id } });
+      if (existingCandidate?.worldId && existingCandidate.experimentId) {
+        const world = await transaction.world.findUnique({ where: { id: existingCandidate.worldId } });
+        return {
+          record: {
+            id: existingCandidate.worldId,
+            experimentId: existingCandidate.experimentId,
+            definition: record(world?.configuration) as unknown as DeterministicWorldDefinition,
+          },
+          created: false,
+        };
+      }
+      const world = await transaction.world.create({ data: { investigationId: context.id, experimentPlanId: context.planId, status: 'QUEUED', configuration: json(candidate.world), reason: candidate.world.reason, randomSeed: candidate.world.randomSeed } });
+      const experiment = await transaction.experiment.create({ data: { investigationId: context.id, worldId: world.id, status: 'QUEUED', kind: 'MINIMISATION' } });
+      await transaction.minimisationCandidate.upsert({
+        where: { id: candidate.id },
+        update: { worldId: world.id, experimentId: experiment.id, result: 'QUEUED', conditionDecision: 'INCONCLUSIVE' },
+        create: {
+          id: candidate.id,
+          minimisationRunId: candidate.minimisationRunId,
+          worldId: world.id,
+          experimentId: experiment.id,
+          sequence: candidate.sequence,
+          purpose: candidate.purpose,
+          variableName: candidate.variable.name,
+          sourceValue: json(candidate.variable.sourceValue),
+          candidateValue: json(candidate.candidateValue),
+        },
+      });
+      await transaction.investigationEvent.createMany({ data: [
+        { investigationId: context.id, type: candidate.purpose === 'DELAY_BOUNDARY_SEARCH' ? 'minimisation_range_candidate_generated' : candidate.purpose === 'CONFIRM_MINIMAL_SET' ? 'minimal_reproduction_candidate_created' : 'minimisation_candidate_generated', data: json({ message: `${candidate.world.name} generated.`, phase: 'minimisation_candidate_generated', minimisationRunId: candidate.minimisationRunId, candidateId: candidate.id, worldId: world.id, experimentId: experiment.id, variable: candidate.variable.name, sourceValue: candidate.variable.sourceValue, candidateValue: candidate.candidateValue, purpose: candidate.purpose }) },
+        { investigationId: context.id, type: 'minimisation_candidate_queued', data: json({ message: `${candidate.world.name} queued for minimisation.`, phase: 'minimisation_candidate_queued', minimisationRunId: candidate.minimisationRunId, candidateId: candidate.id, worldId: world.id, experimentId: experiment.id }) },
+      ] });
+      return { record: { id: world.id, experimentId: experiment.id, definition: candidate.world }, created: true };
+    });
+  }
+
+  async minimisationWorldResult(candidateId: string): Promise<MinimisationWorldResultRecord | null> {
+    const candidate = await this.database.minimisationCandidate.findUnique({
+      where: { id: candidateId },
+      include: {
+        world: true,
+        experiment: {
+          include: {
+            evaluations: { select: { id: true, passed: true } },
+            artifacts: { select: { id: true } },
+          },
+        },
+      },
+    });
+    if (!candidate?.world || !candidate.experiment) return null;
+    return {
+      candidateId: candidate.id,
+      worldId: candidate.world.id,
+      experimentId: candidate.experiment.id,
+      purpose: candidate.purpose,
+      variableName: candidate.variableName,
+      world: record(candidate.world.configuration) as unknown as DeterministicWorldDefinition,
+      status: candidate.experiment.status,
+      invariantEvaluationIds: candidate.experiment.evaluations.filter(({ passed }) => !passed).map(({ id }) => id),
+      evidenceArtifactIds: candidate.experiment.artifacts.map(({ id }) => id),
+    };
+  }
+
+  async updateMinimisationCandidate(input: MinimisationCandidateUpdateInput): Promise<void> {
+    await this.database.$transaction(async (transaction) => {
+      const existingRun = await transaction.minimisationRun.findUnique({ where: { id: input.runId } });
+      const generated = stringArray(existingRun?.generatedCandidateWorldIds);
+      const candidate = await transaction.minimisationCandidate.findUnique({ where: { id: input.candidateId } });
+      await transaction.minimisationCandidate.update({ where: { id: input.candidateId }, data: {
+        result: input.result,
+        conditionDecision: input.decision,
+        invariantIds: json(input.invariantIds),
+        supportingEvidenceIds: json(input.evidenceArtifactIds),
+        completedAt: new Date(),
+      } });
+      await transaction.minimisationRun.update({ where: { id: input.runId }, data: {
+        currentRetainedConditions: json(input.retainedConditions),
+        removedConditions: json(input.removedConditions),
+        inconclusiveConditions: json(input.inconclusiveConditions),
+        ...(input.delayRange.lowerPassingBoundMs !== undefined ? { knownPassingDelayMs: input.delayRange.lowerPassingBoundMs } : {}),
+        ...(input.delayRange.upperFailingBoundMs !== undefined ? { knownFailingDelayMs: input.delayRange.upperFailingBoundMs } : {}),
+        generatedCandidateWorldIds: json([...new Set([...generated, ...(candidate?.worldId ? [candidate.worldId] : [])])]),
+        completedTrials: { increment: candidate?.completedAt ? 0 : 1 },
+      } });
+      await transaction.investigationEvent.create({ data: { investigationId: existingRun!.investigationId, type: 'minimisation_candidate_completed', data: messageData('Minimisation candidate completed.', { phase: 'minimisation_candidate_completed', minimisationRunId: input.runId, candidateId: input.candidateId, variable: candidate?.variableName, result: input.result, conditionDecision: input.decision, evidenceArtifactIds: input.evidenceArtifactIds, explanation: input.explanation }) } });
+      if (input.decision === 'RETAINED') {
+        await transaction.investigationEvent.create({ data: { investigationId: existingRun!.investigationId, type: 'minimisation_condition_retained', data: messageData('Condition retained in the minimal tested set.', { phase: 'minimisation_condition_retained', minimisationRunId: input.runId, candidateId: input.candidateId, variable: candidate?.variableName, conditionDecision: input.decision }) } });
+      } else if (input.decision === 'REMOVED') {
+        await transaction.investigationEvent.create({ data: { investigationId: existingRun!.investigationId, type: candidate?.purpose === 'DELAY_BOUNDARY_SEARCH' ? 'minimisation_range_updated' : 'minimisation_condition_removed', data: messageData(candidate?.purpose === 'DELAY_BOUNDARY_SEARCH' ? 'Failure range updated.' : 'Condition removed from the minimal tested set.', { phase: candidate?.purpose === 'DELAY_BOUNDARY_SEARCH' ? 'minimisation_range_updated' : 'minimisation_condition_removed', minimisationRunId: input.runId, candidateId: input.candidateId, variable: candidate?.variableName, conditionDecision: input.decision, passingBound: input.delayRange.lowerPassingBoundMs, failingBound: input.delayRange.upperFailingBoundMs }) } });
+      } else {
+        await transaction.investigationEvent.create({ data: { investigationId: existingRun!.investigationId, type: 'minimisation_condition_inconclusive', data: messageData('Condition remained inconclusive.', { phase: 'minimisation_condition_inconclusive', minimisationRunId: input.runId, candidateId: input.candidateId, variable: candidate?.variableName }) } });
+      }
+    });
   }
 
   async createAdaptiveWorlds(context: InvestigationOrchestrationContext, plan: AdaptiveReproductionPlan): Promise<CreatedWorldRecord[]> {
@@ -320,6 +552,14 @@ export class InvestigationRepository {
         ...(event.sandboxId ? { sandboxId: event.sandboxId } : {}),
         ...(event.metadata ?? {}),
       }),
+    } });
+  }
+
+  async recordMinimisationEvent(investigationId: string, type: string, message: string, metadata: Record<string, unknown> = {}): Promise<void> {
+    await this.database.investigationEvent.create({ data: {
+      investigationId,
+      type: type as never,
+      data: messageData(message, { phase: type, ...metadata }),
     } });
   }
 
@@ -533,6 +773,109 @@ export class InvestigationRepository {
     });
   }
 
+  async completeMinimisation(input: CompleteMinimisationInput): Promise<void> {
+    await this.database.$transaction(async (transaction) => {
+      const finding = await transaction.finding.findUnique({ where: { id: input.findingId } });
+      if (!finding) throw new Error('Finding disappeared before minimisation completion');
+      const existingConditions = record(finding.causalConditions);
+      const existingEvidence = stringArray(existingConditions.evidenceArtifactIds);
+      const reportArtifactIds: string[] = [];
+      let finalReportEvidenceId: string | undefined;
+      if (input.report) {
+        const jsonArtifact = await transaction.evidenceArtifact.create({ data: {
+          experimentId: input.report.report.originalObservation.experimentId,
+          type: input.report.jsonArtifact.type,
+          storageProvider: 'LOCAL_REPORT',
+          storageKey: input.report.jsonArtifact.storageKey,
+          mimeType: input.report.jsonArtifact.mimeType,
+          sizeBytes: input.report.jsonArtifact.sizeBytes,
+          ...(input.report.jsonArtifact.checksum ? { checksum: input.report.jsonArtifact.checksum } : {}),
+          redacted: true,
+          metadata: json({ ...input.report.jsonArtifact.metadata, investigationId: input.investigationId, findingId: input.findingId, path: input.report.jsonPath, checksum: input.report.jsonChecksum }),
+        } });
+        const markdownArtifact = await transaction.evidenceArtifact.create({ data: {
+          experimentId: input.report.report.originalObservation.experimentId,
+          type: input.report.markdownArtifact.type,
+          storageProvider: 'LOCAL_REPORT',
+          storageKey: input.report.markdownArtifact.storageKey,
+          mimeType: input.report.markdownArtifact.mimeType,
+          sizeBytes: input.report.markdownArtifact.sizeBytes,
+          ...(input.report.markdownArtifact.checksum ? { checksum: input.report.markdownArtifact.checksum } : {}),
+          redacted: true,
+          metadata: json({ ...input.report.markdownArtifact.metadata, investigationId: input.investigationId, findingId: input.findingId, path: input.report.markdownPath, checksum: input.report.markdownChecksum }),
+        } });
+        reportArtifactIds.push(jsonArtifact.id, markdownArtifact.id);
+        finalReportEvidenceId = jsonArtifact.id;
+        await transaction.investigationEvent.create({ data: { investigationId: input.investigationId, type: 'final_report_artifact_created', data: messageData('Final evidence report artifacts were created.', { phase: 'final_report_artifact_created', findingId: input.findingId, minimisationRunId: input.runId, finalReportEvidenceId, artifactIds: reportArtifactIds }) } });
+      }
+
+      const finalConditions = {
+        retainedConditions: input.retainedConditions,
+        removedConditions: input.removedConditions,
+        inconclusiveConditions: input.inconclusiveConditions,
+        timingRange: {
+          lowerPassingBoundMs: input.boundedRange.lowerPassingBoundMs,
+          upperFailingBoundMs: input.boundedRange.upperFailingBoundMs,
+          targetPrecisionMs: input.boundedRange.targetPrecisionMs,
+        },
+        confirmation: {
+          ...(input.confirmationWorldId ? { worldId: input.confirmationWorldId } : {}),
+          reproduced: input.confirmationReproduced,
+        },
+        claimLevel: 'MINIMAL_TESTED_SET',
+        limitations: [
+          'Greedy single-variable removal',
+          'No exhaustive interaction search',
+          'Results apply to the tested fixture and journey',
+        ],
+      };
+      const nextConditions = {
+        ...existingConditions,
+        minimisationStatus: input.confirmationReproduced ? 'COMPLETED' : 'INCONCLUSIVE',
+        minimisationRunId: input.runId,
+        minimalTestedConditions: finalConditions,
+        retainedConditions: input.retainedConditions,
+        removedConditions: input.removedConditions,
+        inconclusiveConditions: input.inconclusiveConditions,
+        finalReproductionSteps: input.report?.report.reproductionSteps ?? [],
+        finalEvidenceSummary: input.report?.report.summary,
+        finalReportEvidenceId,
+        finalReportEvidenceIds: reportArtifactIds,
+        causalStatus: input.confirmationReproduced ? 'SUPPORTED' : 'INCONCLUSIVE',
+        numericConfidence: input.finalConfidence,
+        confidenceExplanation: input.confidenceExplanation,
+        evidenceArtifactIds: [...new Set([...existingEvidence, ...reportArtifactIds])],
+      };
+      await transaction.finding.update({ where: { id: input.findingId }, data: {
+        confidence: input.confidenceLabel,
+        causalConditions: json(nextConditions),
+      } });
+      if (reportArtifactIds.length) {
+        await transaction.findingEvidence.createMany({
+          data: reportArtifactIds.map((artifactId) => ({ findingId: input.findingId, artifactId })),
+          skipDuplicates: true,
+        });
+      }
+      await transaction.findingCondition.upsert({
+        where: { id: `${input.runId}:completed` },
+        update: { condition: json({ completedAt: new Date().toISOString(), finalConditions }) },
+        create: { id: `${input.runId}:completed`, findingId: input.findingId, kind: 'MINIMISATION_COMPLETED', condition: json({ completedAt: new Date().toISOString(), finalConditions }) },
+      });
+      await transaction.minimisationRun.update({ where: { id: input.runId }, data: {
+        status: input.confirmationReproduced ? 'COMPLETED' : 'INCONCLUSIVE',
+        completedAt: new Date(),
+        finalMinimalTestedConditions: json(finalConditions),
+        finalBoundedRange: json(finalConditions.timingRange),
+        finalConfidence: input.finalConfidence,
+        ...(finalReportEvidenceId ? { finalReportEvidenceId } : {}),
+      } });
+      await transaction.investigationEvent.createMany({ data: [
+        { investigationId: input.investigationId, type: input.confirmationReproduced ? 'minimal_reproduction_found' : 'minimal_reproduction_inconclusive', data: messageData(input.confirmationReproduced ? 'Minimal tested condition set confirmed.' : 'Minimal tested condition set was inconclusive.', { phase: input.confirmationReproduced ? 'minimal_reproduction_found' : 'minimal_reproduction_inconclusive', findingId: input.findingId, minimisationRunId: input.runId, confirmationWorldId: input.confirmationWorldId, retainedConditions: input.retainedConditions, removedConditions: input.removedConditions, inconclusiveConditions: input.inconclusiveConditions }) },
+        { investigationId: input.investigationId, type: 'final_report_completed', data: messageData('Final evidence report completed.', { phase: 'final_report_completed', findingId: input.findingId, minimisationRunId: input.runId, finalReportEvidenceId, finalConfidence: input.finalConfidence }) },
+      ] });
+    });
+  }
+
   async finishInvestigation(id: string): Promise<void> {
     await this.database.$transaction(async (transaction) => {
       const moved = await transaction.investigation.updateMany({ where: { id, status: { in: ['RUNNING', 'OBSERVING'] } }, data: { status: 'OBSERVING' } });
@@ -609,5 +952,15 @@ export class InvestigationRepository {
   }
   async listFindings(organisationId: string, id: string) {
     return this.database.finding.findMany({ where: { investigationId: id, organisationId, deletedAt: null }, orderBy: { createdAt: 'desc' } });
+  }
+  async getFinding(organisationId: string, id: string, findingId: string) {
+    return this.database.finding.findFirst({
+      where: { id: findingId, investigationId: id, organisationId, deletedAt: null },
+      include: {
+        evidence: { include: { artifact: true } },
+        reproductions: { orderBy: { createdAt: 'asc' } },
+        minimalReproduction: true,
+      },
+    });
   }
 }

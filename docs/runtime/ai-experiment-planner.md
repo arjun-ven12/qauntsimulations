@@ -14,6 +14,7 @@ CreateInvestigationInput
 → persisted ExperimentPlan
 → existing local/Daytona execution
 → deterministic adaptive reproduction when eligible
+→ deterministic minimisation when a supported finding is available
 ```
 
 ## Providers
@@ -82,6 +83,7 @@ Plan persistence reuses an existing plan for an investigation instead of creatin
 
 - OpenAI plans only the initial world set.
 - Adaptive reproduction remains deterministic.
-- No Kimi, Nosana, minimisation, source-code repair, or recursive AI causal planning is implemented.
+- No Kimi, Nosana, source-code repair, or recursive AI causal planning is implemented.
+- Prompt 8 minimisation is deterministic and does not call the planner or OpenAI.
 - Model output can vary; deterministic validation is authoritative.
 - Live OpenAI tests are opt-in with `RUN_OPENAI_PLANNER_INTEGRATION_TESTS=true`.

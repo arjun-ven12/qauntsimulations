@@ -19,6 +19,7 @@ export function createInvestigationRouter(controller: InvestigationController) {
   router.get('/:investigationId/workers', controller.workers);
   router.get('/:investigationId/evidence', controller.evidence);
   router.get('/:investigationId/findings', controller.findings);
+  router.get('/:investigationId/findings/:findingId', controller.finding);
   router.post('/:investigationId/cancel', controller.cancel);
   return router;
 }

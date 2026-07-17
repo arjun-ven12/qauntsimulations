@@ -3,9 +3,11 @@ import { logger } from '../../core/logging/logger.js';
 import type { LocalEvidenceMetadataService } from '../evidence/local-evidence-metadata.service.js';
 import { AdaptiveConfidenceService } from '../experiments/services/adaptive-confidence.service.js';
 import { AdaptiveReproductionPlanService } from '../experiments/services/adaptive-reproduction-plan.service.js';
+import type { FinalEvidenceReportService, FinalFindingReport } from '../experiments/services/final-evidence-report.service.js';
+import { DeterministicMinimisationPlanService, type CandidateResult, type MinimisationCandidateDefinition, type MinimisationState } from '../experiments/services/minimisation.service.js';
 import { ReproductionComparisonService, type ComparisonOutcome } from '../experiments/services/reproduction-comparison.service.js';
 import type { InvestigationRepository } from '../investigations/investigations.repository.js';
-import type { CreatedWorldRecord, InvestigationOrchestrationContext, PersistedWorldExecution } from '../investigations/investigations.types.js';
+import type { CreatedWorldRecord, InvestigationOrchestrationContext, MinimisationFindingCandidate, PersistedWorldExecution } from '../investigations/investigations.types.js';
 import { ExecutionConcurrencyService } from './execution-concurrency.service.js';
 import type { DaytonaWorkerFleet } from './daytona-worker-fleet.service.js';
 import { classifyFleetError } from './daytona-retry-classifier.js';
@@ -13,7 +15,7 @@ import type { FleetEvent, FleetJob } from './daytona-fleet.types.js';
 import type { WorkerExecutionEvent, WorkerExecutor } from './worker-executor.types.js';
 import type { WorkerJobFactoryService } from './worker-job-factory.service.js';
 
-type OrchestrationRepository = Pick<InvestigationRepository, 'orchestrationContext' | 'queueInitialWorlds' | 'eligibleAdaptiveFindings' | 'createAdaptiveWorlds' | 'adaptiveWorldResults' | 'updateFindingAfterAdaptive' | 'transitionToRunning' | 'transitionToObserving' | 'transitionToAdapting' | 'transitionToReproducing' | 'completeAdaptiveStage' | 'beginWorld' | 'completeExecution' | 'failExecution' | 'finishInvestigation' | 'failInvestigation' | 'isCancelled' | 'recordExecutionEvent' | 'recordFleetEvent'>;
+type OrchestrationRepository = Pick<InvestigationRepository, 'orchestrationContext' | 'queueInitialWorlds' | 'eligibleAdaptiveFindings' | 'createAdaptiveWorlds' | 'adaptiveWorldResults' | 'updateFindingAfterAdaptive' | 'eligibleMinimisationFindings' | 'transitionToMinimising' | 'completeMinimisationStage' | 'createMinimisationRun' | 'createMinimisationCandidateWorld' | 'minimisationWorldResult' | 'updateMinimisationCandidate' | 'completeMinimisation' | 'recordMinimisationEvent' | 'transitionToRunning' | 'transitionToObserving' | 'transitionToAdapting' | 'transitionToReproducing' | 'completeAdaptiveStage' | 'beginWorld' | 'completeExecution' | 'failExecution' | 'finishInvestigation' | 'failInvestigation' | 'isCancelled' | 'recordExecutionEvent' | 'recordFleetEvent'>;
 
 export interface DaytonaFleetOrchestratorOptions {
   perInvestigationLimit: number;
@@ -37,6 +39,19 @@ export interface AdaptiveReproductionOptions {
   timeoutSeconds: number;
 }
 
+export interface MinimisationOptions {
+  enabled: boolean;
+  maximumFindingsPerInvestigation: number;
+  maximumTrials: number;
+  maximumTotalWorlds: number;
+  maximumDurationSeconds: number;
+  maximumDelayTrials: number;
+  delayTargetPrecisionMs: number;
+  confirmFinalSet: boolean;
+  confidenceMaximum: number;
+  finalReportEnabled: boolean;
+}
+
 const defaultAdaptiveOptions: AdaptiveReproductionOptions = {
   enabled: false,
   maximumFindingsPerInvestigation: 1,
@@ -57,6 +72,19 @@ const defaultDaytonaFleetOptions: DaytonaFleetOrchestratorOptions = {
   retryMaximumDelayMs: 10_000,
   maximumTotalSandboxCreations: 4,
   maximumInvestigationDurationSeconds: 1_200,
+};
+
+const defaultMinimisationOptions: MinimisationOptions = {
+  enabled: false,
+  maximumFindingsPerInvestigation: 1,
+  maximumTrials: 8,
+  maximumTotalWorlds: 20,
+  maximumDurationSeconds: 1_200,
+  maximumDelayTrials: 4,
+  delayTargetPrecisionMs: 100,
+  confirmFinalSet: true,
+  confidenceMaximum: 0.97,
+  finalReportEnabled: true,
 };
 
 const retryableErrorCodes = [
@@ -83,6 +111,9 @@ export class InvestigationOrchestratorService {
     private readonly adaptiveOptions: AdaptiveReproductionOptions = defaultAdaptiveOptions,
     private readonly adaptivePlans = new AdaptiveReproductionPlanService(),
     private readonly adaptiveComparison = new ReproductionComparisonService(),
+    private readonly minimisationOptions: MinimisationOptions = defaultMinimisationOptions,
+    private readonly minimisationPlans = new DeterministicMinimisationPlanService(),
+    private readonly finalReports?: FinalEvidenceReportService,
   ) {}
 
   start(investigationId: string): void {
@@ -115,6 +146,7 @@ export class InvestigationOrchestratorService {
     if (executions.length > 0 && executions.every(({ result }) => result === false)) throw new Error('All workers failed to produce a processable result');
     await this.repository.transitionToObserving(investigationId);
     if (this.adaptiveOptions.enabled) await this.runAdaptiveReproduction(context);
+    if (this.minimisationOptions.enabled) await this.runMinimisation(context);
     if (await this.repository.isCancelled(investigationId)) return;
     await this.repository.finishInvestigation(investigationId);
     logger.info({ investigationId, provider: this.executor.provider, status: 'COMPLETED' }, 'Investigation completed');
@@ -186,6 +218,256 @@ export class InvestigationOrchestratorService {
       });
       await this.repository.completeAdaptiveStage(context.id, candidate.id, reproductionRunId);
     }
+  }
+
+  private async runMinimisation(context: InvestigationOrchestrationContext): Promise<void> {
+    const startedAt = Date.now();
+    const candidates = await this.repository.eligibleMinimisationFindings(
+      context.id,
+      this.minimisationOptions.maximumFindingsPerInvestigation,
+      this.minimisationOptions.maximumTotalWorlds,
+    );
+    for (const candidate of candidates) {
+      if (await this.repository.isCancelled(context.id)) return;
+      if (Date.now() - startedAt > this.minimisationOptions.maximumDurationSeconds * 1_000) return;
+      await this.repository.transitionToMinimising(context.id, candidate.id);
+      const plan = this.minimisationPlans.create({
+        investigationId: context.id,
+        findingId: candidate.id,
+        findingFingerprint: candidate.fingerprint,
+        sourceWorldId: candidate.sourceWorldId,
+        sourceExperimentId: candidate.sourceExperimentId,
+        reproductionRunId: candidate.reproductionRunId,
+        sourceWorld: candidate.sourceWorld,
+        causalConditions: candidate.causalConditions,
+        maximumTrials: this.minimisationOptions.maximumTrials,
+        targetPrecisionMs: this.minimisationOptions.delayTargetPrecisionMs,
+      });
+      const persisted = await this.repository.createMinimisationRun(plan);
+      if (persisted.run.status === 'COMPLETED' && persisted.run.finalReportEvidenceId) {
+        await this.repository.completeMinimisationStage(context.id, candidate.id, plan.id, 'COMPLETED');
+        continue;
+      }
+      let state = this.minimisationPlans.initialState(plan);
+      state = {
+        ...state,
+        retainedConditions: persisted.run.retainedConditions,
+        removedConditions: persisted.run.removedConditions,
+        inconclusiveConditions: persisted.run.inconclusiveConditions,
+        completedTrials: persisted.run.completedTrials,
+        delayRange: this.delayRange(
+          persisted.run.knownPassingDelayMs ?? state.delayRange.lowerPassingBoundMs,
+          persisted.run.knownFailingDelayMs ?? state.delayRange.upperFailingBoundMs,
+        ),
+      };
+
+      const categorical = this.minimisationPlans.categoricalCandidates(plan, state);
+      for (const definition of categorical) {
+        if (await this.repository.isCancelled(context.id)) {
+          await this.repository.completeMinimisationStage(context.id, candidate.id, plan.id, 'CANCELLED');
+          return;
+        }
+        if (state.completedTrials >= this.minimisationOptions.maximumTrials) break;
+        state = await this.runMinimisationCandidate(context, state, definition);
+      }
+
+      let delayTrials = 0;
+      while (state.completedTrials < this.minimisationOptions.maximumTrials && delayTrials < this.minimisationOptions.maximumDelayTrials) {
+        const next = this.minimisationPlans.nextDelayCandidate(plan, state, state.completedTrials + 1);
+        if (!next) break;
+        delayTrials++;
+        state = await this.runMinimisationCandidate(context, state, next);
+      }
+
+      let confirmationWorldId: string | undefined;
+      let confirmationReproduced = false;
+      if (this.minimisationOptions.confirmFinalSet && state.completedTrials < this.minimisationOptions.maximumTrials) {
+        const confirmation = this.minimisationPlans.confirmationCandidate(plan, state, state.completedTrials + 1);
+        const before = state;
+        state = await this.runMinimisationCandidate(context, state, confirmation);
+        confirmationWorldId = confirmation.world.key;
+        confirmationReproduced = state === before ? false : true;
+        const result = await this.repository.minimisationWorldResult(confirmation.id);
+        confirmationWorldId = result?.worldId ?? confirmationWorldId;
+        confirmationReproduced = Boolean(result && this.minimisationResult(result.status, result.invariantEvaluationIds.length) === 'FAILURE_REPRODUCED');
+      }
+
+      const boundedRangeEstablished = state.delayRange.lowerPassingBoundMs !== undefined && state.delayRange.upperFailingBoundMs !== undefined;
+      const confidence = this.minimisationPlans.updateConfidence({
+        previousConfidence: candidate.numericConfidence,
+        retainedCount: Object.keys(state.retainedConditions).length,
+        removedCount: Object.keys(state.removedConditions).length,
+        boundedRangeEstablished,
+        finalConfirmationReproduced: confirmationReproduced,
+        maximumConfidence: this.minimisationOptions.confidenceMaximum,
+      });
+      const report = this.minimisationOptions.finalReportEnabled && this.finalReports
+        ? await this.writeFinalReport(context, candidate, plan.id, state, confidence.previousConfidence, confidence.finalConfidence, confidence.explanation, confirmationWorldId, confirmationReproduced)
+        : undefined;
+      await this.repository.completeMinimisation({
+        investigationId: context.id,
+        findingId: candidate.id,
+        runId: plan.id,
+        finalConfiguration: state.currentConfiguration,
+        retainedConditions: state.retainedConditions,
+        removedConditions: state.removedConditions,
+        inconclusiveConditions: state.inconclusiveConditions,
+        boundedRange: state.delayRange,
+        ...(confirmationWorldId ? { confirmationWorldId } : {}),
+        confirmationReproduced,
+        previousConfidence: confidence.previousConfidence,
+        finalConfidence: confidence.finalConfidence,
+        confidenceLabel: confidence.confidenceLabel,
+        confidenceExplanation: confidence.explanation,
+        ...(report ? { report } : {}),
+      });
+      await this.repository.completeMinimisationStage(context.id, candidate.id, plan.id, confirmationReproduced ? 'COMPLETED' : 'INCONCLUSIVE');
+    }
+  }
+
+  private async runMinimisationCandidate(
+    context: InvestigationOrchestrationContext,
+    state: MinimisationState,
+    definition: MinimisationCandidateDefinition,
+  ): Promise<MinimisationState> {
+    const created = await this.repository.createMinimisationCandidateWorld(context, definition);
+    if (this.executor.provider === 'DAYTONA' && this.fleet) {
+      await this.executeDaytonaFleet(context, [created.record], 1);
+    } else {
+      await this.executeLocalWorlds(context, [created.record], 1);
+    }
+    const result = await this.repository.minimisationWorldResult(definition.id);
+    const candidateResult = result ? this.minimisationResult(result.status, result.invariantEvaluationIds.length) : 'INCONCLUSIVE';
+    const decision = this.minimisationPlans.decide(state, definition, candidateResult);
+    await this.repository.updateMinimisationCandidate({
+      runId: definition.minimisationRunId,
+      candidateId: definition.id,
+      result: candidateResult,
+      decision: decision.decision,
+      invariantIds: result?.invariantEvaluationIds ?? [],
+      evidenceArtifactIds: result?.evidenceArtifactIds ?? [],
+      retainedConditions: decision.retainedConditions,
+      removedConditions: decision.removedConditions,
+      inconclusiveConditions: decision.inconclusiveConditions,
+      currentConfiguration: decision.currentConfiguration,
+      delayRange: decision.delayRange,
+      explanation: decision.explanation,
+    });
+    return {
+      retainedConditions: decision.retainedConditions,
+      removedConditions: decision.removedConditions,
+      inconclusiveConditions: decision.inconclusiveConditions,
+      currentConfiguration: decision.currentConfiguration,
+      completedTrials: state.completedTrials + 1,
+      delayRange: decision.delayRange,
+    };
+  }
+
+  private minimisationResult(status: string, failedInvariantCount: number): CandidateResult {
+    if (failedInvariantCount > 0 || status === 'FAILED') return 'FAILURE_REPRODUCED';
+    if (status === 'PASSED' || status === 'COMPLETED') return 'FAILURE_NOT_REPRODUCED';
+    if (status === 'CANCELLED') return 'CANCELLED';
+    if (status === 'ERROR') return 'EXECUTION_FAILED';
+    return 'INCONCLUSIVE';
+  }
+
+  private delayRange(lowerPassingBoundMs: number | undefined, upperFailingBoundMs: number | undefined) {
+    return {
+      ...(lowerPassingBoundMs !== undefined ? { lowerPassingBoundMs } : {}),
+      ...(upperFailingBoundMs !== undefined ? { upperFailingBoundMs } : {}),
+      targetPrecisionMs: this.minimisationOptions.delayTargetPrecisionMs,
+    };
+  }
+
+  private async writeFinalReport(
+    context: InvestigationOrchestrationContext,
+    candidate: MinimisationFindingCandidate,
+    minimisationRunId: string,
+    state: MinimisationState,
+    initialConfidence: number,
+    finalConfidence: number,
+    confidenceExplanation: string[],
+    confirmationWorldId: string | undefined,
+    confirmationReproduced: boolean,
+  ) {
+    if (!this.finalReports) return undefined;
+    await this.repository.recordMinimisationEvent(context.id, 'final_report_started', 'Final evidence report generation started.', { findingId: candidate.id, minimisationRunId });
+    const report: FinalFindingReport = {
+      reportVersion: '2026-07-17.prompt8.v1',
+      investigationId: context.id,
+      findingId: candidate.id,
+      title: candidate.title,
+      generatedAt: new Date().toISOString(),
+      summary: 'A deterministic minimisation run identified the minimal tested condition set for duplicate checkout submission.',
+      businessImpact: typeof candidate.causalConditions.businessImpact === 'string'
+        ? candidate.causalConditions.businessImpact
+        : 'A customer may create duplicate payment/order activity for one intended checkout in the tested fixture.',
+      environment: {
+        projectId: context.projectId,
+        environmentId: context.environmentId,
+        journeyId: context.journeyId,
+      },
+      originalObservation: {
+        worldId: candidate.sourceWorldId,
+        experimentId: candidate.sourceExperimentId,
+        configuration: candidate.sourceWorld as unknown as Record<string, unknown>,
+        invariantIds: candidate.invariantEvaluationIds,
+      },
+      reproduction: {
+        reproductionRunId: candidate.reproductionRunId,
+        reproductionCount: candidate.reproductionCount,
+        outcome: 'SUPPORTED',
+      },
+      minimisation: {
+        minimisationRunId,
+        retainedConditions: state.retainedConditions,
+        removedConditions: state.removedConditions,
+        inconclusiveConditions: state.inconclusiveConditions,
+        boundedRange: {
+          lowerPassingBoundMs: state.delayRange.lowerPassingBoundMs,
+          upperFailingBoundMs: state.delayRange.upperFailingBoundMs,
+          targetPrecisionMs: state.delayRange.targetPrecisionMs,
+        },
+        ...(confirmationWorldId ? { confirmationWorldId } : {}),
+        confirmed: confirmationReproduced,
+        claimLevel: 'MINIMAL_TESTED_SET',
+      },
+      confidence: {
+        initial: initialConfidence,
+        final: finalConfidence,
+        explanation: confidenceExplanation,
+      },
+      reproductionSteps: this.reproductionSteps(state),
+      evidence: candidate.evidenceArtifactIds.map((id) => ({ id, type: 'SUPPORTING_EVIDENCE', description: 'Evidence from source or adaptive reproduction world.' })),
+      limitations: [
+        'Greedy single-variable removal may miss interacting condition combinations.',
+        'The delay result is a bounded tested range, not an exact threshold.',
+        'Results apply to this fixture, journey, and deterministic worker setup.',
+        'No automatic repair or repair verification is included.',
+      ],
+      provenance: {
+        plannerProvider: context.plan.planner?.effectiveProvider ?? 'DETERMINISTIC',
+        workerProvider: this.executor.provider,
+        reportGenerator: 'DETERMINISTIC',
+      },
+    };
+    return { ...(await this.finalReports.write(report)), report };
+  }
+
+  private reproductionSteps(state: MinimisationState): string[] {
+    const delay = state.delayRange.upperFailingBoundMs ?? state.currentConfiguration.paymentDelayMs;
+    return [
+      'Open the checkout product page.',
+      ...(state.retainedConditions.duplicateSubmissionBug ? ['Enable duplicate-submission mode.'] : []),
+      `Configure payment response delay at a tested failing value around ${delay} ms.`,
+      'Add the product to the cart.',
+      'Proceed to checkout.',
+      'Enter a valid test email.',
+      state.retainedConditions.doubleSubmit
+        ? `Click Pay twice with the tested interval of ${state.currentConfiguration.doubleSubmitIntervalMs} ms.`
+        : 'Click Pay using the tested interaction pattern.',
+      'Observe the payment and order invariant results.',
+    ];
   }
 
   private comparisonOutcome(status: string, failedInvariantCount: number): ComparisonOutcome {

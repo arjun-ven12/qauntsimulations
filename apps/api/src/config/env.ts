@@ -71,6 +71,16 @@ export const apiEnvironmentSchema = z
     ADAPTIVE_CONFIDENCE_MAX: z.coerce.number().min(0).max(1).default(0.95),
     ADAPTIVE_MIN_EVIDENCE_WORLDS: z.coerce.number().int().min(1).max(10).default(2),
     ADAPTIVE_REPRODUCTION_TIMEOUT_SECONDS: z.coerce.number().int().min(60).max(3_600).default(900),
+    MINIMISATION_ENABLED: booleanString.default('true'),
+    MINIMISATION_MAX_FINDINGS_PER_INVESTIGATION: z.coerce.number().int().min(0).max(5).default(1),
+    MINIMISATION_MAX_TRIALS: z.coerce.number().int().min(0).max(20).default(8),
+    MINIMISATION_MAX_TOTAL_WORLDS: z.coerce.number().int().min(1).max(100).default(20),
+    MINIMISATION_MAX_DURATION_SECONDS: z.coerce.number().int().min(60).max(3_600).default(1_200),
+    MINIMISATION_MAX_DELAY_TRIALS: z.coerce.number().int().min(0).max(10).default(4),
+    MINIMISATION_DELAY_TARGET_PRECISION_MS: z.coerce.number().int().min(1).max(5_000).default(100),
+    MINIMISATION_CONFIRM_FINAL_SET: booleanString.default('true'),
+    MINIMISATION_CONFIDENCE_MAX: z.coerce.number().min(0).max(1).default(0.97),
+    FINAL_REPORT_ENABLED: booleanString.default('true'),
   })
   .superRefine((environment, context) => {
     if (environment.NODE_ENV === 'production' && !environment.COOKIE_SECURE) {
@@ -120,6 +130,13 @@ export const apiEnvironmentSchema = z
         code: 'custom',
         path: ['ADAPTIVE_CONFIDENCE_INITIAL'],
         message: 'ADAPTIVE_CONFIDENCE_INITIAL must not exceed ADAPTIVE_CONFIDENCE_MAX',
+      });
+    }
+    if (environment.ADAPTIVE_CONFIDENCE_MAX > environment.MINIMISATION_CONFIDENCE_MAX) {
+      context.addIssue({
+        code: 'custom',
+        path: ['MINIMISATION_CONFIDENCE_MAX'],
+        message: 'MINIMISATION_CONFIDENCE_MAX must be at least ADAPTIVE_CONFIDENCE_MAX',
       });
     }
     const workspacePrefix = `${environment.DAYTONA_WORKSPACE_PATH.replace(/\/$/, '')}/`;
