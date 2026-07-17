@@ -18,6 +18,11 @@
     "db:migrate": "pnpm --filter @taskos/database db:migrate",
     "db:studio": "pnpm --filter @taskos/database db:studio",
     "db:seed": "pnpm --filter @taskos/database db:seed",
+    "runtime:daytona:fleet:test": "RUN_DAYTONA_FLEET_INTEGRATION_TESTS=true pnpm exec vitest run apps/api/src/modules/execution/__tests__/daytona-fleet.integration.test.ts",
+    "runtime:adaptive:test": "pnpm exec vitest run apps/api/src/modules/experiments/services/__tests__/adaptive-reproduction-plan.test.ts apps/api/src/modules/experiments/services/__tests__/reproduction-comparison.test.ts",
+    "runtime:adaptive:daytona:test": "RUN_DAYTONA_ADAPTIVE_INTEGRATION_TESTS=true ADAPTIVE_REPRODUCTION_ENABLED=true pnpm exec vitest run apps/api/src/modules/execution/__tests__/daytona-adaptive.integration.test.ts",
+    "runtime:daytona:cleanup": "pnpm --filter @taskos/api exec tsx src/scripts/daytona-orphan-cleanup.ts",
+    "runtime:daytona:cleanup:dry-run": "pnpm --filter @taskos/api exec tsx src/scripts/daytona-orphan-cleanup.ts --dry-run",
     "format": "prettier --write ."
   },
   "devDependencies": {

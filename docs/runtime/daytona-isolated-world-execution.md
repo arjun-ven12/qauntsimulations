@@ -1,6 +1,6 @@
 # Daytona isolated world execution
 
-Runtime Milestone 4 adds a provider-selectable executor that runs one existing `WorkerJob` in one ephemeral Daytona sandbox. The public Render demo store is not used: its URL works from the developer Mac, but Daytona EU resets the TLS connection during negotiation. The demo store and Playwright worker therefore run together and communicate only over sandbox localhost.
+Runtime Milestone 4 added a provider-selectable executor that runs one existing `WorkerJob` in one ephemeral Daytona sandbox. Runtime Milestone 5 keeps this single-sandbox executor as the per-attempt primitive used by the bounded Daytona fleet. The public Render demo store is not used: its URL works from the developer Mac, but Daytona EU resets the TLS connection during negotiation. The demo store and Playwright worker therefore run together and communicate only over sandbox localhost.
 
 ## Architecture
 
@@ -14,7 +14,7 @@ InvestigationOrchestratorService
        `- Playwright worker
 ```
 
-`WORKER_EXECUTION_PROVIDER` defaults to `local`. Daytona credentials are parsed only when `daytona` is selected. The orchestrator, persistence layer, evidence API, `WorkerJob`, and `WorkerResult` remain provider-neutral. Daytona mode is deliberately limited to one concurrent sandbox; there is no fleet scheduler in this milestone.
+`WORKER_EXECUTION_PROVIDER` defaults to `local`. Daytona credentials are parsed only when `daytona` is selected. The orchestrator, persistence layer, evidence API, `WorkerJob`, and `WorkerResult` remain provider-neutral. Daytona execution is now admitted by a bounded process-local fleet; there is still no distributed queue across API replicas.
 
 ## Configuration
 
@@ -141,4 +141,4 @@ Normal unit tests never contact Daytona. Local execution remains available with 
 - The default snapshot currently supplies Node 25 while the repository targets Node 22 or newer. The portable worker is verified on that runtime, but a pinned LTS snapshot is preferable.
 - Cancellation and process stopping use Daytona sessions and are best-effort until sandbox deletion completes.
 - Only the healthy live scenario is required and verified here; the defective live scenario has not been claimed.
-- There is no multi-sandbox fleet, lease/heartbeat scheduler, adaptive follow-up, minimisation, or AI-provider integration.
+- There is no distributed lease/heartbeat scheduler, adaptive follow-up, minimisation, or AI-provider integration.

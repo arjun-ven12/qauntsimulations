@@ -20,7 +20,9 @@ import { ExecutionCleanupService } from './modules/execution/execution-cleanup.s
 import { InvestigationOrchestratorService } from './modules/execution/investigation-orchestrator.service.js';
 import { LocalPlaywrightWorkerExecutor } from './modules/execution/local-worker-executor.service.js';
 import { WorkerJobFactoryService } from './modules/execution/worker-job-factory.service.js';
+import { DaytonaFleetCapacityManager } from './modules/execution/daytona-fleet-capacity-manager.js';
 import { DaytonaPlaywrightWorkerExecutor } from './modules/execution/daytona-worker-executor.service.js';
+import { DaytonaWorkerFleet } from './modules/execution/daytona-worker-fleet.service.js';
 import { WorkerExecutorFactory } from './modules/execution/worker-executor.factory.js';
 import { InvestigationController } from './modules/investigations/investigations.controller.js';
 import { InvestigationRepository } from './modules/investigations/investigations.repository.js';
@@ -64,6 +66,7 @@ const evidenceRoot = isAbsolute(env.EVIDENCE_LOCAL_PATH)
   ? env.EVIDENCE_LOCAL_PATH
   : resolve(repositoryRoot, env.EVIDENCE_LOCAL_PATH);
 const investigationRepository = new InvestigationRepository(database);
+const daytonaFleet = new DaytonaWorkerFleet(new DaytonaFleetCapacityManager(env.DAYTONA_FLEET_HARD_LIMIT));
 const workerExecutor = new WorkerExecutorFactory(
   new LocalPlaywrightWorkerExecutor(evidenceRoot),
   () => {
@@ -99,6 +102,28 @@ const investigationOrchestrator = new InvestigationOrchestratorService(
     resolve(repositoryRoot, 'demo/fixtures/checkout-journey.json'),
   ),
   new LocalEvidenceMetadataService(evidenceRoot),
+  undefined,
+  daytonaFleet,
+  {
+    perInvestigationLimit: env.DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION,
+    serverWideLimit: env.DAYTONA_MAX_CONCURRENT_SANDBOXES,
+    maximumAttempts: env.DAYTONA_MAX_RETRY_ATTEMPTS,
+    retryBaseDelayMs: env.DAYTONA_RETRY_BASE_DELAY_MS,
+    retryMaximumDelayMs: env.DAYTONA_RETRY_MAX_DELAY_MS,
+    maximumTotalSandboxCreations: env.DAYTONA_MAX_TOTAL_SANDBOX_CREATIONS_PER_INVESTIGATION,
+    maximumInvestigationDurationSeconds: env.DAYTONA_MAX_INVESTIGATION_DURATION_SECONDS,
+  },
+  {
+    enabled: env.ADAPTIVE_REPRODUCTION_ENABLED,
+    maximumFindingsPerInvestigation: env.ADAPTIVE_MAX_FINDINGS_PER_INVESTIGATION,
+    maximumFollowupWorlds: env.ADAPTIVE_MAX_FOLLOWUP_WORLDS,
+    maximumTotalWorlds: env.ADAPTIVE_MAX_TOTAL_WORLDS,
+    exactReproductionAttempts: env.ADAPTIVE_EXACT_REPRODUCTION_ATTEMPTS,
+    confidenceInitial: env.ADAPTIVE_CONFIDENCE_INITIAL,
+    confidenceMaximum: env.ADAPTIVE_CONFIDENCE_MAX,
+    minimumEvidenceWorlds: env.ADAPTIVE_MIN_EVIDENCE_WORLDS,
+    timeoutSeconds: env.ADAPTIVE_REPRODUCTION_TIMEOUT_SECONDS,
+  },
 );
 await new ExecutionCleanupService(investigationRepository).run();
 

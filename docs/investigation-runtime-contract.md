@@ -20,10 +20,16 @@ COMPLETED
 FAILED
 ```
 
-Prompt 3 may initially implement only:
+The baseline execution path may run:
 
 ```text
 PLANNING → QUEUED → RUNNING → OBSERVING → COMPLETED
+```
+
+When deterministic adaptive reproduction is enabled, the same public contract also supports:
+
+```text
+PLANNING → QUEUED → RUNNING → OBSERVING → ADAPTING → REPRODUCING → OBSERVING → COMPLETED
 ```
 
 `InvestigationProgress` contains `id`, `status`, `progress`, `recentEvents`, and `findingsCount`.
@@ -45,7 +51,7 @@ The consistency rule is:
 queued + running + passed + failed + flaky <= totalWorlds
 ```
 
-Once all initially planned worlds exist, the sum should normally equal `totalWorlds`.
+Once all currently generated worlds exist, the sum should normally equal `totalWorlds`. Runtime may append deterministic adaptive follow-up worlds after the initial fleet, so `totalWorlds` is not immutable and may increase during execution.
 
 ## Creation request
 
@@ -110,6 +116,4 @@ Runtime owner:
 - `WorkerResult`, event, and progress persistence
 - counter updates, findings, runtime-specific database models, and orchestration loops
 
-The existing Prisma schema already supports all product fixture records. No Prisma model or runtime
-orchestration model is added by this milestone. Existing `WorkerJob`, `WorkerResult`, evidence, and
-runtime execution contracts remain owned by the runtime developer.
+The existing Prisma schema already supports product fixture records, initial worlds, and deterministic adaptive follow-up worlds. Existing `WorkerJob`, `WorkerResult`, evidence, and runtime execution contracts remain owned by the runtime developer. Adaptive reproduction is bounded to one deterministic stage until minimisation and AI planning are introduced in later milestones.

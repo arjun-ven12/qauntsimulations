@@ -156,6 +156,13 @@ export class DaytonaSandboxProvider implements SandboxProvider {
     return 'CREATING';
   }
 
+  async *listSandboxes(labels: Record<string, string>): AsyncIterable<SandboxHandle> {
+    for await (const sandbox of this.client.sdk.list({ labels })) {
+      this.sandboxes.set(sandbox.id, sandbox);
+      yield this.handle(sandbox, 'READY');
+    }
+  }
+
   private sandbox(handle: SandboxHandle): Sandbox {
     const sandbox = this.sandboxes.get(handle.id);
     if (!sandbox) throw new SandboxProviderError(`Unknown Daytona sandbox ${handle.id}`);
@@ -170,6 +177,7 @@ export class DaytonaSandboxProvider implements SandboxProvider {
       target: sandbox.target,
       ...(sandbox.snapshot ? { snapshot: sandbox.snapshot } : {}),
       ...(sandbox.createdAt ? { createdAt: sandbox.createdAt } : {}),
+      ...(sandbox.labels ? { labels: sandbox.labels } : {}),
     };
   }
 
