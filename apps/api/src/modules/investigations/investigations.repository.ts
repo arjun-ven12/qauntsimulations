@@ -441,8 +441,12 @@ export class InvestigationRepository {
 
   async queueInitialWorlds(context: InvestigationOrchestrationContext): Promise<CreatedWorldRecord[]> {
     return this.database.$transaction(async (transaction) => {
-      const changed = await transaction.investigation.updateMany({ where: { id: context.id, status: 'PLANNING' }, data: { status: 'QUEUED' } });
-      if (changed.count !== 1) throw new Error('Investigation is not in PLANNING state');
+      const preparedRepairVerification = (context.plan as unknown as { executionMode?: unknown }).executionMode === 'REPAIR_VERIFICATION';
+      const changed = await transaction.investigation.updateMany({
+        where: { id: context.id, status: preparedRepairVerification ? 'QUEUED' : 'PLANNING' },
+        data: { status: 'QUEUED' },
+      });
+      if (changed.count !== 1) throw new Error(preparedRepairVerification ? 'Prepared Repair Verification is not queued' : 'Investigation is not in PLANNING state');
       await transaction.investigationEvent.create({ data: { investigationId: context.id, type: 'plan_created', data: messageData('Deterministic experiment plan created.', { status: 'QUEUED', maximumConcurrentWorkers: context.plan.maximumConcurrentWorkers }) } });
       const created: CreatedWorldRecord[] = [];
       for (const definition of context.plan.worlds) {
