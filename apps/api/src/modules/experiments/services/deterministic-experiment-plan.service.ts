@@ -1,7 +1,7 @@
 import type { CreateInvestigationInput } from '@taskos/shared-types';
 
 export interface DeterministicWorldDefinition {
-  key: 'baseline' | 'protected-repeat' | 'defective-repeat' | 'reduced-latency';
+  key: string;
   name: string;
   browser: 'chromium' | 'webkit' | 'firefox';
   viewport: 'desktop-1440x900' | 'mobile-390x844';
@@ -15,6 +15,22 @@ export interface DeterministicWorldDefinition {
   reason: string;
   randomSeed: number;
   creationOrder: number;
+  origin?: 'INITIAL' | 'ADAPTIVE_REPRODUCTION';
+  adaptive?: {
+    reproductionRunId: string;
+    findingId: string;
+    sourceWorldId: string;
+    sourceExperimentId: string;
+    adaptivePurpose:
+      | 'EXACT_REPRODUCTION'
+      | 'BUG_FLAG_CONTROL'
+      | 'INTERACTION_CONTROL'
+      | 'DELAY_COMPARISON'
+      | 'LOW_DELAY_COMPARISON';
+    changedVariables: Record<string, unknown>;
+    fixedVariables: Record<string, unknown>;
+    hypothesisContribution: string;
+  };
 }
 
 export interface DeterministicExperimentPlan {

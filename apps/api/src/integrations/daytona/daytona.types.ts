@@ -17,6 +17,7 @@ export interface SandboxHandle {
   target: string;
   snapshot?: string;
   createdAt?: string;
+  labels?: Record<string, string>;
 }
 
 export interface SandboxUpload {
@@ -73,4 +74,5 @@ export interface SandboxProvider {
   stopProcess(sandbox: SandboxHandle, process: ProcessHandle): Promise<void>;
   deleteSandbox(sandbox: SandboxHandle): Promise<void>;
   getSandboxStatus(sandbox: SandboxHandle): Promise<SandboxStatus>;
+  listSandboxes?(labels: Record<string, string>): AsyncIterable<SandboxHandle>;
 }

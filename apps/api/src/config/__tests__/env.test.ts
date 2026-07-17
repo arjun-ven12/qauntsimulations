@@ -38,9 +38,41 @@ describe('API environment security', () => {
     expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, WORKER_EXECUTION_PROVIDER: 'local' }).success).toBe(true);
   });
 
+  it('validates Daytona fleet limits', () => {
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      WORKER_EXECUTION_PROVIDER: 'daytona',
+      DAYTONA_API_KEY: 'test-key',
+      DAYTONA_MAX_CONCURRENT_SANDBOXES: '2',
+      DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION: '2',
+      DAYTONA_FLEET_HARD_LIMIT: '4',
+    }).success).toBe(true);
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      WORKER_EXECUTION_PROVIDER: 'daytona',
+      DAYTONA_API_KEY: 'test-key',
+      DAYTONA_MAX_CONCURRENT_SANDBOXES: '2',
+      DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION: '3',
+    }).success).toBe(false);
+  });
+
   it('requires Daytona credentials only in Daytona mode and rejects the unsupported US target', () => {
     expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, WORKER_EXECUTION_PROVIDER: 'daytona' }).success).toBe(false);
     expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, WORKER_EXECUTION_PROVIDER: 'daytona', DAYTONA_API_KEY: 'test-key', DAYTONA_TARGET: 'eu' }).success).toBe(true);
     expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, WORKER_EXECUTION_PROVIDER: 'daytona', DAYTONA_API_KEY: 'test-key', DAYTONA_TARGET: 'us' }).success).toBe(false);
+  });
+
+  it('validates adaptive reproduction confidence limits', () => {
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      ADAPTIVE_REPRODUCTION_ENABLED: 'true',
+      ADAPTIVE_CONFIDENCE_INITIAL: '0.75',
+      ADAPTIVE_CONFIDENCE_MAX: '0.95',
+    }).success).toBe(true);
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      ADAPTIVE_CONFIDENCE_INITIAL: '0.96',
+      ADAPTIVE_CONFIDENCE_MAX: '0.95',
+    }).success).toBe(false);
   });
 });

@@ -148,8 +148,21 @@ export const experimentPlanSchema = z.object({
   invariants: z.array(invariantSchema),
   worlds: z.array(worldConfigSchema),
   planningExplanation: z.string(),
-  aiProvider: z.enum(['OPENAI', 'KIMI', 'MOCK']),
+  aiProvider: z.enum(['DETERMINISTIC', 'OPENAI', 'KIMI', 'MOCK', 'FALLBACK']),
   estimatedComputeUnits: z.number().nonnegative(),
+  plannerStatus: z
+    .enum([
+      'PENDING',
+      'GENERATING',
+      'VALIDATING',
+      'ACCEPTED',
+      'PARTIALLY_ACCEPTED',
+      'REJECTED',
+      'FALLBACK_USED',
+      'FAILED',
+    ])
+    .optional(),
+  plannerMetadata: z.record(z.unknown()).optional(),
 });
 export type ExperimentPlan = z.infer<typeof experimentPlanSchema>;
 
@@ -311,7 +324,7 @@ export const investigationSchema = timestampsSchema.extend({
   plan: experimentPlanSchema.nullable(),
   aggregateProgress: z.number().min(0).max(100),
   workerCounts: z.object({ queued: z.number(), running: z.number(), completed: z.number(), failed: z.number() }),
-  recentEvents: z.array(z.object({ id: idSchema, type: investigationEventTypeSchema, occurredAt: dateTimeSchema, data: z.record(z.unknown()) })),
+  recentEvents: z.array(z.object({ id: idSchema, type: z.string().min(1), occurredAt: dateTimeSchema, data: z.record(z.unknown()) })),
   findingsCount: z.number().int().nonnegative(),
   elapsedTimeSeconds: z.number().int().nonnegative(),
 });

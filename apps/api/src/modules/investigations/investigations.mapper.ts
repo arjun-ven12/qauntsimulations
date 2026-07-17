@@ -7,6 +7,9 @@ const publicStatus = (status: string): InvestigationProgress['status'] => {
   if (status === 'PROVISIONING') return 'PROVISIONING';
   if (status === 'RUNNING') return 'RUNNING';
   if (status === 'OBSERVING') return 'OBSERVING';
+  if (status === 'ADAPTING') return 'ADAPTING';
+  if (status === 'REPRODUCING') return 'REPRODUCING';
+  if (status === 'MINIMISING') return 'MINIMISING';
   if (status === 'COMPLETED') return 'COMPLETED';
   return 'FAILED';
 };

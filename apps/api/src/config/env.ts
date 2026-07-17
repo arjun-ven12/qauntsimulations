@@ -33,8 +33,18 @@ export const apiEnvironmentSchema = z
     DAYTONA_API_URL: optionalUrl,
     DAYTONA_TARGET: z.preprocess((value) => value === '' ? undefined : value, z.literal('eu').default('eu')),
     DAYTONA_SNAPSHOT: optionalString,
-    DAYTONA_MAX_CONCURRENT_SANDBOXES: z.coerce.number().int().min(1).max(1).default(1),
+    DAYTONA_MAX_CONCURRENT_SANDBOXES: z.coerce.number().int().min(1).max(4).default(2),
+    DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION: z.coerce.number().int().min(1).max(4).default(2),
+    DAYTONA_MAX_RETRY_ATTEMPTS: z.coerce.number().int().min(1).max(3).default(2),
+    DAYTONA_RETRY_BASE_DELAY_MS: z.coerce.number().int().min(0).max(60_000).default(1_000),
+    DAYTONA_RETRY_MAX_DELAY_MS: z.coerce.number().int().min(0).max(120_000).default(10_000),
     DAYTONA_SANDBOX_TIMEOUT_SECONDS: z.coerce.number().int().min(60).max(1_800).default(300),
+    DAYTONA_CLEANUP_TIMEOUT_SECONDS: z.coerce.number().int().min(10).max(600).default(60),
+    DAYTONA_FLEET_HARD_LIMIT: z.coerce.number().int().min(1).max(8).default(4),
+    DAYTONA_ORPHAN_SWEEP_ENABLED: booleanString.default('true'),
+    DAYTONA_ORPHAN_MAX_AGE_MINUTES: z.coerce.number().int().min(1).max(24 * 60).default(30),
+    DAYTONA_MAX_TOTAL_SANDBOX_CREATIONS_PER_INVESTIGATION: z.coerce.number().int().min(1).max(20).default(8),
+    DAYTONA_MAX_INVESTIGATION_DURATION_SECONDS: z.coerce.number().int().min(60).max(3_600).default(1_200),
     DAYTONA_AUTO_DELETE: booleanString.default('true'),
     DAYTONA_WORKSPACE_PATH: z.string().default('/home/daytona/taskos'),
     DAYTONA_DEMO_STORE_PATH: z.string().default('/home/daytona/taskos/demo-store'),
@@ -42,6 +52,15 @@ export const apiEnvironmentSchema = z
     DAYTONA_INPUT_PATH: z.string().default('/home/daytona/taskos/input'),
     DAYTONA_EVIDENCE_PATH: z.string().default('/home/daytona/taskos/output'),
     DAYTONA_DEMO_STORE_PORT: z.coerce.number().int().min(1).max(65_535).default(4174),
+    ADAPTIVE_REPRODUCTION_ENABLED: booleanString.default('true'),
+    ADAPTIVE_MAX_FINDINGS_PER_INVESTIGATION: z.coerce.number().int().min(0).max(5).default(1),
+    ADAPTIVE_MAX_FOLLOWUP_WORLDS: z.coerce.number().int().min(0).max(10).default(5),
+    ADAPTIVE_MAX_TOTAL_WORLDS: z.coerce.number().int().min(1).max(50).default(12),
+    ADAPTIVE_EXACT_REPRODUCTION_ATTEMPTS: z.coerce.number().int().min(1).max(3).default(1),
+    ADAPTIVE_CONFIDENCE_INITIAL: z.coerce.number().min(0).max(1).default(0.75),
+    ADAPTIVE_CONFIDENCE_MAX: z.coerce.number().min(0).max(1).default(0.95),
+    ADAPTIVE_MIN_EVIDENCE_WORLDS: z.coerce.number().int().min(1).max(10).default(2),
+    ADAPTIVE_REPRODUCTION_TIMEOUT_SECONDS: z.coerce.number().int().min(60).max(3_600).default(900),
   })
   .superRefine((environment, context) => {
     if (environment.NODE_ENV === 'production' && !environment.COOKIE_SECURE) {
@@ -56,6 +75,27 @@ export const apiEnvironmentSchema = z
         code: 'custom',
         path: ['DAYTONA_API_KEY'],
         message: 'DAYTONA_API_KEY is required when WORKER_EXECUTION_PROVIDER=daytona',
+      });
+    }
+    if (environment.DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION > environment.DAYTONA_MAX_CONCURRENT_SANDBOXES) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION'],
+        message: 'DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION must not exceed DAYTONA_MAX_CONCURRENT_SANDBOXES',
+      });
+    }
+    if (environment.DAYTONA_MAX_CONCURRENT_SANDBOXES > environment.DAYTONA_FLEET_HARD_LIMIT) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DAYTONA_MAX_CONCURRENT_SANDBOXES'],
+        message: 'DAYTONA_MAX_CONCURRENT_SANDBOXES must not exceed DAYTONA_FLEET_HARD_LIMIT',
+      });
+    }
+    if (environment.ADAPTIVE_CONFIDENCE_INITIAL > environment.ADAPTIVE_CONFIDENCE_MAX) {
+      context.addIssue({
+        code: 'custom',
+        path: ['ADAPTIVE_CONFIDENCE_INITIAL'],
+        message: 'ADAPTIVE_CONFIDENCE_INITIAL must not exceed ADAPTIVE_CONFIDENCE_MAX',
       });
     }
     const workspacePrefix = `${environment.DAYTONA_WORKSPACE_PATH.replace(/\/$/, '')}/`;

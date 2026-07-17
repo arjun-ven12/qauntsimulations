@@ -1,6 +1,6 @@
 # Local investigation orchestration
 
-Runtime Milestone 3 adds a development-only, in-process orchestration path around the existing Playwright worker. It persists all durable state in Neon through Prisma but does not claim to be a production distributed queue. Daytona, adaptive follow-up generation, AI planning, reproduction, minimisation, and repair verification are intentionally excluded.
+Runtime Milestone 3 added a development-only, in-process orchestration path around the existing Playwright worker. It persists all durable state in Neon through Prisma but does not claim to be a production distributed queue. Runtime Milestone 6 can append deterministic adaptive follow-up worlds after the initial fleet. AI planning, minimisation, and repair verification remain excluded.
 
 ## Architecture
 
@@ -25,6 +25,12 @@ The normal lifecycle is:
 PLANNING → QUEUED → RUNNING → OBSERVING → COMPLETED
 ```
 
+With adaptive reproduction enabled and an eligible finding, the lifecycle becomes:
+
+```text
+PLANNING → QUEUED → RUNNING → OBSERVING → ADAPTING → REPRODUCING → OBSERVING → COMPLETED
+```
+
 An orchestration-level fatal error enters `FAILED`. A world-level invariant violation does not fail the investigation; it increments the public `failed` world counter and the investigation can still complete.
 
 Public progress follows the frozen contract:
@@ -36,7 +42,7 @@ Public progress follows the frozen contract:
 - `failed`: invariant-violating, execution-error, or cancelled experiments;
 - `flaky`: zero in this milestone.
 
-At normal completion the classified counters equal `totalWorlds`.
+At normal completion the classified counters equal `totalWorlds`. During adaptive reproduction, `totalWorlds` may increase as follow-up worlds are persisted.
 
 ## Deterministic worlds
 
@@ -102,6 +108,6 @@ An API restart interrupts active in-process workers. Startup cleanup marks local
 
 ## Provider-selectable execution
 
-The orchestrator now depends on the provider-neutral `WorkerExecutor` port. `WORKER_EXECUTION_PROVIDER=local` retains the original in-process `LocalPlaywrightWorkerExecutor` and remains the default. `WORKER_EXECUTION_PROVIDER=daytona` selects the isolated `DaytonaPlaywrightWorkerExecutor`, which runs the same validated job and returns the same validated result through one ephemeral EU sandbox.
+The orchestrator now depends on the provider-neutral `WorkerExecutor` port. `WORKER_EXECUTION_PROVIDER=local` retains the original in-process `LocalPlaywrightWorkerExecutor` and remains the default. `WORKER_EXECUTION_PROVIDER=daytona` selects the bounded Daytona fleet, which delegates each admitted world attempt to the isolated `DaytonaPlaywrightWorkerExecutor`.
 
-Daytona configuration is loaded lazily, so local development does not require Daytona credentials. Job construction, result validation, persistence, evidence metadata, counters, and API mapping are shared. Daytona mode is capped at one concurrent execution for Runtime Milestone 4; the existing local mode retains its bounded local concurrency behavior. See [Daytona isolated world execution](./daytona-isolated-world-execution.md) for the verified lifecycle and limitations.
+Daytona configuration is loaded lazily, so local development does not require Daytona credentials. Job construction, result validation, persistence, evidence metadata, counters, and API mapping are shared. The Daytona fleet limits are process-local and are not a distributed queue. See [Daytona isolated world execution](./daytona-isolated-world-execution.md) and [Daytona fleet orchestration](./daytona-fleet-orchestration.md) for the verified lifecycle and limitations.
