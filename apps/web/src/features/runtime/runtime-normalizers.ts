@@ -2,7 +2,7 @@ import type { Finding, InvestigationEvent, InvestigationProgress } from '@taskos
 import type { EvidenceArtifactResponse, ExperimentPlanResponse, FindingDetail, InvestigationExperiment, InvestigationWorker, InvestigationWorld } from '../../services/api/index.js';
 
 export type WorldOrigin = 'INITIAL' | 'ADAPTIVE_REPRODUCTION' | 'MINIMISATION' | 'UNKNOWN';
-export type WorldFilter = 'ALL' | WorldOrigin | 'PASSED' | 'FAILED' | 'RUNNING' | 'INCONCLUSIVE';
+export type WorldFilter = 'ALL' | WorldOrigin | 'BUSINESS_PASS' | 'BUSINESS_FAIL' | 'BUSINESS_INCONCLUSIVE' | 'EXECUTION_RUNNING' | 'EXECUTION_FAILED';
 export type WorldSort = 'CHRONOLOGY' | 'STAGE' | 'STATUS' | 'PAYMENT_DELAY';
 
 export const terminalStatuses = new Set(['COMPLETED', 'FAILED', 'CANCELLED']);
@@ -225,21 +225,37 @@ export function evidenceForExperiment(experimentId: string | undefined, evidence
   return experimentId ? evidence.filter((artifact) => artifact.experimentId === experimentId) : [];
 }
 
-export function worldResult(world: InvestigationWorld, experiments: InvestigationExperiment[]): string {
+export function worldExecutionState(world: InvestigationWorld, experiments: InvestigationExperiment[]): 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED' {
+  if (world.executionState) return world.executionState;
   const experiment = experimentForWorld(world, experiments);
-  if (!experiment) return humanize(world.status);
-  if (experiment.status === 'PASSED') return 'PASS';
-  if (experiment.status === 'FAILED' || experiment.status === 'ERROR') return 'FAIL';
-  if (experiment.status === 'CANCELLED') return 'INCONCLUSIVE';
-  return humanize(experiment.status);
+  if (experiment?.executionState) return experiment.executionState;
+  if (world.status === 'CANCELLED' || experiment?.status === 'CANCELLED') return 'CANCELLED';
+  if (experiment?.status === 'ERROR') return 'FAILED';
+  if (experiment?.status === 'RUNNING' || world.status === 'RUNNING') return 'RUNNING';
+  if (experiment?.status === 'QUEUED' || world.status === 'GENERATED' || world.status === 'QUEUED') return 'QUEUED';
+  // Legacy APIs used FAILED/PASSED as business outcomes. A terminal experiment
+  // with a completed attempt is execution-complete regardless of its outcome.
+  if (experiment?.latestAttempt?.completedAt || experiment?.status === 'PASSED' || experiment?.status === 'FAILED' || world.status === 'COMPLETED' || world.status === 'PASSED') return 'COMPLETED';
+  return 'FAILED';
+}
+
+export function worldResult(world: InvestigationWorld, experiments: InvestigationExperiment[]): 'PASS' | 'FAIL' | 'INCONCLUSIVE' {
+  if (world.businessOutcome) return world.businessOutcome;
+  const experiment = experimentForWorld(world, experiments);
+  if (experiment?.businessOutcome) return experiment.businessOutcome;
+  if (worldExecutionState(world, experiments) !== 'COMPLETED') return 'INCONCLUSIVE';
+  if (experiment?.status === 'PASSED') return 'PASS';
+  if (experiment?.status === 'FAILED') return 'FAIL';
+  return 'INCONCLUSIVE';
 }
 
 export function filterWorld(world: InvestigationWorld, filter: WorldFilter, experiments: InvestigationExperiment[]): boolean {
   if (filter === 'ALL') return true;
-  if (filter === 'PASSED') return worldResult(world, experiments) === 'PASS';
-  if (filter === 'FAILED') return worldResult(world, experiments) === 'FAIL';
-  if (filter === 'RUNNING') return world.status === 'RUNNING';
-  if (filter === 'INCONCLUSIVE') return !['PASS', 'FAIL'].includes(worldResult(world, experiments));
+  if (filter === 'BUSINESS_PASS') return worldResult(world, experiments) === 'PASS';
+  if (filter === 'BUSINESS_FAIL') return worldResult(world, experiments) === 'FAIL';
+  if (filter === 'BUSINESS_INCONCLUSIVE') return worldResult(world, experiments) === 'INCONCLUSIVE';
+  if (filter === 'EXECUTION_RUNNING') return worldExecutionState(world, experiments) === 'RUNNING';
+  if (filter === 'EXECUTION_FAILED') return worldExecutionState(world, experiments) === 'FAILED';
   return worldOrigin(world) === filter;
 }
 
@@ -323,7 +339,7 @@ export function worldRows(
       paymentDelay: paymentDelay(world),
       repeatedSubmission: repeatedSubmit(world),
       bugMode: bugMode(world),
-      status: humanize(world.status),
+      status: humanize(worldExecutionState(world, experiments)),
       result: worldResult(world, experiments),
       workerId: worker?.id ?? world.workerId,
       attempts: experiment?.attemptCount ?? worker?.attempts.length ?? 0,
@@ -338,14 +354,16 @@ export function filterWorldRows(rows: RuntimeWorldRow[], filter: WorldFilter, se
     const filterMatch =
       filter === 'ALL'
         ? true
-        : filter === 'PASSED'
+        : filter === 'BUSINESS_PASS'
           ? row.result === 'PASS'
-          : filter === 'FAILED'
+          : filter === 'BUSINESS_FAIL'
             ? row.result === 'FAIL'
-            : filter === 'RUNNING'
-              ? row.world.status === 'RUNNING'
-              : filter === 'INCONCLUSIVE'
-                ? !['PASS', 'FAIL'].includes(row.result)
+            : filter === 'EXECUTION_RUNNING'
+              ? row.status === 'Running'
+              : filter === 'EXECUTION_FAILED'
+                ? row.status === 'Failed'
+                : filter === 'BUSINESS_INCONCLUSIVE'
+                  ? row.result === 'INCONCLUSIVE'
                 : row.origin === filter;
     if (!filterMatch) return false;
     if (!needle) return true;
@@ -423,14 +441,17 @@ export function workerState(status: string): string {
 
 export function workerViewModels(workers: InvestigationWorker[], experiments: InvestigationExperiment[]): WorkerViewModel[] {
   return workers.map((worker) => {
-    const attempts = worker.attempts.map((attempt, index) => ({
-      id: attempt.id,
-      number: index + 1,
-      status: humanize(attempt.status),
-      duration: formatDuration(attempt.durationMs),
-      ...(attempt.exitCode !== null && attempt.exitCode !== undefined ? { exitCode: attempt.exitCode } : {}),
-      infrastructureFailure: attempt.status === 'ERROR' || (attempt.exitCode !== null && attempt.exitCode !== undefined && attempt.exitCode !== 0 && attempt.status !== 'FAILED'),
-    }));
+    const attempts = worker.attempts.map((attempt, index) => {
+      const invariantViolation = attempt.status === 'FAILED' && attempt.exitCode === 2;
+      return {
+        id: attempt.id,
+        number: index + 1,
+        status: invariantViolation ? 'Completed · invariant violation' : attempt.status === 'PASSED' ? 'Completed' : humanize(attempt.status),
+        duration: formatDuration(attempt.durationMs),
+        ...(attempt.exitCode !== null && attempt.exitCode !== undefined ? { exitCode: attempt.exitCode } : {}),
+        infrastructureFailure: attempt.status === 'ERROR' || (attempt.exitCode !== null && attempt.exitCode !== undefined && attempt.exitCode !== 0 && !invariantViolation),
+      };
+    });
     const worldId = worker.attempts[0]?.experiment.worldId;
     const experiment = experiments.find((item) => item.worldId === worldId);
     const active = ['QUEUED', 'PROVISIONING', 'RUNNING', 'RETRYING'].includes(worker.status);
@@ -438,7 +459,15 @@ export function workerViewModels(workers: InvestigationWorker[], experiments: In
       worker,
       ...(worldId ? { worldId } : {}),
       state: workerState(worker.status),
-      finalOutcome: experiment?.status ? humanize(experiment.status) : workerState(worker.status),
+      finalOutcome: experiment?.businessOutcome
+        ? humanize(experiment.businessOutcome)
+        : experiment?.status === 'PASSED'
+          ? 'Pass'
+          : experiment?.status === 'FAILED'
+            ? 'Fail'
+            : experiment?.status === 'ERROR' || experiment?.status === 'CANCELLED'
+              ? 'Inconclusive'
+              : workerState(worker.status),
       attempts,
       active,
       retrying: attempts.length > 1 || worker.status === 'RETRYING',
@@ -464,7 +493,7 @@ export type RuntimeMatrix = {
 
 function matrixOutcome(rows: RuntimeWorldRow[]): RuntimeMatrixCell['outcome'] {
   if (!rows.length) return 'NOT_TESTED';
-  const outcomes = new Set(rows.map((row) => row.result === 'PASS' || row.result === 'FAIL' ? row.result : row.world.status === 'RUNNING' ? 'RUNNING' : 'INCONCLUSIVE'));
+  const outcomes = new Set(rows.map((row) => row.result === 'PASS' || row.result === 'FAIL' ? row.result : row.status === 'Running' ? 'RUNNING' : 'INCONCLUSIVE'));
   if (outcomes.size > 1) return 'MIXED';
   return [...outcomes][0] as RuntimeMatrixCell['outcome'];
 }

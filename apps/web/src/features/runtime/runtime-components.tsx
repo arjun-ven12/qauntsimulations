@@ -150,8 +150,8 @@ export function ProgressSummary({ progress }: { progress: InvestigationProgress 
     ['Completed', completedWorlds(progress.progress)],
     ['Queued', progress.progress.queued],
     ['Running', progress.progress.running],
-    ['Passed', progress.progress.passed],
-    ['Failed', progress.progress.failed],
+    ['Execution completed', progress.progress.passed],
+    ['Execution failed', progress.progress.failed],
     ['Findings', progress.findingsCount],
   ] as const;
   return (
@@ -231,7 +231,14 @@ function ListBlock({ title, items, empty }: { title: string; items: string[]; em
 }
 
 export function WorldTable({ worlds, experiments, workers = [], evidence }: { worlds: InvestigationWorld[]; experiments: InvestigationExperiment[]; workers?: InvestigationWorker[]; evidence: EvidenceArtifactResponse[] }) {
-  const filters: WorldFilter[] = ['ALL', 'INITIAL', 'ADAPTIVE_REPRODUCTION', 'MINIMISATION', 'PASSED', 'FAILED', 'RUNNING', 'INCONCLUSIVE'];
+  const filters: WorldFilter[] = ['ALL', 'INITIAL', 'ADAPTIVE_REPRODUCTION', 'MINIMISATION', 'BUSINESS_PASS', 'BUSINESS_FAIL', 'BUSINESS_INCONCLUSIVE', 'EXECUTION_RUNNING', 'EXECUTION_FAILED'];
+  const filterLabels: Partial<Record<WorldFilter, string>> = {
+    BUSINESS_PASS: 'Business: Pass',
+    BUSINESS_FAIL: 'Business: Fail',
+    BUSINESS_INCONCLUSIVE: 'Business: Inconclusive',
+    EXECUTION_RUNNING: 'Execution: Running',
+    EXECUTION_FAILED: 'Execution: Failed',
+  };
   const sorts: Array<{ value: WorldSort; label: string }> = [
     { value: 'CHRONOLOGY', label: 'Creation order' },
     { value: 'STAGE', label: 'Stage' },
@@ -263,7 +270,7 @@ export function WorldTable({ worlds, experiments, workers = [], evidence }: { wo
       <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="World filters">
         {filters.map((filter) => (
           <button className={`rounded-full px-3 py-1 text-xs ${activeFilter === filter ? 'bg-cyan text-ink' : 'bg-slate-900 text-slate-300'}`} key={filter} onClick={() => setActiveFilter(filter)} role="tab" aria-selected={activeFilter === filter} type="button">
-            {filter === 'ALL' ? 'All' : filter === 'INITIAL' || filter === 'ADAPTIVE_REPRODUCTION' || filter === 'MINIMISATION' ? worldOriginLabel(filter) : humanize(filter)}
+            {filter === 'ALL' ? 'All' : filter === 'INITIAL' || filter === 'ADAPTIVE_REPRODUCTION' || filter === 'MINIMISATION' ? worldOriginLabel(filter) : filterLabels[filter]}
           </button>
         ))}
       </div>
@@ -273,7 +280,7 @@ export function WorldTable({ worlds, experiments, workers = [], evidence }: { wo
           <table className="min-w-full text-left text-sm">
             <thead className="text-xs uppercase text-slate-500">
               <tr>
-                {['Compare', 'World', 'Origin', 'Purpose', 'Browser', 'Viewport', 'Network', 'Payment delay', 'Repeated submit', 'Bug mode', 'World status', 'Result', 'Worker', 'Attempts', 'Evidence', 'Created / completed'].map((heading) => <th className="px-3 py-2" key={heading}>{heading}</th>)}
+                {['Compare', 'World', 'Origin', 'Purpose', 'Browser', 'Viewport', 'Network', 'Payment delay', 'Repeated submit', 'Bug mode', 'Execution', 'Business outcome', 'Worker', 'Attempts', 'Evidence', 'Created / completed'].map((heading) => <th className="px-3 py-2" key={heading}>{heading}</th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800">
@@ -293,7 +300,7 @@ export function WorldTable({ worlds, experiments, workers = [], evidence }: { wo
                     <td className="px-3 py-3">{row.repeatedSubmission}</td>
                     <td className="px-3 py-3">{row.bugMode}</td>
                     <td className="px-3 py-3">{row.status}</td>
-                    <td className="px-3 py-3"><StatusBadge tone={resultTone}>{row.result}</StatusBadge></td>
+                    <td className="px-3 py-3"><StatusBadge tone={resultTone}>{humanize(row.result)}</StatusBadge></td>
                     <td className="px-3 py-3 font-mono text-xs" title={row.workerId}>{row.workerId ? shortId(row.workerId) : 'Not recorded'}</td>
                     <td className="px-3 py-3">{row.attempts}</td>
                     <td className="px-3 py-3">{row.evidenceCount}</td>
@@ -321,7 +328,8 @@ function WorldComparison({ rows, clear }: { rows: RuntimeWorldRow[]; clear: () =
     ['Double-submit', (row) => row.repeatedSubmission],
     ['Click interval', (row) => formatConditionValue('doubleSubmitIntervalMs', row.world.configuration && typeof row.world.configuration === 'object' && !Array.isArray(row.world.configuration) ? (row.world.configuration as Record<string, unknown>).doubleSubmitIntervalMs : undefined)],
     ['Bug mode', (row) => row.bugMode],
-    ['Outcome', (row) => row.result],
+    ['Execution', (row) => row.status],
+    ['Business outcome', (row) => humanize(row.result)],
     ['Failed invariants', (row) => row.result === 'FAIL' ? 'Business invariant failed' : 'None recorded'],
     ['Evidence count', (row) => row.evidenceCount],
   ];
@@ -425,7 +433,7 @@ export function WorkerPanel({ workers, experiments = [] }: { workers: Investigat
               </summary>
               <dl className="mt-3 grid gap-2 text-xs text-slate-400 md:grid-cols-2">
                 <div><dt>World</dt><dd className="font-mono">{item.worldId ? shortId(item.worldId, 14) : 'Not recorded'}</dd></div>
-                <div><dt>Final world outcome</dt><dd>{item.finalOutcome}</dd></div>
+                <div><dt>Business outcome</dt><dd>{item.finalOutcome}</dd></div>
                 <div><dt>Attempts</dt><dd>{item.attempts.length}{item.retrying ? ' · retry recorded' : ''}</dd></div>
                 <div><dt>Cleanup</dt><dd>{item.cleanupLabel}</dd></div>
               </dl>

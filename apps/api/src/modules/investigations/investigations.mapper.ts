@@ -4,6 +4,57 @@ import { sanitizeRuntimePublicMetadata } from './runtime-public-sanitizer.js';
 
 const record = (value: unknown): Record<string, unknown> => value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 
+export type PublicWorldExecutionState = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
+export type PublicBusinessOutcome = 'PASS' | 'FAIL' | 'INCONCLUSIVE';
+
+interface ExecutionSemanticsRecord {
+  status: string;
+  experiments: Array<{
+    status: string;
+    evaluations: Array<{ passed: boolean; executionAttemptId?: string | null }>;
+    attempts: Array<{ id?: string; status: string; result: unknown; startedAt?: Date | null; completedAt?: Date | null }>;
+  }>;
+}
+
+const workerResultStatus = (value: unknown): string | undefined => {
+  const status = record(value).status;
+  return typeof status === 'string' ? status : undefined;
+};
+
+function latestExperiment(record: ExecutionSemanticsRecord) {
+  return record.experiments[0];
+}
+
+export function deriveWorldExecutionState(world: ExecutionSemanticsRecord): PublicWorldExecutionState {
+  const experiment = latestExperiment(world);
+  const attempt = experiment?.attempts[0];
+  const resultStatus = workerResultStatus(attempt?.result);
+
+  if (world.status === 'CANCELLED' || experiment?.status === 'CANCELLED' || attempt?.status === 'CANCELLED') return 'CANCELLED';
+  if (resultStatus === 'PASSED' || resultStatus === 'INVARIANT_VIOLATION') return 'COMPLETED';
+  if (resultStatus === 'FAILED' || resultStatus === 'TIMED_OUT' || resultStatus === 'RUNNER_ERROR') return 'FAILED';
+  if (attempt?.status === 'ERROR' || experiment?.status === 'ERROR') return 'FAILED';
+  if (attempt?.status === 'RUNNING' || experiment?.status === 'RUNNING' || world.status === 'RUNNING') return 'RUNNING';
+  if (attempt?.status === 'QUEUED' || experiment?.status === 'QUEUED' || world.status === 'GENERATED' || world.status === 'QUEUED') return 'QUEUED';
+
+  // Legacy records used FAILED for both invariant violations and execution failures.
+  // A completed attempt with conclusive evaluations is safe to expose as executed.
+  if (attempt?.completedAt && experiment?.evaluations.length) return 'COMPLETED';
+  if (world.status === 'COMPLETED' || experiment?.status === 'PASSED') return 'COMPLETED';
+  return 'FAILED';
+}
+
+export function deriveWorldBusinessOutcome(world: ExecutionSemanticsRecord): PublicBusinessOutcome {
+  if (deriveWorldExecutionState(world) !== 'COMPLETED') return 'INCONCLUSIVE';
+  const experiment = latestExperiment(world);
+  const attemptId = experiment?.attempts[0]?.id;
+  const attemptEvaluations = attemptId
+    ? experiment?.evaluations.filter((evaluation) => !evaluation.executionAttemptId || evaluation.executionAttemptId === attemptId) ?? []
+    : experiment?.evaluations ?? [];
+  if (!attemptEvaluations.length) return 'INCONCLUSIVE';
+  return attemptEvaluations.some(({ passed }) => !passed) ? 'FAIL' : 'PASS';
+}
+
 const publicStatus = (status: string): InvestigationProgress['status'] => {
   if (status === 'PLANNING') return 'PLANNING';
   if (status === 'QUEUED') return 'QUEUED';
@@ -19,15 +70,18 @@ const publicStatus = (status: string): InvestigationProgress['status'] => {
 
 export function mapProgress(record: InvestigationProgressRecord): InvestigationProgress {
   const counters = { queued: 0, running: 0, passed: 0, failed: 0 };
-  for (const experiment of record.experiments) {
-    if (experiment.status === 'QUEUED') counters.queued++;
-    else if (experiment.status === 'RUNNING') counters.running++;
-    else if (experiment.status === 'PASSED') counters.passed++;
-    else counters.failed++;
+  for (const world of record.worlds) {
+    const state = deriveWorldExecutionState(world);
+    if (state === 'QUEUED') counters.queued++;
+    else if (state === 'RUNNING') counters.running++;
+    else if (state === 'COMPLETED') counters.passed++;
+    else if (state === 'FAILED') counters.failed++;
   }
   return investigationProgressSchema.parse({
     id: record.id,
     status: publicStatus(record.status),
+    // `passed` and `failed` are legacy counter names. They now mean technically
+    // completed and technically failed. Cancelled worlds are neither.
     progress: { totalWorlds: Math.max(record.worlds.length, record.experiments.length), ...counters, flaky: 0 },
     recentEvents: record.events.map((event) => {
       const data = event.data && typeof event.data === 'object' && !Array.isArray(event.data) ? event.data as Record<string, unknown> : {};
@@ -48,24 +102,27 @@ export function mapProgress(record: InvestigationProgressRecord): InvestigationP
 
 interface WorldListRecord {
   id: string; investigationId: string; status: string; reason: string; configuration: unknown; createdAt: Date; updatedAt: Date;
-  experiments: Array<{ id: string; attempts: Array<{ workerId: string | null; startedAt: Date | null; completedAt: Date | null }> }>;
+  experiments: Array<{ id: string; status: string; evaluations: Array<{ passed: boolean; executionAttemptId: string | null }>; attempts: Array<{ id: string; status: string; result: unknown; workerId: string | null; startedAt: Date | null; completedAt: Date | null }> }>;
 }
 export function mapWorldList(records: WorldListRecord[]) {
   return records.map((world) => {
     const experiment = world.experiments[0]; const attempt = experiment?.attempts[0];
     const configuration = world.configuration && typeof world.configuration === 'object' && !Array.isArray(world.configuration) ? sanitizeRuntimePublicMetadata(world.configuration) as Record<string, unknown> : {};
-    return { id: world.id, investigationId: world.investigationId, name: typeof configuration.name === 'string' ? configuration.name : 'World', status: world.status, reason: world.reason, configuration, ...(experiment ? { experimentId: experiment.id } : {}), ...(attempt?.workerId ? { workerId: attempt.workerId } : {}), createdAt: world.createdAt.toISOString(), ...(attempt?.startedAt ? { startedAt: attempt.startedAt.toISOString() } : {}), ...(attempt?.completedAt ? { completedAt: attempt.completedAt.toISOString() } : {}) };
+    return { id: world.id, investigationId: world.investigationId, name: typeof configuration.name === 'string' ? configuration.name : 'World', status: world.status, executionState: deriveWorldExecutionState(world), businessOutcome: deriveWorldBusinessOutcome(world), reason: world.reason, configuration, ...(experiment ? { experimentId: experiment.id } : {}), ...(attempt?.workerId ? { workerId: attempt.workerId } : {}), createdAt: world.createdAt.toISOString(), ...(attempt?.startedAt ? { startedAt: attempt.startedAt.toISOString() } : {}), ...(attempt?.completedAt ? { completedAt: attempt.completedAt.toISOString() } : {}) };
   });
 }
 
-interface ExperimentListRecord { id: string; investigationId: string; worldId: string; status: string; kind: string; createdAt: Date; updatedAt: Date; _count: { attempts: number }; attempts: Array<{ id: string; startedAt: Date | null; completedAt: Date | null; exitCode: number | null; durationMs: number | null }> }
+interface ExperimentListRecord { id: string; investigationId: string; worldId: string; status: string; kind: string; createdAt: Date; updatedAt: Date; world?: { status: string }; evaluations: Array<{ passed: boolean; executionAttemptId: string | null }>; _count: { attempts: number }; attempts: Array<{ id: string; status: string; result: unknown; startedAt: Date | null; completedAt: Date | null; exitCode: number | null; durationMs: number | null }> }
 export function mapExperimentList(records: ExperimentListRecord[]) { return records.map((record) => {
   const latest = record.attempts[0];
+  const semanticRecord = { status: record.world?.status ?? record.status, experiments: [{ status: record.status, evaluations: record.evaluations, attempts: record.attempts }] };
   return {
     id: record.id,
     investigationId: record.investigationId,
     worldId: record.worldId,
     status: record.status,
+    executionState: deriveWorldExecutionState(semanticRecord),
+    businessOutcome: deriveWorldBusinessOutcome(semanticRecord),
     kind: record.kind,
     attemptCount: record._count.attempts,
     latestAttempt: latest ? {

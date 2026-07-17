@@ -31,12 +31,18 @@ export class InvestigationApiError extends Error {
 }
 
 const jsonRecordSchema = z.record(z.unknown());
+export const publicWorldExecutionStateSchema = z.enum(['QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED']);
+export const publicBusinessOutcomeSchema = z.enum(['PASS', 'FAIL', 'INCONCLUSIVE']);
+export type PublicWorldExecutionState = z.infer<typeof publicWorldExecutionStateSchema>;
+export type PublicBusinessOutcome = z.infer<typeof publicBusinessOutcomeSchema>;
 
 export const investigationWorldSchema = z.object({
   id: z.string(),
   investigationId: z.string(),
   name: z.string(),
   status: z.string(),
+  executionState: publicWorldExecutionStateSchema.optional(),
+  businessOutcome: publicBusinessOutcomeSchema.optional(),
   reason: z.string(),
   configuration: z.unknown(),
   experimentId: z.string().optional(),
@@ -99,6 +105,8 @@ export const investigationExperimentSchema = z.object({
   investigationId: z.string(),
   worldId: z.string(),
   status: z.string(),
+  executionState: publicWorldExecutionStateSchema.optional(),
+  businessOutcome: publicBusinessOutcomeSchema.optional(),
   kind: z.string(),
   attemptCount: z.number().int().nonnegative(),
   latestAttempt: z

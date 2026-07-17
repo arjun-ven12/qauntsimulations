@@ -95,6 +95,11 @@ describe('LiveWorldLabPage runtime metadata helpers', () => {
     expect(findings).toHaveLength(1);
     expect(html).toContain('Investigation complete');
     expect(html).toContain('World exploration');
+    expect(html).toContain('Execution');
+    expect(html).toContain('Business outcome');
+    expect(html).toContain('Execution completed');
+    expect(html).toContain('Execution failed');
+    expect(html).not.toContain('World status');
     expect(html).toContain('Adaptive reproduction');
     expect(html).toContain('Failure minimisation');
     expect(html).toContain('World matrix');

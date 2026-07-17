@@ -32,6 +32,7 @@ import {
   worldOrigin,
   worldPurpose,
   worldRows,
+  worldExecutionState,
   worldResult,
 } from './runtime-normalizers.js';
 
@@ -45,6 +46,42 @@ describe('runtime world normalization', () => {
     expect(worldPurpose(worlds[7]!)).toContain('Normalise');
   });
 
+  it('keeps lifecycle and business outcomes independent for the affected real-shape rows', async () => {
+    const api = new MockInvestigationApi();
+    const worlds = await api.getWorlds('cmrox3ij8010t8z9kdrt0xjjt');
+    const experiments = await api.getExperiments('cmrox3ij8010t8z9kdrt0xjjt');
+    const workers = await api.getWorkers('cmrox3ij8010t8z9kdrt0xjjt');
+    const evidence = await api.getEvidence('cmrox3ij8010t8z9kdrt0xjjt');
+    const rows = worldRows(worlds, experiments, workers, evidence);
+
+    for (const workerId of ['worker_3', 'worker_4', 'worker_5']) {
+      expect(rows.find((row) => row.workerId === workerId)).toMatchObject({ status: 'Completed', result: 'FAIL' });
+      expect(workers.find((worker) => worker.id === workerId)).toMatchObject({ status: 'COMPLETED', attempts: [{ status: 'FAILED', exitCode: 2 }] });
+    }
+    expect(rows.some((row) => row.status === 'Failed' && row.result === 'PASS')).toBe(false);
+  });
+
+  it('normalizes technical failure as FAILED / INCONCLUSIVE even when partial invariants passed', async () => {
+    const api = new MockInvestigationApi();
+    const [sourceWorld] = await api.getWorlds(MOCK_INVESTIGATION_ID);
+    const [sourceExperiment] = await api.getExperiments(MOCK_INVESTIGATION_ID);
+    const world = { ...sourceWorld!, id: 'technical-world', status: 'FAILED', executionState: 'FAILED' as const, businessOutcome: 'INCONCLUSIVE' as const };
+    const experiment = { ...sourceExperiment!, worldId: world.id, status: 'ERROR', executionState: 'FAILED' as const, businessOutcome: 'INCONCLUSIVE' as const };
+    expect(worldExecutionState(world, [experiment])).toBe('FAILED');
+    expect(worldResult(world, [experiment])).toBe('INCONCLUSIVE');
+  });
+
+  it('filters lifecycle and business outcome independently', async () => {
+    const api = new MockInvestigationApi();
+    const worlds = await api.getWorlds(MOCK_INVESTIGATION_ID);
+    const experiments = await api.getExperiments(MOCK_INVESTIGATION_ID);
+    const workers = await api.getWorkers(MOCK_INVESTIGATION_ID);
+    const evidence = await api.getEvidence(MOCK_INVESTIGATION_ID);
+    const rows = worldRows(worlds, experiments, workers, evidence);
+    expect(filterWorldRows(rows, 'BUSINESS_FAIL', '').map((row) => row.workerId)).toEqual(expect.arrayContaining(['worker_3', 'worker_4', 'worker_5']));
+    expect(filterWorldRows(rows, 'EXECUTION_FAILED', '')).toHaveLength(0);
+  });
+
   it('does not treat attempts as world count and filters by result/origin', async () => {
     const api = new MockInvestigationApi();
     const worlds = await api.getWorlds(MOCK_INVESTIGATION_ID);
@@ -52,7 +89,7 @@ describe('runtime world normalization', () => {
     expect(worlds).toHaveLength(13);
     expect(experiments.reduce((sum, experiment) => sum + experiment.attemptCount, 0)).toBe(13);
     expect(worlds.filter((world) => filterWorld(world, 'MINIMISATION', experiments))).toHaveLength(6);
-    expect(worlds.filter((world) => filterWorld(world, 'PASSED', experiments)).length).toBeGreaterThan(0);
+    expect(worlds.filter((world) => filterWorld(world, 'BUSINESS_PASS', experiments)).length).toBeGreaterThan(0);
     expect(['PASS', 'FAIL']).toContain(worldResult(worlds[0]!, experiments));
   });
 });
@@ -61,6 +98,8 @@ describe('runtime progress and event formatting', () => {
   it('renders dynamic progress and terminal statuses accurately', async () => {
     const progress = await new MockInvestigationApi().getInvestigation(MOCK_INVESTIGATION_ID);
     expect(completedWorlds(progress.progress)).toBe(13);
+    expect(progress.progress.passed).toBe(13);
+    expect(progress.progress.failed).toBe(0);
     expect(progressPercentage(progress.progress)).toBe(100);
     expect(progressPercentage({ totalWorlds: 20, queued: 7, running: 0, passed: 7, failed: 6, flaky: 0 })).toBe(65);
     expect(phaseLabel('ADAPTING')).toBe('Designing follow-up worlds');
@@ -205,6 +244,11 @@ describe('finding, minimisation, and evidence normalization', () => {
     expect(workerRows).toHaveLength(13);
     expect(workerRows[0]?.attempts[0]?.number).toBe(1);
     expect(workerRows.every((row) => row.cleanupLabel.length > 0)).toBe(true);
+    expect(workerRows.find((row) => row.worker.id === 'worker_3')).toMatchObject({
+      state: 'Completed',
+      finalOutcome: 'Fail',
+      attempts: [{ status: 'Completed · invariant violation', infrastructureFailure: false }],
+    });
 
     const matrix = runtimeMatrix(rows);
     expect(matrix?.columns).toEqual([600, 900, 1200]);
@@ -212,5 +256,9 @@ describe('finding, minimisation, and evidence normalization', () => {
     expect(matrix?.cells.some((cell) => cell.outcome === 'NOT_TESTED')).toBe(true);
     expect(matrix?.cells.some((cell) => cell.outcome === 'PASS')).toBe(true);
     expect(matrix?.cells.some((cell) => cell.outcome === 'FAIL' || cell.outcome === 'MIXED')).toBe(true);
+
+    const technicalFailureMatrix = runtimeMatrix([{ ...rows[0]!, status: 'Failed', result: 'INCONCLUSIVE' }]);
+    expect(technicalFailureMatrix?.cells.some((cell) => cell.outcome === 'FAIL')).toBe(false);
+    expect(technicalFailureMatrix?.cells.some((cell) => cell.outcome === 'INCONCLUSIVE')).toBe(true);
   });
 });
