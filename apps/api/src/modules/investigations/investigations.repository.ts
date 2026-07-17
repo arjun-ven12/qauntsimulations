@@ -34,6 +34,7 @@ import type { WorkerExecutionProvider } from '../execution/worker-executor.types
 import type { AdaptiveReproductionPlan } from '../experiments/services/adaptive-reproduction-plan.service.js';
 import type { DeterministicWorldDefinition } from '../experiments/services/deterministic-experiment-plan.service.js';
 import { aggregateMinimisationDelayBounds } from './minimisation-bounds.js';
+import { correlateInvariantEvaluations } from './invariant-evaluation-correlation.js';
 
 const json = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 const messageData = (message: string, metadata: Record<string, unknown> = {}): Prisma.InputJsonValue => json({ message, ...metadata });
@@ -883,6 +884,10 @@ export class InvestigationRepository {
 
   async completeExecution(input: CompletedExecutionInput): Promise<void> {
     const { execution, result } = input;
+    const correlatedEvaluations = correlateInvariantEvaluations(
+      execution.invariants,
+      result.invariantEvaluations,
+    );
     const isCompleted = result.status === 'PASSED' || result.status === 'INVARIANT_VIOLATION';
     const experimentStatus = result.status === 'PASSED' ? 'PASSED' : result.status === 'INVARIANT_VIOLATION' ? 'FAILED' : 'ERROR';
     await this.database.$transaction(async (transaction) => {
@@ -935,10 +940,10 @@ export class InvestigationRepository {
       }
 
       const evaluationIds: string[] = [];
-      for (const evaluation of result.invariantEvaluations) {
+      for (const { invariant, evaluation } of correlatedEvaluations) {
         const created = await transaction.invariantEvaluation.create({ data: {
           experimentId: execution.experimentId,
-          invariantId: execution.invariantId,
+          invariantId: invariant.id,
           executionAttemptId: execution.attemptId,
           workerId: execution.workerId,
           passed: evaluation.passed,
@@ -977,6 +982,9 @@ export class InvestigationRepository {
               experimentId: execution.experimentId,
               minimalConditions: { paymentDelayMs: execution.world.paymentDelayMs, doubleSubmit: execution.world.doubleSubmit, duplicateSubmissionBug: execution.world.duplicateSubmissionBug },
               invariantEvaluationIds: evaluationIds,
+              failedInvariantIds: correlatedEvaluations
+                .filter(({ evaluation }) => !evaluation.passed)
+                .map(({ invariant }) => invariant.id),
               evidenceArtifactIds: artifactIds,
               numericConfidence: 0.75,
             }),
