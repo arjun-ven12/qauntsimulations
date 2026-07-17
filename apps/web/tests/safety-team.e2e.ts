@@ -62,7 +62,7 @@ const initialSafety = {
   allowedHttpMethods: ['GET'],
   permitCheckoutSubmission: false,
   permitMockPayment: false,
-  permitOrderCreation: false,
+  permitTestOrderCreation: false,
   restrictions: {
     testEnvironmentsOnly: true,
     productionAccess: false,
@@ -127,7 +127,7 @@ test('Owner edits hosts, methods, toggles and prohibited actions and persists af
     allowedHttpMethods: ['GET', 'POST', 'OPTIONS'],
     permitCheckoutSubmission: true,
     permitMockPayment: true,
-    permitOrderCreation: true,
+    permitTestOrderCreation: true,
     prohibitedActions: ['Never alter production inventory', 'Never export customer data'],
     acknowledgement: true,
   });

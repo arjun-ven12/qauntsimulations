@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import type {
   ProjectListRecord,
+  PersistedProjectSafetyConfiguration,
   ProjectRecord,
   ProjectSafetyConfiguration,
 } from './projects.types.js';
 
-const safetyConfigurationSchema = z.object({
+const persistedSafetyConfigurationSchema = z.object({
   version: z.literal(1),
   applicationUrl: z.string().url(),
   apiEndpoints: z.array(z.object({ label: z.string(), url: z.string().url() })),
@@ -83,7 +84,7 @@ export function mapSafety(
     allowedHttpMethods: configuration?.allowedHttpMethods ?? ['GET'],
     permitCheckoutSubmission: configuration?.permitCheckoutSubmission ?? false,
     permitMockPayment: configuration?.permitMockPayment ?? false,
-    permitOrderCreation: configuration?.permitOrderCreation ?? false,
+    permitTestOrderCreation: configuration?.permitTestOrderCreation ?? false,
     restrictions: configuration?.restrictions ?? safeRestrictions(),
     acknowledgedAt: configuration?.acknowledgedAt ?? safety.updatedAt.toISOString(),
     updatedAt: safety.updatedAt.toISOString(),
@@ -91,12 +92,22 @@ export function mapSafety(
 }
 
 export function parseSafetyConfiguration(value: unknown): ProjectSafetyConfiguration {
-  return safetyConfigurationSchema.parse(value);
+  const { permitOrderCreation, ...configuration } = persistedSafetyConfigurationSchema.parse(value);
+  return { ...configuration, permitTestOrderCreation: permitOrderCreation };
 }
 
 export function tryParseSafetyConfiguration(value: unknown): ProjectSafetyConfiguration | null {
-  const result = safetyConfigurationSchema.safeParse(value);
-  return result.success ? result.data : null;
+  const result = persistedSafetyConfigurationSchema.safeParse(value);
+  if (!result.success) return null;
+  const { permitOrderCreation, ...configuration } = result.data;
+  return { ...configuration, permitTestOrderCreation: permitOrderCreation };
+}
+
+export function persistSafetyConfiguration(
+  value: ProjectSafetyConfiguration,
+): PersistedProjectSafetyConfiguration {
+  const { permitTestOrderCreation, ...configuration } = value;
+  return { ...configuration, permitOrderCreation: permitTestOrderCreation };
 }
 
 function safeRestrictions() {

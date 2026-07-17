@@ -96,22 +96,18 @@ const summarySchema = z.object({
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
-const safetyWireSchema = z.object({
+const safetySchema = z.object({
   id: z.string(),
   domainAllowlist: z.array(z.string()),
   prohibitedActions: z.array(z.string()),
   allowedHttpMethods: z.array(z.enum(['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'])),
   permitCheckoutSubmission: z.boolean(),
   permitMockPayment: z.boolean(),
-  permitOrderCreation: z.boolean(),
+  permitTestOrderCreation: z.boolean(),
   restrictions: z.record(z.boolean()),
   acknowledgedAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
-const safetySchema = safetyWireSchema.transform(({ permitOrderCreation, ...policy }) => ({
-  ...policy,
-  permitTestOrderCreation: permitOrderCreation,
-}));
 const detailsSchema = summarySchema.omit({ safety: true }).extend({
   credentialReferences: z.array(
     z.object({
@@ -172,11 +168,10 @@ class HttpProjectApi {
   }
 
   async updateSafety(projectId: string, input: UpdateSafetyInput): Promise<SafetyPolicy> {
-    const { permitTestOrderCreation, ...rest } = input;
     return safetySchema.parse(
       await this.request(`/projects/${projectId}/safety`, {
         method: 'PATCH',
-        body: JSON.stringify({ ...rest, permitOrderCreation: permitTestOrderCreation }),
+        body: JSON.stringify(input),
       }),
     );
   }

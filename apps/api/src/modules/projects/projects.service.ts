@@ -8,6 +8,7 @@ import {
   mapProject,
   mapProjectSummary,
   mapSafety,
+  persistSafetyConfiguration,
   tryParseSafetyConfiguration,
 } from './projects.mapper.js';
 import type { ProjectRepository } from './projects.repository.js';
@@ -141,13 +142,13 @@ export class ProjectService {
       allowedHttpMethods: input.allowedHttpMethods,
       permitCheckoutSubmission: input.permitCheckoutSubmission,
       permitMockPayment: input.permitMockPayment,
-      permitOrderCreation: input.permitOrderCreation,
+      permitTestOrderCreation: input.permitTestOrderCreation,
       acknowledgedAt: new Date().toISOString(),
     };
     const updated = await this.repository.updateSafety({
       organisationId,
       projectId: id,
-      configuration,
+      configuration: persistSafetyConfiguration(configuration),
       domainAllowlist: input.domainAllowlist,
       blockedActions: normaliseActions(input.prohibitedActions),
     });
@@ -196,7 +197,7 @@ function mutationRecord(
     allowedHttpMethods: existing?.allowedHttpMethods ?? (['GET'] as const),
     permitCheckoutSubmission: existing?.permitCheckoutSubmission ?? false,
     permitMockPayment: existing?.permitMockPayment ?? false,
-    permitOrderCreation: existing?.permitOrderCreation ?? false,
+    permitTestOrderCreation: existing?.permitTestOrderCreation ?? false,
     restrictions: existing?.restrictions ?? safeRestrictions(),
     acknowledgedAt: existing?.acknowledgedAt ?? new Date().toISOString(),
   };
@@ -206,7 +207,7 @@ function mutationRecord(
     name: input.name,
     description: input.description,
     repositoryUrl: input.repositoryUrl,
-    configuration,
+    configuration: persistSafetyConfiguration(configuration),
     domainAllowlist: domainsFor(configuration),
     blockedActions: normaliseActions(
       input.prohibitedActions.length ? input.prohibitedActions : DEFAULT_PROHIBITED_ACTIONS,

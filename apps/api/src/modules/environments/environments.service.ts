@@ -202,7 +202,7 @@ function assertCompatible(input: EnvironmentInput, safety: ProjectSafetyConfigur
       'Mock payments are not permitted by Project Safety',
       403,
     );
-  if (actions.includes('CREATE_TEST_ORDER') && !safety.permitOrderCreation)
+  if (actions.includes('CREATE_TEST_ORDER') && !safety.permitTestOrderCreation)
     throw new ApplicationError(
       'ENVIRONMENT_SAFETY_CONFLICT',
       'Test-order creation is not permitted by Project Safety',
