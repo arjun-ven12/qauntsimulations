@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   createInvestigationInputSchema,
   demoCreateInvestigationInput,
+  evidenceArtifactSchema,
   experimentPlanSchema,
   findingSchema,
+  investigationEventTypeSchema,
   investigationSchema,
   investigationProgressSchema,
   investigationStatuses,
@@ -105,6 +107,70 @@ describe('investigation progress contract', () => {
         recentEvents: plannerEvents,
       }).status,
     ).toBe('ADAPTING');
+  });
+
+  it('accepts minimisation progress, bounded ranges, final report events, and unknown future event types', () => {
+    const minimisationEventTypes = [
+      'minimisation_started',
+      'minimisation_plan_created',
+      'minimisation_candidate_generated',
+      'minimisation_candidate_started',
+      'minimisation_candidate_completed',
+      'minimisation_condition_removed',
+      'minimisation_condition_retained',
+      'minimisation_range_updated',
+      'minimal_reproduction_found',
+      'final_report_started',
+      'final_report_completed',
+      'minimisation_completed',
+      'minimisation_inconclusive',
+      'minimisation_cancelled',
+      'unknown_future_minimisation_event',
+    ];
+
+    const parsed = investigationProgressSchema.parse({
+      ...validProgress,
+      status: 'MINIMISING',
+      progress: { totalWorlds: 9, queued: 2, running: 2, passed: 2, failed: 3, flaky: 0 },
+      recentEvents: minimisationEventTypes.map((type, index) => ({
+        id: `event_minimisation_${index}`,
+        investigationId: validProgress.id,
+        type,
+        message: type.replaceAll('_', ' '),
+        createdAt: '2026-01-01T00:00:00.000Z',
+        metadata: {
+          candidateId: `candidate_${index}`,
+          trialOutcome: index % 2 === 0 ? 'FAILING' : 'PASSING',
+          failureRange: { paymentDelayMs: { min: 900, max: 1200 } },
+          finalReportArtifactId: 'artifact_final_report',
+        },
+      })),
+    });
+
+    expect(parsed.status).toBe('MINIMISING');
+    expect(parsed.progress.totalWorlds).toBe(9);
+    expect(parsed.recentEvents.at(-1)?.type).toBe('unknown_future_minimisation_event');
+  });
+
+  it('enumerates persisted minimisation event types while keeping progress events extensible', () => {
+    for (const type of [
+      'minimisation_started',
+      'minimisation_plan_created',
+      'minimisation_candidate_generated',
+      'minimisation_candidate_started',
+      'minimisation_candidate_completed',
+      'minimisation_condition_removed',
+      'minimisation_condition_retained',
+      'minimisation_range_updated',
+      'minimal_reproduction_found',
+      'final_report_started',
+      'final_report_completed',
+      'minimisation_completed',
+      'minimisation_inconclusive',
+      'minimisation_cancelled',
+    ]) {
+      expect(investigationEventTypeSchema.parse(type)).toBe(type);
+    }
   });
 
   it('rejects negative and inconsistent counters', () => {
@@ -235,6 +301,59 @@ describe('finding contract', () => {
       confidence: 'POSSIBLE',
       reproductionCount: 0,
     });
+  });
+
+  it('accepts final minimisation metadata without requiring absolute causal claims', () => {
+    const parsed = findingSchema.parse({
+      id: 'finding_minimised',
+      investigationId: 'investigation_demo_checkout',
+      title: 'Duplicate checkout submission',
+      summary: 'Minimisation narrowed the failure region.',
+      severity: 'HIGH',
+      confidence: 'CONFIRMED',
+      reproductionCount: 5,
+      causalConditions: {
+        causalStatus: 'SUPPORTED',
+        candidateConditionSets: [
+          { id: 'candidate_delay_and_double_submit', outcome: 'FAILING' },
+          { id: 'candidate_double_submit_only', outcome: 'PASSING' },
+        ],
+        minimalConditions: {
+          duplicateSubmissionBug: true,
+          doubleSubmit: true,
+          paymentDelayMs: { min: 900, max: 1200 },
+        },
+        finalReproductionSteps: [
+          'Open the product page.',
+          'Add the product to cart.',
+          'Submit payment twice while the first payment request is pending.',
+        ],
+        finalEvidenceSummary: 'Two payment and two order requests were observed.',
+        evidenceArtifactIds: ['artifact_network_initial', 'artifact_network_minimised'],
+        finalReportArtifactId: 'artifact_final_report',
+      },
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    expect(parsed.causalConditions).toMatchObject({ causalStatus: 'SUPPORTED' });
+    expect(parsed.causalConditions).not.toMatchObject({ causalStatus: 'PROVEN' });
+  });
+
+  it('accepts a final report as a first-class evidence artifact type', () => {
+    expect(
+      evidenceArtifactSchema.parse({
+        id: 'artifact_final_report',
+        experimentId: 'experiment_minimisation',
+        type: 'FINAL_REPORT',
+        path: 'evidence/final-report.json',
+        mimeType: 'application/json',
+        sizeBytes: 2048,
+        redacted: true,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      }).type,
+    ).toBe('FINAL_REPORT');
   });
 });
 

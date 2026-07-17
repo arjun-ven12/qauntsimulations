@@ -4,11 +4,12 @@ Runtime Milestone 3 added a development-only, in-process orchestration path arou
 
 ## Architecture
 
-Authenticated investigation requests are validated with the canonical `createInvestigationInputSchema` from `@taskos/shared-types`. `InvestigationService` validates product scope, creates a deterministic plan, persists the `PLANNING` investigation, and schedules `InvestigationOrchestratorService` with `setImmediate` so the HTTP request does not wait for browser execution.
+Authenticated investigation requests are validated with the canonical `createInvestigationInputSchema` from `@taskos/shared-types`. `InvestigationService` validates product scope, persists the `PLANNING` investigation, runs the configured experiment planner, persists the validated executable plan, and schedules `InvestigationOrchestratorService` with `setImmediate` so the HTTP request does not wait for browser execution.
 
 The orchestrator uses:
 
-- `DeterministicExperimentPlanService` for four bounded initial worlds;
+- `InvestigationPlanningService` for deterministic, OpenAI, or fallback initial planning;
+- `DeterministicExperimentPlanService` remains the safe fallback for four bounded initial worlds;
 - `ExecutionConcurrencyService` for an in-process worker pool with a server hard maximum of two;
 - `WorkerJobFactoryService` to load and validate `demo/fixtures/checkout-journey.json` and convert its approved pay action into the runtime `submitPayment` control;
 - `LocalPlaywrightWorkerExecutor` to call the existing validated worker runtime directly;

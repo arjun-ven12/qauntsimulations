@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { DaytonaClient } from '../../../integrations/daytona/daytona.client.js';
 import { DaytonaSandboxProvider } from '../../../integrations/daytona/daytona-sandbox.service.js';
 import { LocalEvidenceMetadataService } from '../../evidence/local-evidence-metadata.service.js';
-import { DeterministicExperimentPlanService } from '../../experiments/services/deterministic-experiment-plan.service.js';
+import { InvestigationPlanningService } from '../../experiments/services/investigation-planning.service.js';
 import { InvestigationRepository } from '../../investigations/investigations.repository.js';
 import { InvestigationService } from '../../investigations/investigations.service.js';
 import { DaytonaPlaywrightWorkerExecutor } from '../daytona-worker-executor.service.js';
@@ -92,7 +92,7 @@ suite('live Daytona isolated worker execution', () => {
       ...(process.env.DAYTONA_SNAPSHOT ? { snapshot: process.env.DAYTONA_SNAPSHOT } : {}),
     });
     const orchestrator = new InvestigationOrchestratorService(repository, executor, new WorkerJobFactoryService(evidenceRoot, resolve(repositoryRoot, 'demo/fixtures/checkout-journey.json')), new LocalEvidenceMetadataService(evidenceRoot));
-    const service = new InvestigationService(repository, new DeterministicExperimentPlanService(1), orchestrator);
+    const service = new InvestigationService(repository, new InvestigationPlanningService({ requestedProvider: 'deterministic', fallbackEnabled: true, maximumWorlds: 8, maximumVariables: 6, maximumAssumptions: 10, maximumWarnings: 20, timeoutMs: 30_000, maxProviderAttempts: 1, maxOutputTokens: 3_000 }), orchestrator);
     let investigationId: string | undefined; let workerIds: string[] = [];
     try {
       const input = { ...demoCreateInvestigationInput, scenario: { ...demoCreateInvestigationInput.scenario, controls: { ...demoCreateInvestigationInput.scenario.controls, maximumWorlds: 1, maximumConcurrentWorkers: 1 } } };

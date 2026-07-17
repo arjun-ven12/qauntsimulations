@@ -2,6 +2,7 @@ import { isAbsolute, resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createDatabaseClient } from '@taskos/database';
+import { OpenAIClient, OpenAIExperimentPlanner } from '@taskos/ai-providers';
 import { createApplication } from './app.js';
 import { loadEnvironment } from './config/env.js';
 import { logger } from './core/logging/logger.js';
@@ -16,6 +17,10 @@ import { EnvironmentController } from './modules/environments/environments.contr
 import { EnvironmentRepository } from './modules/environments/environments.repository.js';
 import { EnvironmentService } from './modules/environments/environments.service.js';
 import { DeterministicExperimentPlanService } from './modules/experiments/services/deterministic-experiment-plan.service.js';
+import {
+  DeterministicExperimentPlanner,
+  InvestigationPlanningService,
+} from './modules/experiments/services/investigation-planning.service.js';
 import { ExecutionCleanupService } from './modules/execution/execution-cleanup.service.js';
 import { InvestigationOrchestratorService } from './modules/execution/investigation-orchestrator.service.js';
 import { LocalPlaywrightWorkerExecutor } from './modules/execution/local-worker-executor.service.js';
@@ -66,6 +71,34 @@ const evidenceRoot = isAbsolute(env.EVIDENCE_LOCAL_PATH)
   ? env.EVIDENCE_LOCAL_PATH
   : resolve(repositoryRoot, env.EVIDENCE_LOCAL_PATH);
 const investigationRepository = new InvestigationRepository(database);
+const openAIPlannerModel = env.OPENAI_PLANNER_MODEL ?? env.OPENAI_MODEL_PLANNER;
+const openAIPlanner = env.PLANNER_PROVIDER === 'openai' && env.OPENAI_API_KEY
+  ? new OpenAIExperimentPlanner(
+      new OpenAIClient({
+        apiKey: env.OPENAI_API_KEY,
+        baseUrl: env.OPENAI_BASE_URL,
+        timeoutMs: env.OPENAI_PLANNER_TIMEOUT_MS,
+        maxRetries: env.OPENAI_PLANNER_MAX_RETRIES,
+      }),
+      openAIPlannerModel,
+    )
+  : undefined;
+const investigationPlanningService = new InvestigationPlanningService(
+  {
+    requestedProvider: env.PLANNER_PROVIDER,
+    fallbackEnabled: env.PLANNER_FALLBACK_ENABLED,
+    maximumWorlds: env.PLANNER_MAX_WORLDS,
+    maximumVariables: env.PLANNER_MAX_VARIABLES,
+    maximumAssumptions: env.PLANNER_MAX_ASSUMPTIONS,
+    maximumWarnings: env.PLANNER_MAX_WARNINGS,
+    timeoutMs: env.OPENAI_PLANNER_TIMEOUT_MS,
+    maxProviderAttempts: env.OPENAI_PLANNER_MAX_RETRIES + 1,
+    maxOutputTokens: env.OPENAI_PLANNER_MAX_OUTPUT_TOKENS,
+    model: openAIPlannerModel,
+  },
+  new DeterministicExperimentPlanner(new DeterministicExperimentPlanService(2)),
+  openAIPlanner,
+);
 const daytonaFleet = new DaytonaWorkerFleet(new DaytonaFleetCapacityManager(env.DAYTONA_FLEET_HARD_LIMIT));
 const workerExecutor = new WorkerExecutorFactory(
   new LocalPlaywrightWorkerExecutor(evidenceRoot),
@@ -149,7 +182,7 @@ const app = createApplication({
     investigations: new InvestigationController(
       new InvestigationService(
         investigationRepository,
-        new DeterministicExperimentPlanService(2),
+        investigationPlanningService,
         investigationOrchestrator,
       ),
     ),

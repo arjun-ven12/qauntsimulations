@@ -75,4 +75,30 @@ describe('API environment security', () => {
       ADAPTIVE_CONFIDENCE_MAX: '0.95',
     }).success).toBe(false);
   });
+
+  it('defaults to deterministic planning and permits fallback without OpenAI credentials', () => {
+    const result = apiEnvironmentSchema.parse(requiredEnvironment);
+    expect(result.PLANNER_PROVIDER).toBe('deterministic');
+    expect(result.PLANNER_FALLBACK_ENABLED).toBe(true);
+  });
+
+  it('requires OpenAI credentials only in strict OpenAI planner mode', () => {
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      PLANNER_PROVIDER: 'openai',
+      PLANNER_FALLBACK_ENABLED: 'true',
+    }).success).toBe(true);
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      PLANNER_PROVIDER: 'openai',
+      PLANNER_FALLBACK_ENABLED: 'false',
+    }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      PLANNER_PROVIDER: 'openai',
+      PLANNER_FALLBACK_ENABLED: 'false',
+      OPENAI_API_KEY: 'test-key',
+      OPENAI_PLANNER_MODEL: 'gpt-5-mini',
+    }).success).toBe(true);
+  });
 });

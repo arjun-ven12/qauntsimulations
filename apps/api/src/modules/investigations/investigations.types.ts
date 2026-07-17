@@ -12,7 +12,11 @@ export interface InvestigationCreationScope {
   organisationId: string;
   scenarioId: string;
   environmentBaseUrl: string;
+  projectName: string;
+  environmentName: string;
+  journeyName: string;
   invariantIds: string[];
+  invariants: Array<{ id: string; name: string; description?: string }>;
 }
 
 export interface InvestigationProgressRecord {
@@ -41,7 +45,7 @@ export interface PersistedWorldExecution {
 }
 
 export interface PersistedArtifactInput {
-  type: 'SCREENSHOT' | 'VIDEO' | 'TRACE' | 'CONSOLE_LOG' | 'NETWORK_LOG' | 'WORKER_RESULT' | 'ENVIRONMENT_MANIFEST';
+  type: 'SCREENSHOT' | 'VIDEO' | 'TRACE' | 'CONSOLE_LOG' | 'NETWORK_LOG' | 'WORKER_RESULT' | 'ENVIRONMENT_MANIFEST' | 'MINIMAL_REPRODUCTION' | 'FINAL_REPORT';
   storageKey: string;
   mimeType: string;
   sizeBytes: bigint;

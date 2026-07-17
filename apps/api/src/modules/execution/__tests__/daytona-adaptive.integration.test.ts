@@ -9,7 +9,7 @@ import { demoCreateInvestigationInput } from '@taskos/shared-types';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createSandboxProvider } from '../../../integrations/daytona/daytona-sandbox.service.js';
 import { LocalEvidenceMetadataService } from '../../evidence/local-evidence-metadata.service.js';
-import { DeterministicExperimentPlanService } from '../../experiments/services/deterministic-experiment-plan.service.js';
+import { InvestigationPlanningService } from '../../experiments/services/investigation-planning.service.js';
 import { InvestigationRepository } from '../../investigations/investigations.repository.js';
 import { InvestigationService } from '../../investigations/investigations.service.js';
 import { DaytonaFleetCapacityManager } from '../daytona-fleet-capacity-manager.js';
@@ -88,7 +88,7 @@ suite('live Daytona adaptive reproduction', () => {
         timeoutSeconds: 900,
       },
     );
-    const service = new InvestigationService(repository, new DeterministicExperimentPlanService(2), orchestrator);
+    const service = new InvestigationService(repository, new InvestigationPlanningService({ requestedProvider: 'deterministic', fallbackEnabled: true, maximumWorlds: 8, maximumVariables: 6, maximumAssumptions: 10, maximumWarnings: 20, timeoutMs: 30_000, maxProviderAttempts: 1, maxOutputTokens: 3_000 }), orchestrator);
     const created = await service.create('organisation_demo_taskos', demoCreateInvestigationInput);
     investigationId = created.id;
 

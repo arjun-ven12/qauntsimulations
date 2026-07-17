@@ -752,6 +752,7 @@ enum EvidenceType {
   WORKER_RESULT
   ENVIRONMENT_MANIFEST
   MINIMAL_REPRODUCTION
+  FINAL_REPORT
 }
 
 enum FaultType {
@@ -826,6 +827,18 @@ enum AIProvider {
 enum InvestigationEventType {
   investigation_created
   plan_created
+  planner_started
+  planner_request_created
+  planner_provider_request_started
+  planner_provider_request_completed
+  planner_output_received
+  planner_validation_started
+  planner_plan_accepted
+  planner_plan_partially_accepted
+  planner_plan_rejected
+  planner_fallback_used
+  planner_completed
+  planner_failed
   world_generated
   world_queued
   worker_started
@@ -842,6 +855,19 @@ enum InvestigationEventType {
   reproduction_started
   finding_confirmed
   minimisation_started
+  minimisation_plan_created
+  minimisation_candidate_generated
+  minimisation_candidate_started
+  minimisation_candidate_completed
+  minimisation_condition_removed
+  minimisation_condition_retained
+  minimisation_range_updated
+  minimal_reproduction_found
+  final_report_started
+  final_report_completed
+  minimisation_completed
+  minimisation_inconclusive
+  minimisation_cancelled
   investigation_completed
   investigation_failed
   investigation_cancelled

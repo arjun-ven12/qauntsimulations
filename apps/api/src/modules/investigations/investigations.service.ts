@@ -1,17 +1,17 @@
 import { createInvestigationInputSchema, type CreateInvestigationInput } from '@taskos/shared-types';
 import { ApplicationError } from '../../core/errors/application-error.js';
-import type { DeterministicExperimentPlanService } from '../experiments/services/deterministic-experiment-plan.service.js';
+import type { InvestigationPlanningService } from '../experiments/services/investigation-planning.service.js';
 import type { InvestigationOrchestratorService } from '../execution/investigation-orchestrator.service.js';
 import { mapEvidenceList, mapExperimentList, mapFindingList, mapProgress, mapWorkerList, mapWorldList } from './investigations.mapper.js';
 import type { InvestigationRepository } from './investigations.repository.js';
 
-type InvestigationServiceRepository = Pick<InvestigationRepository, 'validateCreationScope' | 'create' | 'progress' | 'listWorlds' | 'listExperiments' | 'listWorkers' | 'listEvidence' | 'listFindings' | 'cancel' | 'orchestrationContext'>;
+type InvestigationServiceRepository = Pick<InvestigationRepository, 'validateCreationScope' | 'create' | 'persistPlan' | 'progress' | 'listWorlds' | 'listExperiments' | 'listWorkers' | 'listEvidence' | 'listFindings' | 'cancel' | 'orchestrationContext' | 'failInvestigation'>;
 type InvestigationStarter = Pick<InvestigationOrchestratorService, 'start'>;
 
 export class InvestigationService {
   constructor(
     private readonly repository: InvestigationServiceRepository,
-    private readonly planner: DeterministicExperimentPlanService,
+    private readonly planner: InvestigationPlanningService,
     private readonly orchestrator: InvestigationStarter,
   ) {}
 
@@ -20,8 +20,24 @@ export class InvestigationService {
     const input = createInvestigationInputSchema.parse({ ...candidate, ...(projectId ? { projectId } : {}) });
     const scope = await this.repository.validateCreationScope(organisationId, input);
     if (!scope) throw new ApplicationError('INVALID_INVESTIGATION_SCOPE', 'Project, environment, journey, scenario, or invariant is missing or unavailable to this organisation', 404);
-    const plan = this.planner.create(input, scope.scenarioId);
-    const id = await this.repository.create(input, scope, plan);
+    const id = await this.repository.create(input, scope);
+    try {
+      const planning = await this.planner.plan(input, {
+        projectId: input.projectId,
+        projectName: scope.projectName,
+        environmentId: input.environmentId,
+        environmentName: scope.environmentName,
+        journeyId: input.journeyId,
+        journeyName: scope.journeyName,
+        scenarioId: scope.scenarioId,
+        invariantIds: scope.invariantIds,
+        invariants: scope.invariants,
+      });
+      await this.repository.persistPlan(input, scope, id, planning.plan);
+    } catch (error) {
+      await this.repository.failInvestigation(id, error);
+      throw error;
+    }
     const progress = await this.get(organisationId, id);
     setImmediate(() => this.orchestrator.start(id));
     return progress;
