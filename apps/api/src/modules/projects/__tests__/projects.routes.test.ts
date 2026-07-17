@@ -82,6 +82,8 @@ describe('project HTTP contract', () => {
       provider: 'vault',
       reference: 'vault://worldlab/checkout/test-customer',
     });
+    expect(response.body.safety).toMatchObject({ permitTestOrderCreation: false });
+    expect(response.body.safety).not.toHaveProperty('permitOrderCreation');
     expect(JSON.stringify(response.body)).not.toMatch(/encryptedPayload|password|secretValue/i);
   });
 
@@ -208,7 +210,7 @@ describe('project HTTP contract', () => {
       allowedHttpMethods: ['GET', 'POST', 'OPTIONS'],
       permitCheckoutSubmission: true,
       permitMockPayment: true,
-      permitOrderCreation: false,
+      permitTestOrderCreation: false,
       prohibitedActions: ['Never issue refunds.'],
       acknowledgement: true,
     };
@@ -248,7 +250,7 @@ describe('project HTTP contract', () => {
         allowedHttpMethods: ['OPTIONS'],
         permitCheckoutSubmission: true,
         permitMockPayment: true,
-        permitOrderCreation: true,
+        permitTestOrderCreation: true,
         prohibitedActions: ['Never export test data', 'Never send messages'],
         acknowledgement: true,
       });
@@ -259,9 +261,16 @@ describe('project HTTP contract', () => {
       allowedHttpMethods: ['OPTIONS'],
       permitCheckoutSubmission: true,
       permitMockPayment: true,
-      permitOrderCreation: true,
+      permitTestOrderCreation: true,
       prohibitedActions: ['Never export test data.', 'Never send messages.'],
     });
+    expect(response.body).not.toHaveProperty('permitOrderCreation');
+    expect(repository.projects[0]!.safetyPolicies[0]!.configuration).toMatchObject({
+      permitOrderCreation: true,
+    });
+    expect(repository.projects[0]!.safetyPolicies[0]!.configuration).not.toHaveProperty(
+      'permitTestOrderCreation',
+    );
   });
 
   it.each([
@@ -294,10 +303,29 @@ describe('project HTTP contract', () => {
         allowedHttpMethods: ['GET'],
         permitCheckoutSubmission: false,
         permitMockPayment: false,
-        permitOrderCreation: false,
+        permitTestOrderCreation: false,
         prohibitedActions: ['Never pay'],
         acknowledgement: true,
         ...override,
+      });
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('rejects the legacy Project Safety field at the API boundary', async () => {
+    repository.projects.push(projectRecord('project-1', 'org-1'));
+    repository.memberships.set('owner:org-1', { role: 'OWNER' });
+    const response = await request(app)
+      .patch('/api/projects/project-1/safety')
+      .set('Cookie', accessCookie('owner', 'org-1', 'OWNER'))
+      .send({
+        domainAllowlist: ['staging.example.com'],
+        allowedHttpMethods: ['GET'],
+        permitCheckoutSubmission: false,
+        permitMockPayment: false,
+        permitOrderCreation: true,
+        prohibitedActions: ['Never pay'],
+        acknowledgement: true,
       });
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe('VALIDATION_ERROR');

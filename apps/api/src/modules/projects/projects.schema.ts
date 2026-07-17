@@ -124,7 +124,7 @@ export const updateSafetySchema = z
     allowedHttpMethods: z.array(z.enum(HTTP_METHODS)).min(1).max(HTTP_METHODS.length),
     permitCheckoutSubmission: z.boolean(),
     permitMockPayment: z.boolean(),
-    permitOrderCreation: z.boolean(),
+    permitTestOrderCreation: z.boolean(),
     prohibitedActions: prohibitedActionsSchema,
     acknowledgement: z.literal(true, {
       errorMap: () => ({ message: 'Authorised-testing acknowledgement is required' }),

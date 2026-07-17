@@ -47,6 +47,12 @@ export function ProjectOverviewPage() {
             <Link className={secondaryButton} to={`/projects/${projectId}/environments`}>
               Environments
             </Link>
+            <Link className={secondaryButton} to={`/projects/${projectId}/journeys`}>
+              Journeys
+            </Link>
+            <Link className={secondaryButton} to={`/projects/${projectId}/invariants`}>
+              Invariants
+            </Link>
           </div>
         }
         description={value.description || 'No project description.'}

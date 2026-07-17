@@ -17,6 +17,18 @@ import { EnvironmentsPage } from '../features/environments/environments.page.js'
 import { NewEnvironmentPage } from '../features/environments/new-environment.page.js';
 import { EnvironmentOverviewPage } from '../features/environments/environment-overview.page.js';
 import { EnvironmentSettingsPage } from '../features/environments/environment-settings.page.js';
+import {
+  JourneyOverviewPage,
+  JourneySettingsPage,
+  JourneysPage,
+  NewJourneyPage,
+} from '../features/journeys/index.js';
+import {
+  InvariantOverviewPage,
+  InvariantSettingsPage,
+  InvariantsPage,
+  NewInvariantPage,
+} from '../features/invariants/index.js';
 import { VerifyRepairPage } from '../features/repairs/verify-repair.page.js';
 import { AppLayout } from '../layouts/app-layout.js';
 import { GuestRoute, RouteGuard } from '../routes/route-guard.js';
@@ -51,6 +63,20 @@ export const router = createBrowserRouter([
       { path: '/projects/:projectId/environments/new', element: <NewEnvironmentPage /> },
       { path: '/projects/:projectId/environments/:environmentId', element: <EnvironmentOverviewPage /> },
       { path: '/projects/:projectId/environments/:environmentId/settings', element: <EnvironmentSettingsPage /> },
+      { path: '/projects/:projectId/journeys', element: <JourneysPage /> },
+      { path: '/projects/:projectId/journeys/new', element: <NewJourneyPage /> },
+      { path: '/projects/:projectId/journeys/:journeyId', element: <JourneyOverviewPage /> },
+      {
+        path: '/projects/:projectId/journeys/:journeyId/settings',
+        element: <JourneySettingsPage />,
+      },
+      { path: '/projects/:projectId/invariants', element: <InvariantsPage /> },
+      { path: '/projects/:projectId/invariants/new', element: <NewInvariantPage /> },
+      { path: '/projects/:projectId/invariants/:invariantId', element: <InvariantOverviewPage /> },
+      {
+        path: '/projects/:projectId/invariants/:invariantId/settings',
+        element: <InvariantSettingsPage />,
+      },
       { path: '/projects/:projectId/investigations/new', element: <NewInvestigationPage /> },
       { path: '/investigations/:investigationId', element: <LiveWorldLabPage /> },
       { path: '/investigations/:investigationId/plan', element: <ExperimentPlanPage /> },

@@ -1,8 +1,16 @@
 import type { NextFunction, Request, Response } from 'express';
-import type { JourneyService } from './journeys.service.js';
+import type { InvariantService } from './invariants.service.js';
 
-export class JourneyController {
-  constructor(private readonly service: JourneyService) {}
+export class InvariantController {
+  constructor(private readonly service: InvariantService) {}
+
+  list = async (request: Request, response: Response, next: NextFunction) => {
+    try {
+      response.json(await this.service.list(request.auth!, String(request.params.projectId)));
+    } catch (error) {
+      next(error);
+    }
+  };
 
   create = async (request: Request, response: Response, next: NextFunction) => {
     try {
@@ -20,21 +28,13 @@ export class JourneyController {
     }
   };
 
-  list = async (request: Request, response: Response, next: NextFunction) => {
-    try {
-      response.json(await this.service.list(request.auth!, String(request.params.projectId)));
-    } catch (error) {
-      next(error);
-    }
-  };
-
   get = async (request: Request, response: Response, next: NextFunction) => {
     try {
       response.json(
         await this.service.get(
           request.auth!,
           String(request.params.projectId),
-          String(request.params.journeyId),
+          String(request.params.invariantId),
         ),
       );
     } catch (error) {
@@ -48,7 +48,7 @@ export class JourneyController {
         await this.service.update(
           request.auth!,
           String(request.params.projectId),
-          String(request.params.journeyId),
+          String(request.params.invariantId),
           request.body,
         ),
       );
@@ -62,7 +62,7 @@ export class JourneyController {
       await this.service.remove(
         request.auth!,
         String(request.params.projectId),
-        String(request.params.journeyId),
+        String(request.params.invariantId),
       );
       response.status(204).send();
     } catch (error) {
@@ -76,7 +76,7 @@ export class JourneyController {
         await this.service.validate(
           request.auth!,
           String(request.params.projectId),
-          String(request.params.journeyId),
+          String(request.params.invariantId),
         ),
       );
     } catch (error) {
@@ -92,7 +92,7 @@ export class JourneyController {
           await this.service.duplicate(
             request.auth!,
             String(request.params.projectId),
-            String(request.params.journeyId),
+            String(request.params.invariantId),
           ),
         );
     } catch (error) {

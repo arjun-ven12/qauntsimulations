@@ -53,7 +53,7 @@ const safety = {
   allowedHttpMethods: ['GET'],
   permitCheckoutSubmission: false,
   permitMockPayment: false,
-  permitOrderCreation: false,
+  permitTestOrderCreation: false,
   restrictions: {
     testEnvironmentsOnly: true,
     productionAccess: false,

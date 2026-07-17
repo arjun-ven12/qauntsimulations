@@ -21,7 +21,7 @@ export interface ProjectSafetyConfiguration {
   allowedHttpMethods: AllowedHttpMethod[];
   permitCheckoutSubmission: boolean;
   permitMockPayment: boolean;
-  permitOrderCreation: boolean;
+  permitTestOrderCreation: boolean;
   restrictions: {
     testEnvironmentsOnly: true;
     productionAccess: false;
@@ -65,10 +65,17 @@ export interface UpdateSafetyInput {
   allowedHttpMethods: AllowedHttpMethod[];
   permitCheckoutSubmission: boolean;
   permitMockPayment: boolean;
-  permitOrderCreation: boolean;
+  permitTestOrderCreation: boolean;
   prohibitedActions: string[];
   acknowledgement: true;
 }
+
+export type PersistedProjectSafetyConfiguration = Omit<
+  ProjectSafetyConfiguration,
+  'permitTestOrderCreation'
+> & {
+  permitOrderCreation: boolean;
+};
 
 export interface ProjectListRecord {
   id: string;
@@ -108,7 +115,7 @@ export interface ProjectMutationRecord {
   name: string;
   description: string | null;
   repositoryUrl: string | null;
-  configuration: ProjectSafetyConfiguration;
+  configuration: PersistedProjectSafetyConfiguration;
   domainAllowlist: string[];
   blockedActions: string[];
   credentialReferences?: CredentialReferenceInput[];
