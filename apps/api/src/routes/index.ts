@@ -26,6 +26,8 @@ import {
   createFindingRepairVerificationRouter,
   createRepairVerificationRouter,
 } from '../modules/repair-verification/repair-verification.routes.js';
+import type { DashboardController } from '../modules/dashboard/dashboard.controller.js';
+import { createDashboardRouter } from '../modules/dashboard/dashboard.routes.js';
 
 export interface ProtectedControllers {
   projects: ProjectController;
@@ -37,6 +39,7 @@ export interface ProtectedControllers {
   organisations: OrganisationController;
   invitations: InvitationController;
   repairVerifications: RepairVerificationController;
+  dashboard: DashboardController;
 }
 export function createProtectedRouter(
   tokens: AuthTokenService,
@@ -50,6 +53,7 @@ export function createProtectedRouter(
     createOrganisationInvitationRouter(controllers.invitations),
   );
   router.use('/organisations', createOrganisationRouter(controllers.organisations));
+  router.use('/organisations', createDashboardRouter(controllers.dashboard));
   router.use(
     '/projects/:projectId/environments',
     createEnvironmentRouter(controllers.environments),

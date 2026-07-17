@@ -56,6 +56,9 @@ import { RepairVerificationController } from './modules/repair-verification/repa
 import { RepairVerificationExecutionService } from './modules/repair-verification/repair-verification-execution.service.js';
 import { PrismaRepairVerificationReadRepository } from './modules/repair-verification/repair-verification.repository.js';
 import { RepairVerificationDomainService } from './modules/repair-verification/repair-verification.service.js';
+import { DashboardController } from './modules/dashboard/dashboard.controller.js';
+import { PrismaDashboardRepository } from './modules/dashboard/dashboard.repository.js';
+import { DashboardService } from './modules/dashboard/dashboard.service.js';
 
 const rootEnvPath = fileURLToPath(new URL('../../../.env', import.meta.url));
 loadEnvFile(rootEnvPath);
@@ -246,6 +249,7 @@ const app = createApplication({
       ),
     ),
     repairVerifications: repairVerificationController,
+    dashboard: new DashboardController(new DashboardService(new PrismaDashboardRepository(database))),
   },
 });
 const server = app.listen(env.PORT, () => logger.info({ port: env.PORT }, 'TaskOS API listening'));
