@@ -5,4 +5,14 @@ export const investigationApi: InvestigationApi =
   import.meta.env.VITE_USE_MOCK_API === 'false'
     ? new HttpInvestigationApi(import.meta.env.VITE_API_URL ?? 'http://localhost:4000/api')
     : new MockInvestigationApi();
-export type { InvestigationApi, CreateInvestigationInput } from './investigation-api.js';
+export type {
+  CreateInvestigationInput,
+  EvidenceArtifactResponse,
+  ExperimentPlanResponse,
+  FindingDetail,
+  InvestigationApi,
+  InvestigationExperiment,
+  InvestigationWorker,
+  InvestigationWorld,
+} from './investigation-api.js';
+export { InvestigationApiError } from './investigation-api.js';

@@ -5,11 +5,13 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { invitationApi } from '../services/invitation-api.js';
 import { useAuthStore } from '../stores/auth.store.js';
 
+const runtimeInvestigationId = import.meta.env.VITE_DEMO_INVESTIGATION_ID ?? 'cmrol9cxh0001rurb8godxnh6';
+
 const nav = [
   { to: '/projects', label: 'Projects', icon: Boxes },
-  { to: '/investigations/investigation-demo/live', label: 'Live WorldLab', icon: Activity },
+  { to: `/investigations/${runtimeInvestigationId}`, label: 'Live WorldLab', icon: Activity },
   {
-    to: '/investigations/investigation-demo/findings',
+    to: `/investigations/${runtimeInvestigationId}/findings`,
     label: 'Findings',
     icon: ShieldCheck,
   },
