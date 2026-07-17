@@ -8,8 +8,10 @@ import type {
   InvestigationCreationScope,
   InvestigationOrchestrationContext,
   InvestigationProgressRecord,
+  PersistedExecutionEvent,
   PersistedWorldExecution,
 } from './investigations.types.js';
+import type { WorkerExecutionProvider } from '../execution/worker-executor.types.js';
 
 const json = (value: unknown): Prisma.InputJsonValue => value as Prisma.InputJsonValue;
 const messageData = (message: string, metadata: Record<string, unknown> = {}): Prisma.InputJsonValue => json({ message, ...metadata });
@@ -74,14 +76,14 @@ export class InvestigationRepository {
     return this.database.$transaction(async (transaction) => {
       const changed = await transaction.investigation.updateMany({ where: { id: context.id, status: 'PLANNING' }, data: { status: 'QUEUED' } });
       if (changed.count !== 1) throw new Error('Investigation is not in PLANNING state');
-      await transaction.investigationEvent.create({ data: { investigationId: context.id, type: 'plan_created', data: messageData('Deterministic local experiment plan created.', { status: 'QUEUED', maximumConcurrentWorkers: context.plan.maximumConcurrentWorkers }) } });
+      await transaction.investigationEvent.create({ data: { investigationId: context.id, type: 'plan_created', data: messageData('Deterministic experiment plan created.', { status: 'QUEUED', maximumConcurrentWorkers: context.plan.maximumConcurrentWorkers }) } });
       const created: CreatedWorldRecord[] = [];
       for (const definition of context.plan.worlds) {
         const world = await transaction.world.create({ data: { investigationId: context.id, experimentPlanId: context.planId, status: 'QUEUED', configuration: json(definition), reason: definition.reason, randomSeed: definition.randomSeed } });
         const experiment = await transaction.experiment.create({ data: { investigationId: context.id, worldId: world.id, status: 'QUEUED', kind: 'INITIAL' } });
         await transaction.investigationEvent.createMany({ data: [
           { investigationId: context.id, type: 'world_generated', data: json({ message: `${definition.name} generated.`, worldId: world.id, creationOrder: definition.creationOrder }) },
-          { investigationId: context.id, type: 'world_queued', data: json({ message: `${definition.name} queued for local execution.`, worldId: world.id, experimentId: experiment.id }) },
+          { investigationId: context.id, type: 'world_queued', data: json({ message: `${definition.name} queued for execution.`, worldId: world.id, experimentId: experiment.id }) },
         ] });
         created.push({ id: world.id, experimentId: experiment.id, definition });
       }
@@ -94,7 +96,7 @@ export class InvestigationRepository {
     if (changed.count !== 1) throw new Error('Investigation is not in QUEUED state');
   }
 
-  async beginWorld(context: InvestigationOrchestrationContext, record: CreatedWorldRecord): Promise<PersistedWorldExecution | null> {
+  async beginWorld(context: InvestigationOrchestrationContext, record: CreatedWorldRecord, provider: WorkerExecutionProvider): Promise<PersistedWorldExecution | null> {
     return this.database.$transaction(async (transaction) => {
       const investigation = await transaction.investigation.findUnique({ where: { id: context.id }, select: { status: true } });
       if (!investigation || investigation.status === 'CANCELLED') return null;
@@ -102,15 +104,39 @@ export class InvestigationRepository {
       await transaction.experiment.update({ where: { id: record.experimentId }, data: { status: 'RUNNING' } });
       const worker = await transaction.worker.create({ data: {
         organisationId: context.organisationId,
-        providerId: 'LOCAL',
+        providerId: provider,
         status: 'RUNNING',
         lastHeartbeatAt: new Date(),
-        metadata: json({ investigationId: context.id, worldId: record.id, experimentId: record.experimentId }),
+        metadata: json({ provider, investigationId: context.id, worldId: record.id, experimentId: record.experimentId }),
       } });
-      const attempt = await transaction.executionAttempt.create({ data: { experimentId: record.experimentId, workerId: worker.id, attempt: 1, status: 'RUNNING', provider: 'LOCAL', startedAt: new Date() } });
-      await transaction.investigationEvent.create({ data: { investigationId: context.id, type: 'worker_started', data: json({ message: `${record.definition.name} started.`, status: 'RUNNING', worldId: record.id, experimentId: record.experimentId, workerId: worker.id }) } });
-      return { investigationId: context.id, organisationId: context.organisationId, projectId: context.projectId, environmentBaseUrl: context.environmentBaseUrl, invariantId: context.plan.invariantIds[0]!, worldId: record.id, experimentId: record.experimentId, workerId: worker.id, attemptId: attempt.id, world: record.definition };
+      const attempt = await transaction.executionAttempt.create({ data: { experimentId: record.experimentId, workerId: worker.id, attempt: 1, status: 'RUNNING', provider, startedAt: new Date() } });
+      await transaction.investigationEvent.create({ data: { investigationId: context.id, type: 'worker_started', data: json({ message: `${record.definition.name} started.`, provider, status: 'RUNNING', worldId: record.id, experimentId: record.experimentId, workerId: worker.id }) } });
+      return { investigationId: context.id, organisationId: context.organisationId, projectId: context.projectId, environmentBaseUrl: context.environmentBaseUrl, invariantId: context.plan.invariantIds[0]!, worldId: record.id, experimentId: record.experimentId, workerId: worker.id, attemptId: attempt.id, world: record.definition, provider };
     });
+  }
+
+  async recordExecutionEvent(execution: PersistedWorldExecution, event: PersistedExecutionEvent): Promise<void> {
+    const type = event.phase.includes('evidence')
+      ? 'evidence_captured'
+      : event.phase.includes('worker_execution')
+        ? 'experiment_started'
+        : event.phase.includes('ready') || event.phase.includes('setup_completed')
+          ? 'sandbox_ready'
+          : 'sandbox_provisioning';
+    await this.database.investigationEvent.create({ data: {
+      investigationId: execution.investigationId,
+      type,
+      data: json({
+        message: event.message,
+        phase: event.phase,
+        provider: execution.provider,
+        worldId: execution.worldId,
+        experimentId: execution.experimentId,
+        workerId: execution.workerId,
+        ...(event.sandboxId ? { sandboxId: event.sandboxId } : {}),
+        ...(event.metadata ?? {}),
+      }),
+    } });
   }
 
   async completeExecution(input: CompletedExecutionInput): Promise<void> {
@@ -127,9 +153,22 @@ export class InvestigationRepository {
         resultPath: join(dirname(result.evidence.manifestPath), 'worker-result.json'),
         evidenceManifestPath: result.evidence.manifestPath,
         metrics: json(result.metrics),
+        provider: input.providerMetadata.provider,
+        ...(input.stdoutSummary ? { stdoutSummary: input.stdoutSummary } : {}),
+        ...(input.stderrSummary ? { stderrSummary: input.stderrSummary } : {}),
         ...(result.error ? { error: json(result.error) } : {}),
       } });
-      await transaction.worker.update({ where: { id: execution.workerId }, data: { status: isCompleted ? 'COMPLETED' : 'FAILED', lastHeartbeatAt: new Date() } });
+      await transaction.worker.update({ where: { id: execution.workerId }, data: {
+        providerId: input.providerMetadata.provider,
+        status: isCompleted ? 'COMPLETED' : 'FAILED',
+        lastHeartbeatAt: new Date(),
+        metadata: json({
+          investigationId: execution.investigationId,
+          worldId: execution.worldId,
+          experimentId: execution.experimentId,
+          ...input.providerMetadata,
+        }),
+      } });
       await transaction.experiment.update({ where: { id: execution.experimentId }, data: { status: experimentStatus } });
       await transaction.world.update({ where: { id: execution.worldId }, data: { status: isCompleted ? 'COMPLETED' : 'FAILED' } });
 
@@ -139,7 +178,7 @@ export class InvestigationRepository {
           experimentId: execution.experimentId,
           executionAttemptId: execution.attemptId,
           type: artifact.type,
-          storageProvider: 'LOCAL',
+          storageProvider: input.providerMetadata.provider,
           storageKey: artifact.storageKey,
           mimeType: artifact.mimeType,
           sizeBytes: artifact.sizeBytes,

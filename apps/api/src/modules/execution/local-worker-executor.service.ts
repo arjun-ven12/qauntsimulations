@@ -1,30 +1,27 @@
 import { resolve, relative, isAbsolute } from 'node:path';
 import { workerJobSchema, workerResultSchema, type WorkerJob, type WorkerResult } from '@taskos/execution-contracts';
 import { runWorker } from '@taskos/playwright-runner';
-
-export interface WorkerExecutionResponse {
-  result: WorkerResult;
-  exitCode: number;
-}
-
-export interface WorkerExecutor {
-  execute(job: WorkerJob): Promise<WorkerExecutionResponse>;
-}
+import type { WorkerExecutionContext, WorkerExecutionResponse, WorkerExecutor } from './worker-executor.types.js';
 
 export class LocalPlaywrightWorkerExecutor implements WorkerExecutor {
+  readonly provider = 'LOCAL' as const;
   private readonly evidenceRoot: string;
 
   constructor(evidenceRoot: string) {
     this.evidenceRoot = resolve(evidenceRoot);
   }
 
-  async execute(input: WorkerJob): Promise<WorkerExecutionResponse> {
+  async execute(input: WorkerJob, _context: WorkerExecutionContext): Promise<WorkerExecutionResponse> {
     const job = workerJobSchema.parse(input);
     const outputDirectory = resolve(job.evidence.outputDirectory);
     const relativeOutput = relative(this.evidenceRoot, outputDirectory);
     if (relativeOutput.startsWith('..') || isAbsolute(relativeOutput)) throw new Error('Worker evidence path escaped the configured evidence root');
     const result = workerResultSchema.parse(await runWorker(job));
-    return { result, exitCode: this.exitCode(result.status) };
+    return {
+      result,
+      exitCode: this.exitCode(result.status),
+      providerMetadata: { provider: this.provider, cleanupOutcome: 'NOT_REQUIRED' },
+    };
   }
 
   private exitCode(status: WorkerResult['status']): number {

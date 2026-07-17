@@ -100,6 +100,8 @@ Cancellation atomically marks the investigation cancelled and prevents queued wo
 
 An API restart interrupts active in-process workers. Startup cleanup marks local attempts older than ten minutes, their worlds, and their investigations failed. It does not resume a browser journey. A persistent queue with leases and heartbeat-based recovery is required before production use.
 
-## Future Daytona replacement
+## Provider-selectable execution
 
-The orchestrator depends on the `WorkerExecutor` port. Runtime Milestone 4 can replace `LocalPlaywrightWorkerExecutor` with a Daytona-backed implementation while retaining job construction, result validation, persistence, evidence processing, concurrency policy, and API mapping. No Daytona code is invoked in this milestone.
+The orchestrator now depends on the provider-neutral `WorkerExecutor` port. `WORKER_EXECUTION_PROVIDER=local` retains the original in-process `LocalPlaywrightWorkerExecutor` and remains the default. `WORKER_EXECUTION_PROVIDER=daytona` selects the isolated `DaytonaPlaywrightWorkerExecutor`, which runs the same validated job and returns the same validated result through one ephemeral EU sandbox.
+
+Daytona configuration is loaded lazily, so local development does not require Daytona credentials. Job construction, result validation, persistence, evidence metadata, counters, and API mapping are shared. Daytona mode is capped at one concurrent execution for Runtime Milestone 4; the existing local mode retains its bounded local concurrency behavior. See [Daytona isolated world execution](./daytona-isolated-world-execution.md) for the verified lifecycle and limitations.

@@ -1,5 +1,6 @@
 import type { CreateInvestigationInput } from '@taskos/shared-types';
 import type { WorkerResult } from '@taskos/execution-contracts';
+import type { WorkerExecutionEvent, WorkerExecutionProvider, WorkerProviderMetadata } from '../execution/worker-executor.types.js';
 import type { DeterministicExperimentPlan, DeterministicWorldDefinition } from '../experiments/services/deterministic-experiment-plan.service.js';
 
 export type { CreateInvestigationInput };
@@ -31,6 +32,7 @@ export interface PersistedWorldExecution {
   workerId: string;
   attemptId: string;
   world: DeterministicWorldDefinition;
+  provider: WorkerExecutionProvider;
 }
 
 export interface PersistedArtifactInput {
@@ -47,7 +49,12 @@ export interface CompletedExecutionInput {
   result: WorkerResult;
   exitCode: number;
   artifacts: PersistedArtifactInput[];
+  providerMetadata: WorkerProviderMetadata;
+  stdoutSummary?: string;
+  stderrSummary?: string;
 }
+
+export type PersistedExecutionEvent = WorkerExecutionEvent;
 
 export interface InvestigationOrchestrationContext {
   id: string;

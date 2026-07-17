@@ -11,6 +11,7 @@ import { AuthService } from './modules/auth/auth.service.js';
 import { JwtAuthTokenService } from './modules/auth/auth-token.service.js';
 import { BcryptPasswordHasher } from './modules/auth/password-hasher.js';
 import { LocalEvidenceMetadataService } from './modules/evidence/local-evidence-metadata.service.js';
+import { createSandboxProvider } from './integrations/daytona/daytona-sandbox.service.js';
 import { EnvironmentController } from './modules/environments/environments.controller.js';
 import { EnvironmentRepository } from './modules/environments/environments.repository.js';
 import { EnvironmentService } from './modules/environments/environments.service.js';
@@ -19,6 +20,8 @@ import { ExecutionCleanupService } from './modules/execution/execution-cleanup.s
 import { InvestigationOrchestratorService } from './modules/execution/investigation-orchestrator.service.js';
 import { LocalPlaywrightWorkerExecutor } from './modules/execution/local-worker-executor.service.js';
 import { WorkerJobFactoryService } from './modules/execution/worker-job-factory.service.js';
+import { DaytonaPlaywrightWorkerExecutor } from './modules/execution/daytona-worker-executor.service.js';
+import { WorkerExecutorFactory } from './modules/execution/worker-executor.factory.js';
 import { InvestigationController } from './modules/investigations/investigations.controller.js';
 import { InvestigationRepository } from './modules/investigations/investigations.repository.js';
 import { InvestigationService } from './modules/investigations/investigations.service.js';
@@ -61,9 +64,36 @@ const evidenceRoot = isAbsolute(env.EVIDENCE_LOCAL_PATH)
   ? env.EVIDENCE_LOCAL_PATH
   : resolve(repositoryRoot, env.EVIDENCE_LOCAL_PATH);
 const investigationRepository = new InvestigationRepository(database);
+const workerExecutor = new WorkerExecutorFactory(
+  new LocalPlaywrightWorkerExecutor(evidenceRoot),
+  () => {
+    if (!env.DAYTONA_API_KEY) throw new Error('DAYTONA_API_KEY is required for Daytona execution');
+    const sandboxProvider = createSandboxProvider({
+      daytonaApiKey: env.DAYTONA_API_KEY,
+      target: env.DAYTONA_TARGET,
+      ...(env.DAYTONA_API_URL ? { daytonaApiUrl: env.DAYTONA_API_URL } : {}),
+      ...(env.DAYTONA_SNAPSHOT ? { snapshot: env.DAYTONA_SNAPSHOT } : {}),
+    });
+    return new DaytonaPlaywrightWorkerExecutor(sandboxProvider, {
+      target: env.DAYTONA_TARGET,
+      autoDelete: env.DAYTONA_AUTO_DELETE,
+      timeoutSeconds: env.DAYTONA_SANDBOX_TIMEOUT_SECONDS,
+      evidenceRoot,
+      demoStoreDistPath: resolve(repositoryRoot, 'apps/demo-store/dist'),
+      workerBundlePath: resolve(repositoryRoot, 'workers/playwright-runner/bundle'),
+      workspacePath: env.DAYTONA_WORKSPACE_PATH,
+      demoStorePath: env.DAYTONA_DEMO_STORE_PATH,
+      workerPath: env.DAYTONA_WORKER_PATH,
+      inputPath: env.DAYTONA_INPUT_PATH,
+      outputPath: env.DAYTONA_EVIDENCE_PATH,
+      demoStorePort: env.DAYTONA_DEMO_STORE_PORT,
+      ...(env.DAYTONA_SNAPSHOT ? { snapshot: env.DAYTONA_SNAPSHOT } : {}),
+    });
+  },
+).create(env.WORKER_EXECUTION_PROVIDER);
 const investigationOrchestrator = new InvestigationOrchestratorService(
   investigationRepository,
-  new LocalPlaywrightWorkerExecutor(evidenceRoot),
+  workerExecutor,
   new WorkerJobFactoryService(
     evidenceRoot,
     resolve(repositoryRoot, 'demo/fixtures/checkout-journey.json'),
