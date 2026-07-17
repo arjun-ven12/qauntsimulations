@@ -34,9 +34,17 @@ import {
   worldRows,
   worldExecutionState,
   worldResult,
+  providerFromPlan,
+  plannerProviderLabel,
 } from './runtime-normalizers.js';
 
 describe('runtime world normalization', () => {
+  it('normalizes Kimi planner provenance independently from fallback source', () => {
+    expect(providerFromPlan({ plannerMetadata: { requestedProvider: 'KIMI', effectiveProvider: 'KIMI', plannerStatus: 'ACCEPTED', model: 'kimi-k2.6' } } as never)).toMatchObject({ requested: 'KIMI', effective: 'KIMI', model: 'kimi-k2.6', fallbackUsed: false });
+    expect(providerFromPlan({ plannerMetadata: { requestedProvider: 'KIMI', effectiveProvider: 'FALLBACK', plannerStatus: 'FALLBACK_USED' } } as never)).toMatchObject({ requested: 'KIMI', effective: 'FALLBACK', fallbackUsed: true });
+    expect(plannerProviderLabel('KIMI')).toBe('Kimi AI');
+    expect(plannerProviderLabel('FALLBACK')).toBe('Deterministic fallback');
+  });
   it('classifies initial, adaptive, minimisation, and unknown origins safely', async () => {
     const worlds = await new MockInvestigationApi().getWorlds(MOCK_INVESTIGATION_ID);
     expect(worldOrigin(worlds[0]!)).toBe('INITIAL');

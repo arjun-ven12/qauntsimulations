@@ -2,7 +2,7 @@ import { isAbsolute, resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createDatabaseClient } from '@taskos/database';
-import { OpenAIClient, OpenAIExperimentPlanner } from '@taskos/ai-providers';
+import { KimiClient, KimiExperimentPlanner, OpenAIClient, OpenAIExperimentPlanner, type ExperimentPlanner } from '@taskos/ai-providers';
 import { createApplication } from './app.js';
 import { loadEnvironment } from './config/env.js';
 import { logger } from './core/logging/logger.js';
@@ -77,8 +77,13 @@ const evidenceRoot = isAbsolute(env.EVIDENCE_LOCAL_PATH)
   : resolve(repositoryRoot, env.EVIDENCE_LOCAL_PATH);
 const investigationRepository = new InvestigationRepository(database);
 const openAIPlannerModel = env.OPENAI_PLANNER_MODEL ?? env.OPENAI_MODEL_PLANNER;
-const openAIPlanner = env.PLANNER_PROVIDER === 'openai' && env.OPENAI_API_KEY
-  ? new OpenAIExperimentPlanner(
+let selectedPlanner: ExperimentPlanner | undefined;
+const plannerModel: string | undefined = env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_MODEL : env.PLANNER_PROVIDER === 'openai' ? openAIPlannerModel : undefined;
+const plannerTimeoutMs = env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_TIMEOUT_MS : env.OPENAI_PLANNER_TIMEOUT_MS;
+const plannerMaximumAttempts = env.PLANNER_PROVIDER === 'kimi' ? 1 : env.OPENAI_PLANNER_MAX_RETRIES + 1;
+const plannerMaximumOutputTokens = env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_MAX_OUTPUT_TOKENS : env.OPENAI_PLANNER_MAX_OUTPUT_TOKENS;
+if (env.PLANNER_PROVIDER === 'openai' && env.OPENAI_API_KEY) {
+  selectedPlanner = new OpenAIExperimentPlanner(
       new OpenAIClient({
         apiKey: env.OPENAI_API_KEY,
         baseUrl: env.OPENAI_BASE_URL,
@@ -86,8 +91,19 @@ const openAIPlanner = env.PLANNER_PROVIDER === 'openai' && env.OPENAI_API_KEY
         maxRetries: env.OPENAI_PLANNER_MAX_RETRIES,
       }),
       openAIPlannerModel,
-    )
-  : undefined;
+    );
+}
+if (env.PLANNER_PROVIDER === 'kimi' && env.MOONSHOT_API_KEY) {
+  selectedPlanner = new KimiExperimentPlanner(
+    new KimiClient({
+      apiKey: env.MOONSHOT_API_KEY,
+      baseUrl: env.KIMI_BASE_URL,
+      timeoutMs: env.KIMI_TIMEOUT_MS,
+      maxRetries: 0,
+    }),
+    env.KIMI_MODEL,
+  );
+}
 const investigationPlanningService = new InvestigationPlanningService(
   {
     requestedProvider: env.PLANNER_PROVIDER,
@@ -96,13 +112,13 @@ const investigationPlanningService = new InvestigationPlanningService(
     maximumVariables: env.PLANNER_MAX_VARIABLES,
     maximumAssumptions: env.PLANNER_MAX_ASSUMPTIONS,
     maximumWarnings: env.PLANNER_MAX_WARNINGS,
-    timeoutMs: env.OPENAI_PLANNER_TIMEOUT_MS,
-    maxProviderAttempts: env.OPENAI_PLANNER_MAX_RETRIES + 1,
-    maxOutputTokens: env.OPENAI_PLANNER_MAX_OUTPUT_TOKENS,
-    model: openAIPlannerModel,
+    timeoutMs: plannerTimeoutMs,
+    maxProviderAttempts: plannerMaximumAttempts,
+    maxOutputTokens: plannerMaximumOutputTokens,
+    ...(plannerModel ? { model: plannerModel } : {}),
   },
   new DeterministicExperimentPlanner(new DeterministicExperimentPlanService(2)),
-  openAIPlanner,
+  selectedPlanner,
 );
 const daytonaFleet = new DaytonaWorkerFleet(new DaytonaFleetCapacityManager(env.DAYTONA_FLEET_HARD_LIMIT));
 const workerExecutor = new WorkerExecutorFactory(

@@ -13,11 +13,11 @@ jobs:
       JWT_REFRESH_SECRET: ci-refresh-secret-at-least-thirty-two-characters
       AI_PROVIDER: mock
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
+      - uses: actions/checkout@v5
       - uses: pnpm/action-setup@v4
         with: { version: 11.7.0 }
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: pnpm }
       - name: Print Node and pnpm versions
         run: |
           node --version

@@ -8,6 +8,6 @@ import { OpenAIProvider } from './providers/openai/openai.provider.js';
 export interface AIProviderConfiguration { provider: 'openai' | 'kimi' | 'mock'; openai?: { apiKey?: string; baseUrl: string; plannerModel: string; explanationModel: string; visionModel: string }; kimi?: { apiKey?: string; baseUrl: string; model?: string } }
 export function createAIProvider(config: AIProviderConfiguration): AIProvider {
   if (config.provider === 'openai' && config.openai?.apiKey) return new OpenAIProvider(new OpenAIClient({ apiKey: config.openai.apiKey, baseUrl: config.openai.baseUrl }), { planner: config.openai.plannerModel, explanation: config.openai.explanationModel, vision: config.openai.visionModel });
-  if (config.provider === 'kimi' && config.kimi?.apiKey && config.kimi.model) return new KimiProvider(new KimiClient({ apiKey: config.kimi.apiKey, baseUrl: config.kimi.baseUrl, model: config.kimi.model }));
+  if (config.provider === 'kimi' && config.kimi?.apiKey && config.kimi.model) return new KimiProvider(new KimiClient({ apiKey: config.kimi.apiKey, baseUrl: config.kimi.baseUrl }));
   return new MockAIProvider();
 }

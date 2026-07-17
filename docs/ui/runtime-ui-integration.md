@@ -172,7 +172,7 @@ The UI handles:
 - No invariant builder was added.
 - No repair verification runtime was added.
 - No Nosana UI was added.
-- No Kimi UI was added.
+- Kimi initial-planner provenance is displayed through the existing Experiment Plan and Live WorldLab plan panel; Kimi has no runtime-evaluator or worker UI role.
 - Binary evidence body retrieval remains metadata-only. Final-report Markdown and JSON can be
   previewed through the safe report-content endpoint.
 - The visual design is intentionally functional and ready for product-owner polish, not a full redesign.

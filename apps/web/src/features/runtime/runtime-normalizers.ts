@@ -390,12 +390,22 @@ export function sortWorldRows(rows: RuntimeWorldRow[], sort: WorldSort): Runtime
   });
 }
 
-export function providerFromPlan(plan: ExperimentPlanResponse | null | undefined): { requested: string; effective: string; status: string } {
+export function providerFromPlan(plan: ExperimentPlanResponse | null | undefined): { requested: string; effective: string; status: string; model: string | null; fallbackUsed: boolean; generatedAt: string | null } {
   const metadata = object(plan?.plannerMetadata);
   const requested = typeof metadata.requestedProvider === 'string' ? metadata.requestedProvider : plan?.aiProvider ?? 'Not recorded';
   const effective = typeof metadata.effectiveProvider === 'string' ? metadata.effectiveProvider : plan?.aiProvider ?? 'Not recorded';
   const status = typeof metadata.plannerStatus === 'string' ? metadata.plannerStatus : plan?.plannerStatus ?? 'Not recorded';
-  return { requested, effective, status };
+  const model = typeof metadata.model === 'string' ? metadata.model : null;
+  const generatedAt = typeof metadata.generatedAt === 'string' ? metadata.generatedAt : null;
+  return { requested, effective, status, model, fallbackUsed: effective === 'FALLBACK' || status === 'FALLBACK_USED', generatedAt };
+}
+
+export function plannerProviderLabel(provider: string): string {
+  if (provider === 'KIMI') return 'Kimi AI';
+  if (provider === 'OPENAI') return 'OpenAI';
+  if (provider === 'FALLBACK') return 'Deterministic fallback';
+  if (provider === 'DETERMINISTIC' || provider === 'MOCK') return 'Deterministic';
+  return humanize(provider);
 }
 
 export function plannerList(plan: ExperimentPlanResponse | null | undefined, key: string): string[] {

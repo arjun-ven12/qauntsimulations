@@ -491,6 +491,10 @@ UI-only work remaining:
 - Minimisation condition comparison UI.
 - Planner/adaptive/minimisation status panels.
 
+## Prompt 14 planner provenance
+
+The plan read API now maps persisted planner metadata into `plannerMetadata`, including requested and effective provider, model, planner status, safe fallback reason, and generation time. `KIMI` identifies an accepted Kimi-generated initial plan. `requestedProvider: KIMI` with `effectiveProvider: FALLBACK` identifies deterministic fallback after a Kimi failure. No provider credential or raw provider error is public.
+
 ## Prompt 9 readiness
 
 Prompt 9 can begin after this checkpoint if repository verification remains green.
