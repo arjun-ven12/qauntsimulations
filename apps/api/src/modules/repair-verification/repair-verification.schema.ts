@@ -9,6 +9,13 @@ export const repairVerificationTargetInputSchema = z.object({
   }),
 }).strict();
 
+export const repairVerificationIdempotencyKeySchema = z.string().trim().min(1).max(128)
+  .regex(/^[A-Za-z0-9._:-]+$/, 'Idempotency-Key contains unsupported characters');
+
+export const repairVerificationCancellationInputSchema = z.object({
+  reason: z.string().trim().min(1).max(1_000).optional(),
+}).strict().default({});
+
 export const repairVerificationExecutionStatusSchema = z.enum([
   'QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED',
 ]);

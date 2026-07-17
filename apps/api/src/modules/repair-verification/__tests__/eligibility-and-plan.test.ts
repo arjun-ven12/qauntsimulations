@@ -73,6 +73,7 @@ function eligibleContext(): RepairVerificationEligibilityContext {
       id: 'finding', organisationId: 'organisation', projectId: 'project',
       investigationId: 'investigation-original', confidence: 'CONFIRMED',
       originalInvestigationOrganisationId: 'organisation', originalInvestigationProjectId: 'project',
+      originalJourneyId: 'journey',
       causalStatus: 'SUPPORTED', originalInvestigationStatus: 'COMPLETED',
     },
     targetEnvironment: {
@@ -86,7 +87,9 @@ function eligibleContext(): RepairVerificationEligibilityContext {
       },
     },
     safetyPolicy: {
+      id: 'safety',
       domainAllowlist: ['localhost'],
+      blockedActions: [],
       configuration: {
         productionAccess: false, allowedHttpMethods: ['GET', 'POST'],
         permitCheckoutSubmission: true, permitMockPayment: true, permitOrderCreation: true,

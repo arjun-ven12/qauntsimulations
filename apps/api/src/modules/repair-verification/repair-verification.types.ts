@@ -41,6 +41,7 @@ export interface RepairVerificationEligibilityContext {
     investigationId: string;
     originalInvestigationOrganisationId: string;
     originalInvestigationProjectId: string;
+    originalJourneyId: string;
     confidence: string;
     causalStatus?: string;
     originalInvestigationStatus: string;
@@ -58,7 +59,9 @@ export interface RepairVerificationEligibilityContext {
     configuration: JsonRecord;
   } | null;
   safetyPolicy: {
+    id: string;
     domainAllowlist: string[];
+    blockedActions: string[];
     configuration: JsonRecord;
   } | null;
   launchSnapshot: RepairVerificationLaunchSnapshot | null;
@@ -83,6 +86,7 @@ export interface RepairVerificationRecord {
   originalInvestigationId: string;
   verificationInvestigationId: string;
   environmentId: string;
+  deploymentVersion: string | null;
   createdByUserId: string | null;
   cancelledByUserId: string | null;
   notes: string | null;
@@ -93,6 +97,8 @@ export interface RepairVerificationRecord {
   regressionControlOutcome: string | null;
   planSnapshot: JsonRecord;
   comparisonSnapshot: JsonRecord | null;
+  idempotencyKey: string;
+  requestFingerprint: string;
   failureCode: string | null;
   failureMessage: string | null;
   inconclusiveReason: string | null;
@@ -102,4 +108,32 @@ export interface RepairVerificationRecord {
   cancelledAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface PreparedRepairVerificationPersistence {
+  repairVerificationId: string;
+  verificationInvestigationId: string;
+  scenario: { id: string; name: string; prompt: string; controls: JsonRecord };
+  investigation: {
+    name: string;
+    journeyId: string;
+    safetyPolicyId: string;
+  };
+  experimentPlan: {
+    plan: JsonRecord;
+    planningExplanation: string;
+    estimatedComputeUnits: number;
+  };
+  repairVerification: {
+    organisationId: string;
+    projectId: string;
+    findingId: string;
+    originalInvestigationId: string;
+    environmentId: string;
+    createdByUserId: string;
+    notes?: string;
+    planSnapshot: JsonRecord;
+    idempotencyKey: string;
+    requestFingerprint: string;
+  };
 }

@@ -21,6 +21,11 @@ import { createScenarioRouter } from '../modules/scenarios/scenarios.routes.js';
 import { createNotImplementedRouter } from './not-implemented.js';
 import type { InvitationController } from '../modules/invitations/invitation.controller.js';
 import { createOrganisationInvitationRouter } from '../modules/invitations/invitation.routes.js';
+import type { RepairVerificationController } from '../modules/repair-verification/repair-verification.controller.js';
+import {
+  createFindingRepairVerificationRouter,
+  createRepairVerificationRouter,
+} from '../modules/repair-verification/repair-verification.routes.js';
 
 export interface ProtectedControllers {
   projects: ProjectController;
@@ -31,6 +36,7 @@ export interface ProtectedControllers {
   investigations: InvestigationController;
   organisations: OrganisationController;
   invitations: InvitationController;
+  repairVerifications: RepairVerificationController;
 }
 export function createProtectedRouter(
   tokens: AuthTokenService,
@@ -60,6 +66,11 @@ export function createProtectedRouter(
   );
   router.use('/projects', createProjectRouter(controllers.projects));
   router.use('/investigations', createInvestigationRouter(controllers.investigations));
+  router.use(
+    '/findings/:findingId/repair-verifications',
+    createFindingRepairVerificationRouter(controllers.repairVerifications),
+  );
+  router.use('/repair-verifications', createRepairVerificationRouter(controllers.repairVerifications));
   router.use('/findings', createNotImplementedRouter('Finding detail and reproduction'));
   router.use('/repairs', createNotImplementedRouter('Repair verification'));
   router.get('/world-packs', (_request, response) =>

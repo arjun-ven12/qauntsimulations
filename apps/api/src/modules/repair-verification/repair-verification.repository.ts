@@ -4,6 +4,7 @@ import type {
   RepairVerificationEligibilityContext,
   RepairVerificationLaunchSnapshot,
   RepairVerificationRecord,
+  PreparedRepairVerificationPersistence,
   RepairVerificationWorldEvidence,
 } from './repair-verification.types.js';
 
@@ -16,6 +17,16 @@ export interface RepairVerificationReadRepository {
   }): Promise<RepairVerificationEligibilityContext>;
   findById(organisationId: string, verificationId: string): Promise<RepairVerificationRecord | null>;
   listForFinding(organisationId: string, findingId: string): Promise<RepairVerificationRecord[]>;
+  findByIdempotencyKey(organisationId: string, idempotencyKey: string): Promise<RepairVerificationRecord | null>;
+  findMembershipRole(organisationId: string, userId: string): Promise<string | null>;
+  findFindingProjectId(organisationId: string, findingId: string): Promise<string | null>;
+  createPrepared(input: PreparedRepairVerificationPersistence): Promise<RepairVerificationRecord>;
+  cancelQueued(input: {
+    organisationId: string;
+    verificationId: string;
+    cancelledByUserId: string;
+    cancellationReason?: string;
+  }): Promise<RepairVerificationRecord | null>;
 }
 
 export class PrismaRepairVerificationReadRepository implements RepairVerificationReadRepository {
@@ -46,7 +57,7 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
               safetyPolicies: {
                 orderBy: { createdAt: 'desc' },
                 take: 1,
-                select: { domainAllowlist: true, configuration: true },
+                select: { id: true, domainAllowlist: true, blockedActions: true, configuration: true },
               },
             },
           },
@@ -114,6 +125,7 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
         investigationId: finding.investigationId,
         originalInvestigationOrganisationId: finding.investigation.organisationId,
         originalInvestigationProjectId: finding.investigation.projectId,
+        originalJourneyId: finding.investigation.journeyId,
         confidence: String(finding.confidence),
         ...(typeof causal?.causalStatus === 'string' ? { causalStatus: causal.causalStatus } : {}),
         originalInvestigationStatus: String(finding.investigation.status),
@@ -131,7 +143,9 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
         configuration: jsonRecord(targetEnvironment.configuration) ?? {},
       } : null,
       safetyPolicy: finding?.project.safetyPolicies[0] ? {
+        id: finding.project.safetyPolicies[0].id,
         domainAllowlist: finding.project.safetyPolicies[0].domainAllowlist,
+        blockedActions: finding.project.safetyPolicies[0].blockedActions,
         configuration: jsonRecord(finding.project.safetyPolicies[0].configuration) ?? {},
       } : null,
       launchSnapshot,
@@ -161,6 +175,116 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
     });
     return records.map(mapRepairVerification);
   }
+
+  async findByIdempotencyKey(organisationId: string, idempotencyKey: string) {
+    const record = await this.database.repairVerification.findUnique({
+      where: { organisationId_idempotencyKey: { organisationId, idempotencyKey } },
+    });
+    return record ? mapRepairVerification(record) : null;
+  }
+
+  async findMembershipRole(organisationId: string, userId: string) {
+    const membership = await this.database.organisationMember.findFirst({
+      where: { organisationId, userId, organisation: { deletedAt: null }, user: { deletedAt: null } },
+      select: { role: true },
+    });
+    return membership ? String(membership.role) : null;
+  }
+
+  async findFindingProjectId(organisationId: string, findingId: string) {
+    const finding = await this.database.finding.findFirst({
+      where: { id: findingId, organisationId, deletedAt: null },
+      select: { projectId: true },
+    });
+    return finding?.projectId ?? null;
+  }
+
+  async createPrepared(input: PreparedRepairVerificationPersistence) {
+    const created = await this.database.$transaction(async (transaction) => {
+      await transaction.scenario.create({ data: {
+        id: input.scenario.id,
+        projectId: input.repairVerification.projectId,
+        name: input.scenario.name,
+        prompt: input.scenario.prompt,
+        controls: input.scenario.controls as never,
+      } });
+      await transaction.investigation.create({ data: {
+        id: input.verificationInvestigationId,
+        organisationId: input.repairVerification.organisationId,
+        projectId: input.repairVerification.projectId,
+        environmentId: input.repairVerification.environmentId,
+        journeyId: input.investigation.journeyId,
+        scenarioId: input.scenario.id,
+        safetyPolicyId: input.investigation.safetyPolicyId,
+        name: input.investigation.name,
+        status: 'QUEUED',
+      } });
+      await transaction.experimentPlan.create({ data: {
+        investigationId: input.verificationInvestigationId,
+        journeyId: input.investigation.journeyId,
+        scenarioId: input.scenario.id,
+        version: 1,
+        provider: 'MOCK',
+        plan: input.experimentPlan.plan as never,
+        planningExplanation: input.experimentPlan.planningExplanation,
+        estimatedComputeUnits: input.experimentPlan.estimatedComputeUnits,
+      } });
+      return transaction.repairVerification.create({ data: {
+        id: input.repairVerificationId,
+        organisationId: input.repairVerification.organisationId,
+        projectId: input.repairVerification.projectId,
+        findingId: input.repairVerification.findingId,
+        originalInvestigationId: input.repairVerification.originalInvestigationId,
+        verificationInvestigationId: input.verificationInvestigationId,
+        environmentId: input.repairVerification.environmentId,
+        createdByUserId: input.repairVerification.createdByUserId,
+        ...(input.repairVerification.notes ? { notes: input.repairVerification.notes } : {}),
+        executionStatus: 'QUEUED',
+        originalBusinessOutcome: 'FAIL',
+        planSnapshot: input.repairVerification.planSnapshot as never,
+        idempotencyKey: input.repairVerification.idempotencyKey,
+        requestFingerprint: input.repairVerification.requestFingerprint,
+      } });
+    });
+    return mapRepairVerification(created);
+  }
+
+  async cancelQueued(input: {
+    organisationId: string;
+    verificationId: string;
+    cancelledByUserId: string;
+    cancellationReason?: string;
+  }) {
+    return this.database.$transaction(async (transaction) => {
+      const current = await transaction.repairVerification.findFirst({
+        where: { id: input.verificationId, organisationId: input.organisationId },
+      });
+      if (!current || current.executionStatus !== 'QUEUED') return null;
+      const now = new Date();
+      const investigation = await transaction.investigation.updateMany({
+        where: { id: current.verificationInvestigationId, organisationId: input.organisationId, status: 'QUEUED' },
+        data: { status: 'CANCELLED', completedAt: now },
+      });
+      if (investigation.count !== 1) return null;
+      const changed = await transaction.repairVerification.updateMany({
+        where: { id: current.id, organisationId: input.organisationId, executionStatus: 'QUEUED' },
+        data: {
+          executionStatus: 'CANCELLED',
+          verificationResult: 'INCONCLUSIVE',
+          repairedBusinessOutcome: 'INCONCLUSIVE',
+          regressionControlOutcome: 'INCONCLUSIVE',
+          cancelledByUserId: input.cancelledByUserId,
+          cancelledAt: now,
+          completedAt: now,
+          ...(input.cancellationReason ? { cancellationReason: input.cancellationReason } : {}),
+        },
+      });
+      if (changed.count !== 1) throw new Error('Queued Repair Verification cancellation lost its atomic update');
+      const cancelled = await transaction.repairVerification.findUnique({ where: { id: current.id } });
+      if (!cancelled) throw new Error('Cancelled Repair Verification was not found');
+      return mapRepairVerification(cancelled);
+    });
+  }
 }
 
 function mapRepairVerification(record: {
@@ -169,14 +293,17 @@ function mapRepairVerification(record: {
   createdByUserId: string | null; cancelledByUserId: string | null; notes: string | null;
   executionStatus: string; verificationResult: string | null; originalBusinessOutcome: string;
   repairedBusinessOutcome: string | null; regressionControlOutcome: string | null;
-  planSnapshot: unknown; comparisonSnapshot: unknown; failureCode: string | null;
+  planSnapshot: unknown; comparisonSnapshot: unknown; idempotencyKey: string; requestFingerprint: string; failureCode: string | null;
   failureMessage: string | null; inconclusiveReason: string | null; cancellationReason: string | null;
   startedAt: Date | null; completedAt: Date | null; cancelledAt: Date | null;
   createdAt: Date; updatedAt: Date;
 }): RepairVerificationRecord {
+  const planSnapshot = jsonRecord(record.planSnapshot) ?? {};
+  const metadata = jsonRecord(planSnapshot.repairVerification);
   return {
     ...record,
-    planSnapshot: jsonRecord(record.planSnapshot) ?? {},
+    deploymentVersion: typeof metadata?.deploymentVersion === 'string' ? metadata.deploymentVersion : null,
+    planSnapshot,
     comparisonSnapshot: jsonRecord(record.comparisonSnapshot),
   };
 }
