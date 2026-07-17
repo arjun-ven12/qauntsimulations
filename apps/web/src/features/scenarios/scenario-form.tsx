@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { Environment } from '../../services/environment-api.js';
-import type { Invariant } from '../invariants/invariant-api.js';
+import type { Invariant, InvariantType } from '../invariants/invariant-api.js';
 import type { Journey } from '../journeys/journey-api.js';
 import { Field, primaryButton, secondaryButton } from '../projects/project-ui.js';
 import type { ScenarioLaunchInput, ScenarioPreflightResult } from './scenario-api.js';
@@ -16,12 +16,23 @@ import {
   toScenarioLaunchInput,
   type ScenarioFormValue,
 } from './scenario-form.model.js';
+import { ScenarioPresetSelector } from './scenario-preset-selector.js';
+import {
+  applyScenarioPreset,
+  defaultScenarioPresetId,
+  isScenarioPresetCustomised,
+  scenarioPresets,
+} from './scenario-presets.js';
 import { ScenarioPreflightResults } from './scenario-preflight-results.js';
-import { ScenarioTemplatePicker } from './scenario-template-picker.js';
 
 interface ReadyPreflight {
   payload: ScenarioLaunchInput;
   result: ScenarioPreflightResult;
+}
+
+interface AppliedPreset {
+  id: string;
+  payload: ScenarioLaunchInput;
 }
 
 export function ScenarioForm({
@@ -49,6 +60,9 @@ export function ScenarioForm({
   const [preflightError, setPreflightError] = useState<Error | null>(null);
   const [readyPreflight, setReadyPreflight] = useState<ReadyPreflight | null>(null);
   const [localLaunchPending, setLocalLaunchPending] = useState(false);
+  const [selectedPresetId, setSelectedPresetId] = useState(defaultScenarioPresetId);
+  const [appliedPreset, setAppliedPreset] = useState<AppliedPreset | null>(null);
+  const [unavailableInvariantTypes, setUnavailableInvariantTypes] = useState<InvariantType[]>([]);
   const preflightInFlight = useRef(createRequestLock());
   const launchInFlight = useRef(createRequestLock());
   const errors = scenarioFormErrors(value, journeys, invariants);
@@ -57,11 +71,24 @@ export function ScenarioForm({
     readyPreflight?.payload ?? null,
     currentPayload,
   );
+  const customised = Boolean(
+    appliedPreset &&
+      isScenarioPresetCustomised(appliedPreset.payload, currentPayload),
+  );
 
   const change = (next: ScenarioFormValue) => {
     setValue(next);
     setReadyPreflight(null);
     setPreflightError(null);
+  };
+
+  const useSelectedPreset = () => {
+    const preset = scenarioPresets.find((candidate) => candidate.id === selectedPresetId);
+    if (!preset) return;
+    const applied = applyScenarioPreset(value, preset, invariants);
+    change(applied.value);
+    setAppliedPreset({ id: preset.id, payload: toScenarioLaunchInput(applied.value) });
+    setUnavailableInvariantTypes(applied.unavailableInvariantTypes);
   };
 
   const runPreflight = async () => {
@@ -97,11 +124,19 @@ export function ScenarioForm({
   return (
     <div className="mt-6 space-y-6">
       <FormSection
-        description="Use a prepared natural-language objective or write your own."
-        title="Scenario prompt template"
+        description="Start from a tested checkout configuration, then customise any populated value."
+        title="Scenario Presets"
       >
-        <ScenarioTemplatePicker
-          onSelect={(prompt) => change({ ...value, scenario: { ...value.scenario, prompt } })}
+        <ScenarioPresetSelector
+          appliedPresetId={appliedPreset?.id ?? null}
+          customised={customised}
+          onApply={useSelectedPreset}
+          onSelect={(preset) => {
+            setSelectedPresetId(preset.id);
+            setUnavailableInvariantTypes([]);
+          }}
+          selectedPresetId={selectedPresetId}
+          unavailableInvariantTypes={unavailableInvariantTypes}
         />
       </FormSection>
 

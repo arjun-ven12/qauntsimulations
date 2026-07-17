@@ -5,9 +5,6 @@ import type { ScenarioLaunchInput } from './scenario-api.js';
 
 export type ScenarioFormValue = ScenarioLaunchInput;
 
-export const commerceScenarioPrompt =
-  'Test the checkout flow under delayed payment responses and repeated user interaction. Verify that one checkout never creates duplicate payments or duplicate orders.';
-
 export const supportedScenarioControls = [
   'browsers',
   'viewports',

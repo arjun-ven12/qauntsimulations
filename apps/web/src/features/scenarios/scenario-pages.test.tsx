@@ -6,6 +6,8 @@ import { useAuthStore } from '../../stores/auth.store.js';
 import { ScenarioApiError, type ScenarioPreflightResult } from './scenario-api.js';
 import { ScenarioCreatePage } from './scenario-create.page.js';
 import { ScenarioForm } from './scenario-form.js';
+import { ScenarioPresetSelector } from './scenario-preset-selector.js';
+import { defaultScenarioPresetId } from './scenario-presets.js';
 import { ScenarioPreflightResults } from './scenario-preflight-results.js';
 import { environment, invariant, journey, validScenario } from './scenario-test-fixtures.js';
 
@@ -35,6 +37,34 @@ describe('Scenario frontend', () => {
     expect(html).toContain('Maximum concurrent workers');
     expect(html).not.toContain('Maximum compute');
     expect(html).not.toContain('JSON editor');
+  });
+
+  it('renders four catalogue-style presets with delayed payment marked recommended', () => {
+    const html = renderForm();
+    expect(html).toContain('Scenario Presets');
+    expect(html).toContain('Healthy Checkout Baseline');
+    expect(html).toContain('Delayed Payment Double Submission');
+    expect(html).toContain('Mobile Checkout Under Slow Network');
+    expect(html).toContain('Payment Timeout and Retry');
+    expect(html.match(/Recommended/g)).toHaveLength(1);
+    expect(html.match(/2 recommended/g)).toHaveLength(4);
+    expect(html).toContain('Use preset');
+  });
+
+  it('renders unavailable recommended Invariants as a non-blocking status message', () => {
+    const html = renderToStaticMarkup(
+      <ScenarioPresetSelector
+        appliedPresetId={defaultScenarioPresetId}
+        customised={false}
+        onApply={() => undefined}
+        onSelect={() => undefined}
+        selectedPresetId={defaultScenarioPresetId}
+        unavailableInvariantTypes={['NO_DUPLICATE_ORDER']}
+      />,
+    );
+    expect(html).toContain('Unavailable recommended Invariants were left unselected');
+    expect(html).toContain('NO_DUPLICATE_ORDER');
+    expect(html).toContain('role="status"');
   });
 
   it('shows disabled and non-READY Invariants as unavailable rather than selectable', () => {
