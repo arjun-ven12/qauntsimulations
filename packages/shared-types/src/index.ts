@@ -310,12 +310,16 @@ export const investigationEventTypeSchema = z.enum([
   'plan_created', 'world_generated', 'worker_queued', 'sandbox_provisioning', 'sandbox_ready',
   'experiment_started', 'evidence_captured', 'invariant_violated', 'follow_up_generated',
   'reproduction_started', 'finding_confirmed', 'minimisation_started',
+  'minimisation_eligibility_checked',
   'minimisation_plan_created', 'minimisation_candidate_generated',
+  'minimisation_candidate_queued',
   'minimisation_candidate_started', 'minimisation_candidate_completed',
   'minimisation_condition_removed', 'minimisation_condition_retained',
+  'minimisation_condition_inconclusive', 'minimisation_range_candidate_generated',
   'minimisation_range_updated', 'minimal_reproduction_found', 'final_report_started',
-  'final_report_completed', 'minimisation_completed', 'minimisation_inconclusive',
-  'minimisation_cancelled',
+  'final_report_artifact_created', 'final_report_completed', 'minimisation_completed',
+  'minimal_reproduction_candidate_created', 'minimal_reproduction_inconclusive',
+  'minimisation_inconclusive', 'minimisation_cancelled', 'minimisation_failed',
   'investigation_completed', 'investigation_failed',
 ]);
 

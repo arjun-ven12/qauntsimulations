@@ -12,5 +12,6 @@ export class InvestigationController {
   workers = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.workers(request.auth!.organisationId!, String(request.params.investigationId))); } catch (error) { next(error); } };
   evidence = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.evidence(request.auth!.organisationId!, String(request.params.investigationId))); } catch (error) { next(error); } };
   findings = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.findings(request.auth!.organisationId!, String(request.params.investigationId))); } catch (error) { next(error); } };
+  finding = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.finding(request.auth!.organisationId!, String(request.params.investigationId), String(request.params.findingId))); } catch (error) { next(error); } };
   cancel = async (request: Request, response: Response, next: NextFunction) => { try { response.json(await this.service.cancel(request.auth!.organisationId!, String(request.params.investigationId))); } catch (error) { next(error); } };
 }

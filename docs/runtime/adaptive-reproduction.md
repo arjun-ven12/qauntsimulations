@@ -2,7 +2,7 @@
 
 Runtime Milestone 6 adds one bounded, deterministic adaptive stage after the initial local or Daytona fleet settles.
 
-It does not add AI planning, Kimi, Nosana, source-code repair, minimisation, delta debugging, WebSockets, Redis, or a distributed queue.
+It does not add Kimi, Nosana, source-code repair, WebSockets, Redis, or a distributed queue. Runtime Prompt 8 now consumes supported adaptive findings for deterministic minimisation.
 
 ## Lifecycle
 
@@ -13,6 +13,8 @@ RUNNING
 → OBSERVING
 → ADAPTING
 → REPRODUCING
+→ OBSERVING
+→ MINIMISING
 → OBSERVING
 → COMPLETED
 ```
@@ -114,7 +116,7 @@ No new Prisma model is added in this milestone. Existing models are reused:
 - `FindingEvidence` for evidence links;
 - `Finding.causalConditions` for causal status, confidence explanation, variable comparisons, and failure-region estimate.
 
-This avoids duplicating reproduction models before minimisation.
+Prompt 8 adds separate minimisation run/candidate models after this adaptive stage while continuing to reuse `World`, `Experiment`, `EvidenceArtifact`, `InvariantEvaluation`, and `FindingEvidence`.
 
 ## Idempotency
 
@@ -158,4 +160,4 @@ It verifies that initial worlds and adaptive worlds run in isolated Daytona sand
 
 ## Prompt 7 handoff
 
-Prompt 7 adds structured AI-generated initial candidate plans. Adaptive reproduction remains deterministic: OpenAI may propose only the initial bounded world set, and this module still owns exact reproduction, controls, comparison worlds, confidence updates, and failure-region estimates.
+Prompt 7 adds structured AI-generated initial candidate plans. Adaptive reproduction remains deterministic: OpenAI may propose only the initial bounded world set, and this module still owns exact reproduction, controls, comparison worlds, confidence updates, and failure-region estimates. Prompt 8 then performs deterministic minimisation; it does not ask AI to infer causes.

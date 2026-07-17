@@ -76,6 +76,18 @@ describe('API environment security', () => {
     }).success).toBe(false);
   });
 
+  it('validates minimisation defaults and confidence limits', () => {
+    const parsed = apiEnvironmentSchema.parse(requiredEnvironment);
+    expect(parsed.MINIMISATION_ENABLED).toBe(true);
+    expect(parsed.MINIMISATION_MAX_TRIALS).toBe(8);
+    expect(parsed.FINAL_REPORT_ENABLED).toBe(true);
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      ADAPTIVE_CONFIDENCE_MAX: '0.95',
+      MINIMISATION_CONFIDENCE_MAX: '0.94',
+    }).success).toBe(false);
+  });
+
   it('defaults to deterministic planning and permits fallback without OpenAI credentials', () => {
     const result = apiEnvironmentSchema.parse(requiredEnvironment);
     expect(result.PLANNER_PROVIDER).toBe('deterministic');

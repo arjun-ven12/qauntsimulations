@@ -15,7 +15,7 @@ export interface DeterministicWorldDefinition {
   reason: string;
   randomSeed: number;
   creationOrder: number;
-  origin?: 'INITIAL' | 'ADAPTIVE_REPRODUCTION';
+  origin?: 'INITIAL' | 'ADAPTIVE_REPRODUCTION' | 'MINIMISATION';
   adaptive?: {
     reproductionRunId: string;
     findingId: string;
@@ -30,6 +30,20 @@ export interface DeterministicWorldDefinition {
     changedVariables: Record<string, unknown>;
     fixedVariables: Record<string, unknown>;
     hypothesisContribution: string;
+  };
+  minimisation?: {
+    minimisationRunId: string;
+    findingId: string;
+    sourceWorldId: string;
+    reproductionRunId: string;
+    candidateId: string;
+    candidateVariable: string;
+    candidatePurpose: string;
+    sourceValue: unknown;
+    candidateValue: unknown;
+    retainedConditions: Record<string, unknown>;
+    candidateSequence: number;
+    expectedInterpretation: string;
   };
 }
 

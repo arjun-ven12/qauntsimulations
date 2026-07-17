@@ -32,6 +32,12 @@ When deterministic adaptive reproduction is enabled, the same public contract al
 PLANNING → QUEUED → RUNNING → OBSERVING → ADAPTING → REPRODUCING → OBSERVING → COMPLETED
 ```
 
+When deterministic minimisation is enabled after a supported finding, completion may include:
+
+```text
+OBSERVING → MINIMISING → OBSERVING → COMPLETED
+```
+
 `InvestigationProgress` contains `id`, `status`, `progress`, `recentEvents`, and `findingsCount`.
 
 Runtime Prompt 7 allows initial planning provenance to be `DETERMINISTIC`, `OPENAI`, or `FALLBACK`. Planner status metadata may include `PENDING`, `GENERATING`, `VALIDATING`, `ACCEPTED`, `PARTIALLY_ACCEPTED`, `REJECTED`, `FALLBACK_USED`, or `FAILED`. Model output is never converted directly into `WorkerJob`; it is schema-validated, policy-validated, normalized, persisted as planner metadata, and then converted into runtime-owned world definitions.
@@ -53,7 +59,7 @@ The consistency rule is:
 queued + running + passed + failed + flaky <= totalWorlds
 ```
 
-Once all currently generated worlds exist, the sum should normally equal `totalWorlds`. Runtime may append deterministic adaptive follow-up worlds after the initial fleet, so `totalWorlds` is not immutable and may increase during execution.
+Once all currently generated worlds exist, the sum should normally equal `totalWorlds`. Runtime may append deterministic adaptive and minimisation follow-up worlds after the initial fleet, so `totalWorlds` is not immutable and may increase during execution.
 
 ## Creation request
 
@@ -118,4 +124,4 @@ Runtime owner:
 - `WorkerResult`, event, and progress persistence
 - counter updates, findings, runtime-specific database models, and orchestration loops
 
-The existing Prisma schema already supports product fixture records, initial worlds, and deterministic adaptive follow-up worlds. Existing `WorkerJob`, `WorkerResult`, evidence, and runtime execution contracts remain owned by the runtime developer. Adaptive reproduction is bounded to one deterministic stage until minimisation and AI planning are introduced in later milestones.
+The existing Prisma schema supports product fixture records, initial worlds, deterministic adaptive follow-up worlds, and deterministic minimisation worlds. Existing `WorkerJob`, `WorkerResult`, evidence, and runtime execution contracts remain owned by the runtime developer. Prompt 8 stores final evidence reports as `FINAL_REPORT` artifacts and does not add repair verification.

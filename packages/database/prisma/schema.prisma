@@ -314,6 +314,7 @@ model Investigation {
   experiments     Experiment[]
   events          InvestigationEvent[]
   findings        Finding[]
+  minimisationRuns MinimisationRun[]
   memory          MemoryRecord[]
   retrievalAudits PlanningRetrievalAudit[]
 
@@ -356,6 +357,7 @@ model World {
   investigation    Investigation  @relation(fields: [investigationId], references: [id], onDelete: Cascade)
   plan             ExperimentPlan @relation(fields: [experimentPlanId], references: [id], onDelete: Cascade)
   experiments      Experiment[]
+  minimisationCandidates MinimisationCandidate[]
 
   @@index([investigationId, status])
 }
@@ -375,6 +377,7 @@ model Experiment {
   artifacts               EvidenceArtifact[]
   evaluations             InvariantEvaluation[]
   reproductionRuns        ReproductionRun[]
+  minimisationCandidates  MinimisationCandidate[]
   verificationExperiments VerificationExperiment[]
 
   @@index([investigationId, status])
@@ -501,6 +504,7 @@ model Finding {
   conditions          FindingCondition[]
   evidence            FindingEvidence[]
   reproductions       ReproductionRun[]
+  minimisationRuns    MinimisationRun[]
   minimalReproduction MinimalReproduction?
   causalAsCause       CausalRelationship[] @relation("CausalCause")
   causalAsEffect      CausalRelationship[] @relation("CausalEffect")
@@ -547,6 +551,67 @@ model MinimalReproduction {
   updatedAt          DateTime          @updatedAt
   finding            Finding           @relation(fields: [findingId], references: [id], onDelete: Cascade)
   scriptArtifact     EvidenceArtifact? @relation(fields: [scriptArtifactId], references: [id], onDelete: SetNull)
+}
+
+model MinimisationRun {
+  id                           String                   @id
+  investigationId              String
+  findingId                    String
+  sourceWorldId                String
+  reproductionRunId            String
+  status                       String
+  strategyVersion              String
+  originalFailingConfiguration Json
+  currentRetainedConditions    Json                     @default("{}")
+  removedConditions            Json                     @default("{}")
+  inconclusiveConditions       Json                     @default("{}")
+  knownPassingDelayMs          Int?
+  knownFailingDelayMs          Int?
+  generatedCandidateWorldIds   Json                     @default("[]")
+  maximumTrials                Int
+  completedTrials              Int                      @default(0)
+  startedAt                    DateTime                 @default(now())
+  completedAt                  DateTime?
+  cancelledAt                  DateTime?
+  failureCode                  String?
+  failureMessage               String?
+  finalMinimalTestedConditions Json?
+  finalBoundedRange            Json?
+  finalConfidence              Float?
+  finalReportEvidenceId        String?
+  investigation                Investigation            @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  finding                      Finding                  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  candidates                   MinimisationCandidate[]
+
+  @@unique([findingId, strategyVersion])
+  @@index([investigationId, status])
+  @@index([findingId, status])
+}
+
+model MinimisationCandidate {
+  id                   String           @id
+  minimisationRunId    String
+  worldId              String?
+  experimentId         String?
+  sequence             Int
+  purpose              String
+  variableName         String
+  sourceValue          Json
+  candidateValue       Json
+  result               String           @default("QUEUED")
+  conditionDecision    String           @default("INCONCLUSIVE")
+  invariantIds         Json             @default("[]")
+  supportingEvidenceIds Json            @default("[]")
+  createdAt            DateTime         @default(now())
+  completedAt          DateTime?
+  minimisationRun      MinimisationRun  @relation(fields: [minimisationRunId], references: [id], onDelete: Cascade)
+  world                World?           @relation(fields: [worldId], references: [id], onDelete: SetNull)
+  experiment           Experiment?      @relation(fields: [experimentId], references: [id], onDelete: SetNull)
+
+  @@unique([minimisationRunId, sequence])
+  @@index([minimisationRunId, result])
+  @@index([worldId])
+  @@index([experimentId])
 }
 
 model CausalRelationship {
@@ -855,19 +920,27 @@ enum InvestigationEventType {
   reproduction_started
   finding_confirmed
   minimisation_started
+  minimisation_eligibility_checked
   minimisation_plan_created
   minimisation_candidate_generated
+  minimisation_candidate_queued
   minimisation_candidate_started
   minimisation_candidate_completed
   minimisation_condition_removed
   minimisation_condition_retained
+  minimisation_condition_inconclusive
+  minimisation_range_candidate_generated
   minimisation_range_updated
+  minimal_reproduction_candidate_created
   minimal_reproduction_found
+  minimal_reproduction_inconclusive
   final_report_started
+  final_report_artifact_created
   final_report_completed
   minimisation_completed
   minimisation_inconclusive
   minimisation_cancelled
+  minimisation_failed
   investigation_completed
   investigation_failed
   investigation_cancelled

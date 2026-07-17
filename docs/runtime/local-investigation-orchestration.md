@@ -1,6 +1,6 @@
 # Local investigation orchestration
 
-Runtime Milestone 3 added a development-only, in-process orchestration path around the existing Playwright worker. It persists all durable state in Neon through Prisma but does not claim to be a production distributed queue. Runtime Milestone 6 can append deterministic adaptive follow-up worlds after the initial fleet. AI planning, minimisation, and repair verification remain excluded.
+Runtime Milestone 3 added a development-only, in-process orchestration path around the existing Playwright worker. It persists all durable state in Neon through Prisma but does not claim to be a production distributed queue. Runtime Milestone 6 can append deterministic adaptive follow-up worlds after the initial fleet. Runtime Milestone 8 can append deterministic minimisation worlds after a supported finding. Repair verification remains excluded.
 
 ## Architecture
 
@@ -32,6 +32,12 @@ With adaptive reproduction enabled and an eligible finding, the lifecycle become
 PLANNING → QUEUED → RUNNING → OBSERVING → ADAPTING → REPRODUCING → OBSERVING → COMPLETED
 ```
 
+With minimisation enabled and an eligible supported finding, completion is delayed until:
+
+```text
+OBSERVING → MINIMISING → OBSERVING → COMPLETED
+```
+
 An orchestration-level fatal error enters `FAILED`. A world-level invariant violation does not fail the investigation; it increments the public `failed` world counter and the investigation can still complete.
 
 Public progress follows the frozen contract:
@@ -43,7 +49,7 @@ Public progress follows the frozen contract:
 - `failed`: invariant-violating, execution-error, or cancelled experiments;
 - `flaky`: zero in this milestone.
 
-At normal completion the classified counters equal `totalWorlds`. During adaptive reproduction, `totalWorlds` may increase as follow-up worlds are persisted.
+At normal completion the classified counters equal `totalWorlds`. During adaptive reproduction and minimisation, `totalWorlds` may increase as follow-up worlds are persisted.
 
 ## Deterministic worlds
 
@@ -58,7 +64,7 @@ The local demo store has one global reset/configuration state at port 5174. To p
 
 ## Persistence
 
-Existing Prisma models are reused: `Investigation`, `ExperimentPlan`, `World`, `Experiment`, `Worker`, `ExecutionAttempt`, `EvidenceArtifact`, `InvariantEvaluation`, `Finding`, `FindingEvidence`, and `InvestigationEvent`.
+Existing Prisma models are reused: `Investigation`, `ExperimentPlan`, `World`, `Experiment`, `Worker`, `ExecutionAttempt`, `EvidenceArtifact`, `InvariantEvaluation`, `Finding`, `FindingEvidence`, and `InvestigationEvent`. Prompt 8 adds `MinimisationRun` and `MinimisationCandidate` as a durable ledger while still using normal worlds and experiments for execution.
 
 Execution attempts store the validated `WorkerResult`, exit code, duration, result and manifest paths, and compact metrics. Evidence rows store relative paths, content type, size, checksum, redaction state, and safe metadata. Screenshots, traces, console logs, network logs, manifests, and result JSON remain on local disk beneath:
 
@@ -67,6 +73,8 @@ storage/evidence/<investigationId>/<worldId>/<experimentId>/attempt-1/
 ```
 
 Every passing and failing invariant evaluation is persisted with confidence and evidence references.
+
+Final reports are stored as `FINAL_REPORT` evidence artifacts under `storage/evidence/reports/<investigationId>/<findingId>/`.
 
 ## Findings
 

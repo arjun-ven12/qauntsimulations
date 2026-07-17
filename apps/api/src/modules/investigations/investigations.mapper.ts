@@ -62,7 +62,40 @@ interface WorkerListRecord { id: string; status: string; providerId: string | nu
 export function mapWorkerList(records: WorkerListRecord[]) { return records.map((worker) => ({ id: worker.id, provider: worker.providerId ?? 'LOCAL', status: worker.status, attempts: worker.attempts.map((attempt) => ({ ...attempt, startedAt: attempt.startedAt?.toISOString(), completedAt: attempt.completedAt?.toISOString() })), createdAt: worker.createdAt.toISOString(), updatedAt: worker.updatedAt.toISOString() })); }
 
 interface EvidenceListRecord { id: string; experimentId: string; type: string; storageKey: string; mimeType: string; sizeBytes: bigint; checksum: string | null; redacted: boolean; createdAt: Date; metadata: unknown }
-export function mapEvidenceList(records: EvidenceListRecord[]) { return records.map((artifact) => ({ id: artifact.id, experimentId: artifact.experimentId, type: artifact.type, path: artifact.storageKey, mimeType: artifact.mimeType, sizeBytes: Number(artifact.sizeBytes), checksum: artifact.checksum, redacted: artifact.redacted, metadata: artifact.metadata, createdAt: artifact.createdAt.toISOString() })); }
+const localPathKeys = new Set(['path', 'absolutePath', 'localPath', 'filesystemPath', 'filePath']);
+function sanitizeEvidenceMetadata(metadata: unknown): unknown {
+  if (Array.isArray(metadata)) return metadata.map((value) => sanitizeEvidenceMetadata(value));
+  if (!metadata || typeof metadata !== 'object') {
+    if (typeof metadata === 'string' && (/\/Users\//.test(metadata) || /^[A-Za-z]:[\\/]/.test(metadata))) return '[redacted-local-path]';
+    return metadata;
+  }
+  return Object.fromEntries(Object.entries(metadata as Record<string, unknown>).flatMap(([key, value]) => {
+    if (localPathKeys.has(key) && typeof value === 'string') return [];
+    return [[key, sanitizeEvidenceMetadata(value)]];
+  }));
+}
+export function mapEvidenceList(records: EvidenceListRecord[]) { return records.map((artifact) => ({ id: artifact.id, experimentId: artifact.experimentId, type: artifact.type, path: artifact.storageKey, mimeType: artifact.mimeType, sizeBytes: Number(artifact.sizeBytes), checksum: artifact.checksum, redacted: artifact.redacted, metadata: sanitizeEvidenceMetadata(artifact.metadata), createdAt: artifact.createdAt.toISOString() })); }
 
 interface FindingListRecord { id: string; investigationId: string; title: string; summary: string; severity: string; confidence: string; reproductionCount: number; causalConditions: unknown; createdAt: Date; updatedAt: Date }
 export function mapFindingList(records: FindingListRecord[]) { return records.map((finding) => findingSchema.parse({ ...finding, causalConditions: finding.causalConditions, createdAt: finding.createdAt.toISOString(), updatedAt: finding.updatedAt.toISOString() })); }
+
+interface FindingDetailRecord extends FindingListRecord {
+  evidence: Array<{ artifact: EvidenceListRecord }>;
+  reproductions: Array<{ id: string; experimentId: string; reproduced: boolean; createdAt: Date }>;
+  minimalReproduction: { id: string; journeySteps: unknown; worldConfiguration: unknown; scriptArtifactId: string | null; createdAt: Date; updatedAt: Date } | null;
+}
+export function mapFindingDetail(finding: FindingDetailRecord) {
+  const summary = findingSchema.parse({ ...finding, causalConditions: finding.causalConditions, createdAt: finding.createdAt.toISOString(), updatedAt: finding.updatedAt.toISOString() });
+  return {
+    ...summary,
+    evidence: mapEvidenceList(finding.evidence.map(({ artifact }) => artifact)),
+    reproductions: finding.reproductions.map((run) => ({ ...run, createdAt: run.createdAt.toISOString() })),
+    minimalReproduction: finding.minimalReproduction
+      ? {
+          ...finding.minimalReproduction,
+          createdAt: finding.minimalReproduction.createdAt.toISOString(),
+          updatedAt: finding.minimalReproduction.updatedAt.toISOString(),
+        }
+      : null,
+  };
+}

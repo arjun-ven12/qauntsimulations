@@ -23,6 +23,8 @@
     "runtime:adaptive:daytona:test": "RUN_DAYTONA_ADAPTIVE_INTEGRATION_TESTS=true ADAPTIVE_REPRODUCTION_ENABLED=true pnpm exec vitest run apps/api/src/modules/execution/__tests__/daytona-adaptive.integration.test.ts",
     "runtime:planner:test": "pnpm exec vitest run apps/api/src/modules/experiments/services/__tests__/investigation-planning.test.ts apps/api/src/config/__tests__/env.test.ts",
     "runtime:planner:openai:test": "RUN_OPENAI_PLANNER_INTEGRATION_TESTS=true PLANNER_PROVIDER=openai PLANNER_FALLBACK_ENABLED=true pnpm exec vitest run apps/api/src/modules/experiments/services/__tests__/openai-planner.integration.test.ts",
+    "runtime:minimisation:test": "pnpm exec vitest run apps/api/src/modules/experiments/services/__tests__/minimisation.test.ts apps/api/src/modules/experiments/services/__tests__/final-evidence-report.test.ts",
+    "runtime:minimisation:daytona:test": "RUN_DAYTONA_MINIMISATION_INTEGRATION_TESTS=true MINIMISATION_ENABLED=true FINAL_REPORT_ENABLED=true WORKER_EXECUTION_PROVIDER=daytona pnpm exec vitest run apps/api/src/modules/execution/__tests__/daytona-minimisation.integration.test.ts",
     "runtime:daytona:cleanup": "pnpm --filter @taskos/api exec tsx src/scripts/daytona-orphan-cleanup.ts",
     "runtime:daytona:cleanup:dry-run": "pnpm --filter @taskos/api exec tsx src/scripts/daytona-orphan-cleanup.ts --dry-run",
     "format": "prettier --write ."

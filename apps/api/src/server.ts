@@ -17,6 +17,7 @@ import { EnvironmentController } from './modules/environments/environments.contr
 import { EnvironmentRepository } from './modules/environments/environments.repository.js';
 import { EnvironmentService } from './modules/environments/environments.service.js';
 import { DeterministicExperimentPlanService } from './modules/experiments/services/deterministic-experiment-plan.service.js';
+import { FinalEvidenceReportService } from './modules/experiments/services/final-evidence-report.service.js';
 import {
   DeterministicExperimentPlanner,
   InvestigationPlanningService,
@@ -157,6 +158,22 @@ const investigationOrchestrator = new InvestigationOrchestratorService(
     minimumEvidenceWorlds: env.ADAPTIVE_MIN_EVIDENCE_WORLDS,
     timeoutSeconds: env.ADAPTIVE_REPRODUCTION_TIMEOUT_SECONDS,
   },
+  undefined,
+  undefined,
+  {
+    enabled: env.MINIMISATION_ENABLED,
+    maximumFindingsPerInvestigation: env.MINIMISATION_MAX_FINDINGS_PER_INVESTIGATION,
+    maximumTrials: env.MINIMISATION_MAX_TRIALS,
+    maximumTotalWorlds: env.MINIMISATION_MAX_TOTAL_WORLDS,
+    maximumDurationSeconds: env.MINIMISATION_MAX_DURATION_SECONDS,
+    maximumDelayTrials: env.MINIMISATION_MAX_DELAY_TRIALS,
+    delayTargetPrecisionMs: env.MINIMISATION_DELAY_TARGET_PRECISION_MS,
+    confirmFinalSet: env.MINIMISATION_CONFIRM_FINAL_SET,
+    confidenceMaximum: env.MINIMISATION_CONFIDENCE_MAX,
+    finalReportEnabled: env.FINAL_REPORT_ENABLED,
+  },
+  undefined,
+  new FinalEvidenceReportService(evidenceRoot),
 );
 await new ExecutionCleanupService(investigationRepository).run();
 
