@@ -62,8 +62,8 @@ export interface DeterministicExperimentPlan {
   launch?: PersistedLaunchSnapshot;
   planner?: {
     version: string;
-    requestedProvider: 'DETERMINISTIC' | 'OPENAI';
-    effectiveProvider: 'DETERMINISTIC' | 'OPENAI' | 'FALLBACK';
+    requestedProvider: 'DETERMINISTIC' | 'OPENAI' | 'KIMI';
+    effectiveProvider: 'DETERMINISTIC' | 'OPENAI' | 'KIMI' | 'FALLBACK';
     plannerStatus: string;
     model?: string;
     assumptions: string[];
@@ -75,6 +75,7 @@ export interface DeterministicExperimentPlan {
     fallbackReason?: string;
     generationDurationMs?: number;
     validationDurationMs?: number;
+    generatedAt?: string;
     usage?: unknown;
   };
 }

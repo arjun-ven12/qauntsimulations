@@ -80,7 +80,32 @@ function application(evidenceRoot?: string) {
       minimalReproduction: { id: 'minimal_api_test', findingId: 'finding_api_test', journeySteps: [], worldConfiguration: {}, scriptArtifactId: null, createdAt, updatedAt: createdAt },
     } : null,
     cancel: async () => { progressRecord.status = 'CANCELLED'; return true; },
-    orchestrationContext: async () => null,
+    orchestrationContext: async (id: string) => id === progressRecord.id ? {
+      id,
+      organisationId: 'organisation_demo_taskos',
+      projectId: 'project_demo_checkout',
+      environmentId: 'environment_demo_local',
+      journeyId: 'journey_checkout',
+      scenarioId: 'scenario_duplicate_submission',
+      environmentBaseUrl: 'http://localhost:5174',
+      planId: 'plan_api_test',
+      plan: {
+        objective: 'Kimi-generated checkout plan',
+        journeyId: 'journey_checkout',
+        scenarioId: 'scenario_duplicate_submission',
+        selectedVariables: ['browser'],
+        selectedControls: demoCreateInvestigationInput.scenario.controls,
+        invariantIds: demoCreateInvestigationInput.invariantIds,
+        executionProvider: 'LOCAL_PLAYWRIGHT' as const,
+        maximumConcurrentWorkers: 2,
+        worlds: [],
+        planningExplanation: 'Validated initial plan.',
+        planner: {
+          version: 'v1', requestedProvider: 'KIMI' as const, effectiveProvider: 'KIMI' as const, plannerStatus: 'ACCEPTED', model: 'kimi-k2.6',
+          assumptions: [], warnings: [], rejectedPlanItems: [], normalizedFields: [], acceptedWorldCount: 0, rejectedWorldCount: 0, generatedAt: createdAt.toISOString(),
+        },
+      },
+    } : null,
     failInvestigation: async () => { progressRecord.status = 'FAILED'; },
   };
   const service = new InvestigationService(
@@ -132,6 +157,16 @@ describe('investigation API', () => {
       invariantIds: ['invariant_single_checkout_submission'],
       validation: { status: 'READY', warnings: [] },
     });
+  });
+  it('returns public Kimi planner provenance without credentials', async () => {
+    const response = await request(application()).get('/api/investigations/investigation_api_test/plan').set('authorization', 'Bearer valid');
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      aiProvider: 'KIMI',
+      plannerStatus: 'ACCEPTED',
+      plannerMetadata: { requestedProvider: 'KIMI', effectiveProvider: 'KIMI', model: 'kimi-k2.6' },
+    });
+    expect(JSON.stringify(response.body)).not.toContain('API_KEY');
   });
   it('rejects invalid scope and missing invariants', async () => {
     const invalidProject = await request(application()).post('/api/investigations').set('authorization', 'Bearer valid').send({ ...demoCreateInvestigationInput, projectId: 'missing' });

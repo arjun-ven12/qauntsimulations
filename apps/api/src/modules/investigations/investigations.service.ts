@@ -84,7 +84,30 @@ export class InvestigationService {
     return this.evidenceContent.readFinalReport(id, artifact);
   }
   async cancel(organisationId: string, id: string) { if (!(await this.repository.cancel(organisationId, id))) throw new ApplicationError('INVESTIGATION_NOT_CANCELLABLE', 'Investigation was not found or is already terminal', 409); return this.get(organisationId, id); }
-  async plan(organisationId: string, id: string) { await this.requireProgress(organisationId, id); return (await this.repository.orchestrationContext(id))?.plan ?? null; }
+  async plan(organisationId: string, id: string) {
+    await this.requireProgress(organisationId, id);
+    const plan = (await this.repository.orchestrationContext(id))?.plan;
+    if (!plan) return null;
+    return {
+      objective: plan.objective,
+      journeyId: plan.journeyId,
+      scenarioId: plan.scenarioId,
+      worldPack: 'persisted-launch-v1',
+      selectedVariables: plan.selectedVariables,
+      initialWorldCount: plan.worlds.length,
+      maximumWorldCount: plan.selectedControls.maximumWorlds,
+      maximumConcurrentWorkers: plan.maximumConcurrentWorkers,
+      timeoutSeconds: 0,
+      retryCount: 0,
+      safetyConstraints: plan.launch ? [plan.launch.safety] : [],
+      invariants: plan.launch?.invariants ?? [],
+      worlds: plan.worlds,
+      planningExplanation: plan.planningExplanation,
+      aiProvider: plan.planner?.effectiveProvider ?? 'DETERMINISTIC',
+      plannerStatus: plan.planner?.plannerStatus ?? 'ACCEPTED',
+      plannerMetadata: plan.planner,
+    };
+  }
 
   private async requireProgress(organisationId: string, id: string) {
     const record = await this.repository.progress(organisationId, id);

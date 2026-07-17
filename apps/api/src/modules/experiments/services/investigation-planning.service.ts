@@ -38,7 +38,7 @@ export interface PlannerValidationResult {
 }
 
 export interface InvestigationPlanningOptions {
-  requestedProvider: 'deterministic' | 'openai';
+  requestedProvider: 'deterministic' | 'openai' | 'kimi';
   fallbackEnabled: boolean;
   maximumWorlds: number;
   maximumVariables: number;
@@ -95,6 +95,7 @@ export class DeterministicExperimentPlanner {
         normalizedFields: [],
         acceptedWorldCount: Math.min(4, input.scenario.controls.maximumWorlds),
         rejectedWorldCount: 0,
+        generatedAt: new Date().toISOString(),
       },
     };
   }
@@ -104,42 +105,44 @@ export class InvestigationPlanningService {
   constructor(
     private readonly options: InvestigationPlanningOptions,
     private readonly deterministicPlanner = new DeterministicExperimentPlanner(),
-    private readonly openAIPlanner?: ExperimentPlanner,
+    private readonly providerPlanner?: ExperimentPlanner,
   ) {}
 
   async plan(input: CreateInvestigationInput, scope: PlanningScope, signal?: AbortSignal): Promise<InvestigationPlanningResult> {
-    const requestedProvider = this.options.requestedProvider === 'openai' ? 'OPENAI' : 'DETERMINISTIC';
-    if (requestedProvider === 'DETERMINISTIC') return this.deterministic(input, scope, 'DETERMINISTIC');
-    if (!this.openAIPlanner) {
-      if (!this.options.fallbackEnabled) throw new PlannerConfigurationError('OPENAI_API_KEY is required when PLANNER_PROVIDER=openai and fallback is disabled');
-      return this.deterministic(input, scope, 'FALLBACK', 'OpenAI planner is not configured.');
+    const requestedProvider = plannerProvider(this.options.requestedProvider);
+    if (requestedProvider === 'DETERMINISTIC') return this.deterministic(input, scope, requestedProvider, 'DETERMINISTIC');
+    if (!this.providerPlanner || this.providerPlanner.provider !== requestedProvider) {
+      const message = `${providerName(requestedProvider)} planner is not configured.`;
+      if (!this.options.fallbackEnabled) throw new PlannerConfigurationError(message);
+      return this.deterministic(input, scope, requestedProvider, 'FALLBACK', message);
     }
 
     const request = this.request(input, scope);
     const generation = await this.generateWithProvider(request, signal);
     if (!generation.output) {
-      if (!this.options.fallbackEnabled) throw new PlannerPolicyValidationError(generation.error?.message ?? 'OpenAI planner failed');
-      return this.deterministic(input, scope, 'FALLBACK', generation.error?.message ?? 'OpenAI planner failed.', generation);
+      if (!this.options.fallbackEnabled) throw new PlannerPolicyValidationError(generation.error?.message ?? 'Planner provider failed');
+      return this.deterministic(input, scope, requestedProvider, 'FALLBACK', generation.error?.message ?? 'Planner provider failed.', generation);
     }
 
     const validationStarted = Date.now();
     const validation = this.validateGeneratedPlan(generation.output, input, scope);
     const validationDurationMs = Date.now() - validationStarted;
     const enoughWorlds = validation.acceptedWorlds.length >= 1 && validation.acceptedWorlds.some(isBaseline);
-    if (!validation.accepted || !enoughWorlds) {
+    if (!validation.accepted || !enoughWorlds || (requestedProvider === 'KIMI' && validation.partiallyAccepted)) {
       const reason = validation.rejectedWorlds.length
         ? validation.rejectedWorlds.flatMap((world) => world.reasons).join('; ').slice(0, 500)
-        : 'OpenAI plan did not leave a meaningful accepted baseline/control world.';
-      if (!this.options.fallbackEnabled) throw new PlannerPolicyValidationError(reason);
-      return this.deterministic(input, scope, 'FALLBACK', reason, generation, validationDurationMs);
+        : `${providerName(requestedProvider)} plan did not leave a meaningful accepted baseline/control world.`;
+      const safeReason = `PLAN_SAFETY_INVALID: ${reason}`;
+      if (!this.options.fallbackEnabled) throw new PlannerPolicyValidationError(safeReason);
+      return this.deterministic(input, scope, requestedProvider, 'FALLBACK', safeReason, generation, validationDurationMs);
     }
 
     const plannerStatus: PlannerStatus = validation.partiallyAccepted ? 'PARTIALLY_ACCEPTED' : 'ACCEPTED';
-    const plan = this.buildPlanFromGenerated(input, scope, generation.output, validation, 'OPENAI', plannerStatus, generation);
+    const plan = this.buildPlanFromGenerated(input, scope, generation.output, validation, requestedProvider, plannerStatus, generation);
     return {
       plan,
       requestedProvider,
-      effectiveProvider: 'OPENAI',
+      effectiveProvider: requestedProvider,
       plannerStatus,
       validation,
       assumptions: generation.output.assumptions,
@@ -154,9 +157,9 @@ export class InvestigationPlanningService {
   }
 
   private async generateWithProvider(request: PlannerRequest, signal?: AbortSignal): Promise<PlannerGenerationResult> {
-    if (!this.openAIPlanner) throw new PlannerConfigurationError('OpenAI planner is not configured.');
+    if (!this.providerPlanner) throw new PlannerConfigurationError('Planner provider is not configured.');
     try {
-      return await this.openAIPlanner.generatePlan(request, {
+      return await this.providerPlanner.generatePlan(request, {
         plannerVersion: experimentPlannerPromptVersion,
         ...(this.options.model ? { model: this.options.model } : {}),
         timeoutMs: this.options.timeoutMs,
@@ -166,14 +169,14 @@ export class InvestigationPlanningService {
       });
     } catch (error) {
       return {
-        provider: 'OPENAI',
+        provider: plannerProvider(this.options.requestedProvider),
         status: 'FAILED',
         ...(this.options.model ? { model: this.options.model } : {}),
         durationMs: 0,
         usage: { providerRequestCount: 1 },
         error: {
           code: error instanceof Error && error.name === 'ZodError' ? 'PlannerSchemaValidationError' : 'PlannerProviderError',
-          message: error instanceof Error ? error.message.slice(0, 500) : 'Planner provider failed',
+          message: 'Planner provider request failed.',
         },
       };
     }
@@ -182,6 +185,7 @@ export class InvestigationPlanningService {
   private deterministic(
     input: CreateInvestigationInput,
     scope: PlanningScope,
+    requestedProvider: Exclude<PlannerProvider, 'FALLBACK'>,
     effectiveProvider: 'DETERMINISTIC' | 'FALLBACK',
     fallbackReason?: string,
     generation?: PlannerGenerationResult,
@@ -197,15 +201,18 @@ export class InvestigationPlanningService {
     if (!existingPlanner) throw new PlannerPolicyValidationError('Deterministic planner did not return planner metadata');
     plan.planner = {
       ...existingPlanner,
-      requestedProvider: generation ? 'OPENAI' : 'DETERMINISTIC',
+      requestedProvider,
       effectiveProvider,
       plannerStatus,
       ...(fallbackReason ? { fallbackReason } : {}),
+      ...(generation?.model ? { model: generation.model } : this.options.model ? { model: this.options.model } : {}),
+      ...(generation ? { generationDurationMs: generation.durationMs } : {}),
+      ...(generation?.usage ? { usage: generation.usage } : {}),
+      generatedAt: new Date().toISOString(),
       warnings: validation.warnings,
       acceptedWorldCount: validation.acceptedWorlds.length,
       rejectedWorldCount: validation.rejectedWorlds.length,
     };
-    const requestedProvider: 'DETERMINISTIC' | 'OPENAI' = generation ? 'OPENAI' : 'DETERMINISTIC';
     const result: InvestigationPlanningResult = {
       plan,
       requestedProvider,
@@ -229,11 +236,27 @@ export class InvestigationPlanningService {
     return {
       scenarioPrompt: input.scenario.prompt,
       project: { id: input.projectId, name: scope.projectName },
-      environment: { id: input.environmentId, name: scope.environmentName },
+      environment: {
+        id: input.environmentId,
+        name: scope.environmentName,
+        ...(scope.launch ? {
+          type: scope.launch.environment.type,
+          origin: safeOrigin(scope.launch.environment.baseUrl),
+          capabilities: {
+            allowedActions: scope.launch.environment.allowedActions ?? [],
+            ...(scope.launch.environment.payment ? { payment: scope.launch.environment.payment } : {}),
+            ...(scope.launch.environment.reset ? { reset: scope.launch.environment.reset } : {}),
+          },
+        } : {}),
+      },
       journey: {
         id: input.journeyId,
         name: scope.journeyName,
         supportedVariables: ['browser', 'viewport', 'networkProfile', 'userProfile', 'paymentDelayMs', 'duplicateSubmissionBug', 'doubleSubmit', 'doubleSubmitIntervalMs'],
+        ...(scope.launch ? {
+          supportedActionTypes: [...new Set(scope.launch.journey.steps.map((step) => step.type))],
+          steps: scope.launch.journey.steps.map(sanitizeJourneyStep),
+        } : {}),
       },
       controls: {
         allowedBrowsers: input.scenario.controls.browsers,
@@ -244,6 +267,7 @@ export class InvestigationPlanningService {
       },
       invariants: scope.invariants,
       supportedFaults,
+      ...(scope.launch ? { safety: scope.launch.safety } : {}),
     };
   }
 
@@ -346,7 +370,7 @@ export class InvestigationPlanningService {
       ...(scope.launch ? { launch: scope.launch } : {}),
       planner: {
         version: experimentPlannerPromptVersion,
-        requestedProvider: 'OPENAI',
+        requestedProvider: generation.provider === 'KIMI' ? 'KIMI' : 'OPENAI',
         effectiveProvider,
         plannerStatus,
         ...(generation.model ? { model: generation.model } : {}),
@@ -357,6 +381,7 @@ export class InvestigationPlanningService {
         acceptedWorldCount: validation.acceptedWorlds.length,
         rejectedWorldCount: validation.rejectedWorlds.length,
         generationDurationMs: generation.durationMs,
+        generatedAt: new Date().toISOString(),
         ...(generation.usage ? { usage: generation.usage } : {}),
       },
     };
@@ -434,4 +459,30 @@ function worldFingerprint(world: DeterministicWorldDefinition, input: CreateInve
 
 function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'world';
+}
+
+function plannerProvider(provider: InvestigationPlanningOptions['requestedProvider']): Exclude<PlannerProvider, 'FALLBACK'> {
+  if (provider === 'openai') return 'OPENAI';
+  if (provider === 'kimi') return 'KIMI';
+  return 'DETERMINISTIC';
+}
+
+function providerName(provider: Exclude<PlannerProvider, 'FALLBACK'>): string {
+  return provider === 'KIMI' ? 'Kimi' : provider === 'OPENAI' ? 'OpenAI' : 'Deterministic';
+}
+
+function safeOrigin(value: string): string {
+  try {
+    const url = new URL(value);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return 'Configured environment';
+  }
+}
+
+function sanitizeJourneyStep(step: PersistedLaunchSnapshot['journey']['steps'][number]): Record<string, unknown> {
+  const candidate = step as unknown as Record<string, unknown>;
+  return Object.fromEntries(
+    Object.entries(candidate).filter(([key]) => !['value', 'expectedText'].includes(key)),
+  );
 }
