@@ -34,8 +34,18 @@ describe('KimiExperimentPlanner', () => {
     });
     const result = await new KimiExperimentPlanner(client, 'sponsor-model').generatePlan(request, { plannerVersion: 'v1', timeoutMs: 60_000, maxOutputTokens: 3_000, maxAttempts: 1 });
     expect(result).toMatchObject({ provider: 'KIMI', status: 'VALIDATING', model: 'sponsor-model', usage: { providerRequestCount: 1 } });
-    expect(captured).toMatchObject({ model: 'sponsor-model', max_tokens: 3_000, response_format: { type: 'json_object' } });
+    expect(captured).toMatchObject({
+      model: 'sponsor-model',
+      max_completion_tokens: 3_000,
+      response_format: { type: 'json_object' },
+      thinking: { type: 'disabled' },
+    });
+    expect(captured).not.toHaveProperty('max_tokens');
     expect(captured).not.toHaveProperty('temperature');
+    expect(captured).not.toHaveProperty('top_p');
+    expect(captured).not.toHaveProperty('presence_penalty');
+    expect(captured).not.toHaveProperty('frequency_penalty');
+    expect(captured).not.toHaveProperty('n');
     const serializedMessages = JSON.stringify(captured?.messages);
     expect(serializedMessages).toContain('maximumWorlds');
     expect(serializedMessages).toContain('domainAllowlist');

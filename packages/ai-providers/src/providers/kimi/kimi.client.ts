@@ -14,7 +14,15 @@ export interface KimiCompletionOptions {
   signal?: AbortSignal;
 }
 
-export type KimiCompletionRequest = ChatCompletionCreateParamsNonStreaming;
+interface KimiChatCompletionExtraBody {
+  thinking: {
+    type: 'disabled';
+  };
+}
+
+// The OpenAI Node SDK serializes additional POST parameters directly into the
+// request body (the equivalent of `extra_body` in other OpenAI SDKs).
+export type KimiCompletionRequest = ChatCompletionCreateParamsNonStreaming & KimiChatCompletionExtraBody;
 export type KimiCompletionTransport = (
   request: KimiCompletionRequest,
   options: { timeout: number; signal?: AbortSignal },
@@ -50,8 +58,9 @@ export class KimiClient {
           { role: 'system', content: instructions },
           { role: 'user', content: JSON.stringify(input) },
         ],
-        max_tokens: options.maxOutputTokens,
+        max_completion_tokens: options.maxOutputTokens,
         response_format: { type: 'json_object' },
+        thinking: { type: 'disabled' },
       },
       { timeout: options.timeoutMs, ...(options.signal ? { signal: options.signal } : {}) },
     );

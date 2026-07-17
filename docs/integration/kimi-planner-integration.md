@@ -20,7 +20,7 @@ Secrets belong in the deployment secret store or an uncommitted local environmen
 
 `KimiExperimentPlanner` implements the same `ExperimentPlanner` contract as `OpenAIExperimentPlanner`. `KimiClient` uses the existing OpenAI Node SDK with a configurable `baseURL` and calls Chat Completions. The server constructs one selected planner adapter at startup; the investigation planning service remains the single planning pipeline.
 
-The request uses the configured model, bounded output tokens, JSON-object response mode, one request, and the configured timeout. It intentionally omits `temperature`: Kimi K2.6 uses provider-fixed temperature values and rejects `temperature: 0`. The shared planning prompt is reused and receives sanitized persisted launch context: environment origin without URL credentials, capabilities, Journey steps without fill values, action types, selected Invariants, maximum worlds, supported dimensions and faults, and Project Safety constraints.
+The request uses the configured model, bounded `max_completion_tokens`, JSON-object response mode, one request, and the configured timeout. It disables K2.6 thinking with `thinking: { type: "disabled" }`, sent as a narrowly typed provider-specific POST-body field (the OpenAI Node SDK equivalent of `extra_body`). It intentionally omits `temperature`: Kimi K2.6 uses provider-fixed temperature values and rejects `temperature: 0`. The shared planning prompt is reused and receives sanitized persisted launch context: environment origin without URL credentials, capabilities, Journey steps without fill values, action types, selected Invariants, maximum worlds, supported dimensions and faults, and Project Safety constraints.
 
 The response flow is:
 
@@ -50,6 +50,6 @@ Run the mock tests first. A real planner-only check is permitted only when both 
 
 ## Known limitations
 
-- Kimi-specific thinking mode is omitted because the installed OpenAI SDK does not expose the documented extra-body shape with sufficiently narrow TypeScript types. The planner leaves K2.6 temperature at its provider-defined value.
+- The installed OpenAI Node SDK does not name provider extensions `extra_body`; it serializes additional POST parameters directly. TaskOS supplies only Kimi's `thinking` extension through a narrow local type and keeps temperature at its provider-defined value.
 - Kimi JSON Schema structured outputs are not assumed; TaskOS uses JSON-object mode followed by its own authoritative Zod validation.
 - Availability, sponsor model access, and rate limits remain provider-account concerns.
