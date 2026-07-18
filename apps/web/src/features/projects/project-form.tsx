@@ -9,6 +9,7 @@ import {
   TemplateManager,
   builtInTemplate,
   projectTemplatePayloadSchema,
+  type ProjectTemplatePayload,
 } from '../templates/index.js';
 import { Field, primaryButton, secondaryButton } from './project-ui.js';
 
@@ -123,12 +124,12 @@ export function ProjectForm({
           'project-built-in-web-application',
           'Web application',
           'A clean authorised web application configuration.',
-          emptyProject(),
+          projectTemplateValue(emptyProject()),
         ),
       ]}
       category="PROJECT"
       onApply={(payload) => {
-        setValue(payload);
+        setValue((current) => ({ ...current, ...payload }));
         setErrors({});
         setDirty(true);
       }}
@@ -140,16 +141,12 @@ export function ProjectForm({
             ['Application', projectHostname(payload.applicationUrl)],
             [
               'Access references',
-              String(
-                payload.credentialReferences.length +
-                  payload.apiEndpoints.length +
-                  payload.webhookEndpoints.length,
-              ),
+              String(payload.apiEndpoints.length + payload.webhookEndpoints.length),
             ],
           ]}
         />
       )}
-      value={value}
+      value={projectTemplateValue(value)}
     />
   );
 
@@ -775,6 +772,11 @@ function emptyProject(): ProjectFormValue {
     apiEndpoints: [],
     webhookEndpoints: [],
   };
+}
+
+function projectTemplateValue(value: ProjectFormValue): ProjectTemplatePayload {
+  const { credentialReferences: _credentialReferences, ...payload } = value;
+  return payload;
 }
 
 function validate(value: ProjectFormValue, acknowledgementMissing?: boolean) {

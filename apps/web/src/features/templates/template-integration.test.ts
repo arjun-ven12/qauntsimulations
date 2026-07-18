@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-const source = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+const repositoryRoot = fileURLToPath(new URL('../../../../../', import.meta.url));
+const source = (path: string) => readFileSync(resolve(repositoryRoot, path), 'utf8');
 
 describe('Template category integration', () => {
   it.each([

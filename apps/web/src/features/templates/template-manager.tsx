@@ -3,7 +3,7 @@ import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'rea
 import type { z } from 'zod';
 import { primaryButton, secondaryButton } from '../projects/project-ui.js';
 import type { RiftTemplate, TemplateCategory } from './template-model.js';
-import { parseImportedTemplate } from './template-storage.js';
+import { parseImportedTemplate, parseTemplatePayload } from './template-storage.js';
 import { useTemplateLibrary } from './use-template-library.js';
 
 export function TemplateManager<TPayload>({
@@ -28,6 +28,7 @@ export function TemplateManager<TPayload>({
   const [applied, setApplied] = useState<RiftTemplate<TPayload> | null>(null);
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
+  const [messageIsError, setMessageIsError] = useState(false);
   const importInput = useRef<HTMLInputElement>(null);
   const templates = useMemo(
     () => [...builtIns, ...library.templates],
@@ -41,23 +42,45 @@ export function TemplateManager<TPayload>({
   const selected = templates.find((template) => template.id === selectedId) ?? filtered[0] ?? null;
   const customised = Boolean(applied) && signature(value) !== signature(applied?.payload);
 
+  function showMessage(text: string, isError = false) {
+    setMessage(text);
+    setMessageIsError(isError);
+  }
+
+  function nameExists(nextName: string, exceptId?: string) {
+    const normalised = nextName.trim().toLocaleLowerCase();
+    return templates.some(
+      (template) =>
+        template.id !== exceptId && template.name.trim().toLocaleLowerCase() === normalised,
+    );
+  }
+
   function apply(template: RiftTemplate<TPayload>) {
     onApply(structuredClone(template.payload), template);
     setApplied(template);
     setSelectedId(template.id);
-    setMessage(`${template.name} applied.`);
+    showMessage(`${template.name} applied.`);
   }
 
   function saveCurrent() {
     if (!name.trim()) {
-      setMessage('Enter a name for the custom template.');
+      showMessage('Enter a name for the custom template.', true);
       return;
     }
-    const template = library.create({ name, payload: value });
-    setName('');
-    setSelectedId(template.id);
-    setApplied(template);
-    setMessage('Custom template saved in this browser.');
+    if (nameExists(name)) {
+      showMessage('Template names must be unique.', true);
+      return;
+    }
+    try {
+      const payload = parseTemplatePayload<TPayload>(value, payloadSchema);
+      const template = library.create({ name, payload });
+      setName('');
+      setSelectedId(template.id);
+      setApplied(template);
+      showMessage('Custom template saved in this browser.');
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : 'Template could not be saved.', true);
+    }
   }
 
   async function importTemplate(event: ChangeEvent<HTMLInputElement>) {
@@ -66,15 +89,16 @@ export function TemplateManager<TPayload>({
     if (!file) return;
     try {
       const parsed = parseImportedTemplate<TPayload>(await file.text(), category, payloadSchema);
+      if (nameExists(parsed.name)) throw new Error('Template names must be unique.');
       const template = library.create({
         name: parsed.name,
         ...(parsed.description ? { description: parsed.description } : {}),
         payload: parsed.payload,
       });
       setSelectedId(template.id);
-      setMessage('Template imported and saved in this browser.');
+      showMessage('Template imported and saved in this browser.');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Template import failed.');
+      showMessage(error instanceof Error ? error.message : 'Template import failed.', true);
     }
   }
 
@@ -200,7 +224,13 @@ export function TemplateManager<TPayload>({
                     className={secondaryButton}
                     onClick={() => {
                       const next = window.prompt('Rename template', selected.name)?.trim();
-                      if (next) library.update(selected.id, { name: next });
+                      if (!next) return;
+                      if (nameExists(next, selected.id)) {
+                        showMessage('Template names must be unique.', true);
+                        return;
+                      }
+                      library.update(selected.id, { name: next });
+                      showMessage('Template renamed.');
                     }}
                     type="button"
                   >
@@ -210,11 +240,12 @@ export function TemplateManager<TPayload>({
                     className={secondaryButton}
                     onClick={() => {
                       const copy = library.create({
-                        name: `${selected.name} copy`,
+                        name: availableCopyName(selected.name, templates),
                         ...(selected.description ? { description: selected.description } : {}),
                         payload: selected.payload,
                       });
                       setSelectedId(copy.id);
+                      showMessage('Template duplicated.');
                     }}
                     type="button"
                   >
@@ -272,7 +303,10 @@ export function TemplateManager<TPayload>({
         </button>
       ) : null}
       {message ? (
-        <p className="text-sm text-[var(--rift-text-secondary)]" role="status">
+        <p
+          className={`text-sm ${messageIsError ? 'text-[var(--status-fail)]' : 'text-[var(--rift-text-secondary)]'}`}
+          role={messageIsError ? 'alert' : 'status'}
+        >
           {message}
         </p>
       ) : null}
@@ -291,4 +325,12 @@ function slug(value: string) {
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/(^-|-$)/g, '') || 'rift-template'
   );
+}
+
+function availableCopyName<TPayload>(original: string, templates: RiftTemplate<TPayload>[]) {
+  const names = new Set(templates.map((template) => template.name.trim().toLocaleLowerCase()));
+  let candidate = `${original} copy`;
+  let suffix = 2;
+  while (names.has(candidate.toLocaleLowerCase())) candidate = `${original} copy ${suffix++}`;
+  return candidate;
 }

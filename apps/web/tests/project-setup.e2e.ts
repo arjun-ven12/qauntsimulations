@@ -204,6 +204,10 @@ test('Project custom templates persist and support apply, reset, rename, duplica
   await page.getByRole('button', { name: 'Save current' }).click();
   await expect(page.getByText('Saved in this browser', { exact: true })).toBeVisible();
 
+  await page.getByLabel('Custom template name').fill('checkout TEMPLATE');
+  await page.getByRole('button', { name: 'Save current' }).click();
+  await expect(page.getByText('Template names must be unique.', { exact: true })).toBeVisible();
+
   await page.getByLabel('Project name').fill('Customised checkout');
   await expect(page.getByText('Customised', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Reset to applied template' }).click();
@@ -211,6 +215,9 @@ test('Project custom templates persist and support apply, reset, rename, duplica
 
   await page.getByRole('button', { name: 'Duplicate' }).click();
   await expect(page.getByRole('heading', { name: 'Checkout template copy' })).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept('Checkout template'));
+  await page.getByRole('button', { name: 'Rename' }).click();
+  await expect(page.getByText('Template names must be unique.', { exact: true })).toBeVisible();
   page.once('dialog', (dialog) => dialog.accept('Renamed checkout'));
   await page.getByRole('button', { name: 'Rename' }).click();
   await expect(page.getByRole('heading', { name: 'Renamed checkout' })).toBeVisible();
@@ -218,6 +225,28 @@ test('Project custom templates persist and support apply, reset, rename, duplica
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export JSON' }).click();
   await expect(download).resolves.toBeTruthy();
+
+  await page.getByLabel('Import template JSON file').setInputFiles({
+    name: 'invalid.rift-template.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{invalid'),
+  });
+  await expect(page.getByRole('alert').filter({ hasText: /./ })).toBeVisible();
+
+  await page.getByLabel('Import template JSON file').setInputFiles({
+    name: 'future.rift-template.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        category: 'PROJECT',
+        name: 'Future project',
+        schemaVersion: 2,
+        payload: {},
+      }),
+    ),
+  });
+  await expect(page.getByRole('alert').filter({ hasText: /./ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Future project' })).toHaveCount(0);
 
   await page.getByLabel('Import template JSON file').setInputFiles({
     name: 'imported.rift-template.json',

@@ -19,13 +19,13 @@ const environmentAction = z.enum([
 
 export const projectTemplatePayloadSchema = z.object({
   name: z.string(),
-  description: nullableString.optional(),
+  description: nullableString,
   applicationUrl: z.string(),
-  repositoryUrl: nullableString.optional(),
-  credentialReferences: z.array(z.object({ label: z.string(), reference: z.string() })),
+  repositoryUrl: nullableString,
   apiEndpoints: z.array(labelledUrl),
   webhookEndpoints: z.array(labelledUrl),
 });
+export type ProjectTemplatePayload = z.infer<typeof projectTemplatePayloadSchema>;
 
 export const environmentTemplatePayloadSchema = z.object({
   name: z.string(),
@@ -57,7 +57,6 @@ export const environmentTemplatePayloadSchema = z.object({
       mode: z.enum(['HTTP_ENDPOINT', 'SCRIPT_REFERENCE', 'MANUAL', 'NONE']),
       endpoint: nullableString,
       method: httpMethod,
-      credentialReference: nullableString,
       timeoutMs: z.number(),
       expectedStatus: z.number(),
       beforeEachWorld: z.boolean(),
@@ -66,20 +65,17 @@ export const environmentTemplatePayloadSchema = z.object({
       scriptReference: nullableString,
     }),
     testData: z.object({
-      customerCredentialReference: nullableString,
       productIdentifier: nullableString,
       initialInventory: z.number(),
       seedProfile: nullableString,
       orderCleanup: nullableString,
       isolation: z.enum(['RESET_BEFORE_WORLD', 'UNIQUE_TEST_DATA_PER_WORLD', 'SHARED_READ_ONLY']),
     }),
-    credentialReferences: z.array(
-      z.object({ label: z.string(), reference: z.string(), purpose: nullableString }),
-    ),
     allowedActions: z.array(environmentAction),
   }),
   acknowledgement: z.literal(true),
 });
+export type EnvironmentTemplatePayload = z.infer<typeof environmentTemplatePayloadSchema>;
 
 export const projectSafetyTemplatePayloadSchema = z.object({
   domainAllowlist: z.array(z.string()),
@@ -89,56 +85,69 @@ export const projectSafetyTemplatePayloadSchema = z.object({
   permitMockPayment: z.boolean(),
   permitTestOrderCreation: z.boolean(),
 });
+export type ProjectSafetyTemplatePayload = z.infer<typeof projectSafetyTemplatePayloadSchema>;
 
 const journeyStepSchema = z.object({
-  clientId: z.string(),
   order: z.number(),
   action: z.enum(['GOTO', 'CLICK', 'FILL', 'WAIT_FOR', 'ASSERT_VISIBLE']),
-  selector: nullableString.optional(),
-  value: nullableString.optional(),
-  metadata: z.record(z.string(), z.unknown()),
+  selector: nullableString,
+  value: nullableString,
+  metadata: z.object({
+    name: z.string().optional(),
+    timeoutMs: z.number().optional(),
+    expectedState: z.literal('VISIBLE').optional(),
+    screenshotCheckpoint: z.boolean().optional(),
+    screenshotCheckpointName: z.string().optional(),
+    continueOnFailure: z.boolean().optional(),
+  }),
 });
 
 export const journeyTemplatePayloadSchema = z.object({
   name: z.string(),
   description: nullableString,
-  environmentId: z.string(),
   startPath: z.string(),
   state: z.enum(['DRAFT', 'ENABLED']),
   completionCondition: z.discriminatedUnion('type', [
     z.object({ type: z.literal('VISIBLE'), selector: z.string() }),
     z.object({ type: z.literal('TEXT'), selector: z.string(), expectedText: z.string() }),
   ]),
-  validationStatus: z.enum(['DRAFT', 'READY', 'INVALID']),
   steps: z.array(journeyStepSchema),
 });
+export type JourneyTemplatePayload = z.infer<typeof journeyTemplatePayloadSchema>;
 
 export const invariantTemplatePayloadSchema = z.object({
   name: z.string(),
-  description: nullableString,
+  description: z.string(),
   type: z.enum(['NO_DUPLICATE_PAYMENT', 'NO_DUPLICATE_ORDER']),
   severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
   enabled: z.boolean(),
-  validationStatus: z.enum(['DRAFT', 'READY', 'INVALID']),
   configuration: z.object({
     requestPatterns: z.array(z.string()),
     methods: z.array(z.enum(['POST', 'PUT', 'PATCH'])),
     orderIdSelector: z.string().optional(),
   }),
 });
+export type InvariantTemplatePayload = z.infer<typeof invariantTemplatePayloadSchema>;
 
 export const scenarioTemplatePayloadSchema = z.object({
-  environmentId: z.string(),
-  journeyId: z.string(),
-  invariantIds: z.array(z.string()),
   scenario: z.object({
     prompt: z.string(),
     controls: z.object({
-      browsers: z.array(z.literal('chromium')).min(1),
-      viewports: z.array(z.enum(['desktop-1440x900', 'mobile-390x844'])).min(1),
-      networkProfiles: z.array(z.enum(['normal', 'delayed-payment'])).min(1),
+      browsers: z.array(z.string()).min(1),
+      viewports: z.array(z.string()).min(1),
+      networkProfiles: z.array(z.string()).min(1),
       maximumWorlds: z.number().int().min(1).max(100),
       maximumConcurrentWorkers: z.number().int().min(1).max(20),
     }),
   }),
 });
+export type ScenarioTemplatePayload = z.infer<typeof scenarioTemplatePayloadSchema>;
+
+export const templatePayloadSchemas = {
+  PROJECT: projectTemplatePayloadSchema,
+  ENVIRONMENT: environmentTemplatePayloadSchema,
+  PROJECT_SAFETY: projectSafetyTemplatePayloadSchema,
+  JOURNEY: journeyTemplatePayloadSchema,
+  INVARIANT: invariantTemplatePayloadSchema,
+  SCENARIO: scenarioTemplatePayloadSchema,
+} as const;

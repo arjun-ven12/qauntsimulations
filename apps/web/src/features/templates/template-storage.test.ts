@@ -25,7 +25,14 @@ const custom = {
   source: 'CUSTOM' as const,
   name: 'Checkout project',
   schemaVersion: 1 as const,
-  payload: { name: 'Checkout' },
+  payload: {
+    name: 'Checkout',
+    description: null,
+    applicationUrl: 'https://checkout.example.test',
+    repositoryUrl: null,
+    apiEndpoints: [],
+    webhookEndpoints: [],
+  },
   createdAt: '2026-07-18T00:00:00.000Z',
   updatedAt: '2026-07-18T00:00:00.000Z',
 };
@@ -56,6 +63,34 @@ describe('Rift custom template storage', () => {
     storage.setItem('future', JSON.stringify({ schemaVersion: 2, templates: [custom] }));
     expect(readStoredTemplates(storage, 'invalid')).toEqual([]);
     expect(readStoredTemplates(storage, 'future')).toEqual([]);
+  });
+
+  it('removes excluded credentials and record identifiers from legacy payloads', () => {
+    const storage = new MemoryStorage();
+    const key = templateStorageKey('org-a', 'user-a');
+    const legacy = {
+      ...custom,
+      payload: {
+        ...custom.payload,
+        credentialReferences: [{ label: 'Checkout user', reference: 'vault://checkout' }],
+      },
+    };
+    storage.setItem(key, JSON.stringify({ schemaVersion: 1, templates: [legacy] }));
+    expect(readStoredTemplates(storage, key)[0]?.payload).toEqual(custom.payload);
+    expect(storage.getItem(key)).not.toContain('vault://checkout');
+  });
+
+  it('removes duplicate names within a category while comparing case-insensitively', () => {
+    const storage = new MemoryStorage();
+    const key = templateStorageKey('org-a', 'user-a');
+    storage.setItem(
+      key,
+      JSON.stringify({
+        schemaVersion: 1,
+        templates: [custom, { ...custom, id: 'custom-2', name: ' checkout PROJECT ' }],
+      }),
+    );
+    expect(readStoredTemplates(storage, key)).toEqual([custom]);
   });
 
   it('validates imported category, schema version, and payload', () => {

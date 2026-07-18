@@ -13,6 +13,7 @@ import {
   TemplateManager,
   builtInTemplate,
   environmentTemplatePayloadSchema,
+  type EnvironmentTemplatePayload,
 } from '../templates/index.js';
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'];
@@ -151,12 +152,30 @@ export function EnvironmentForm({
             'environment-built-in-local',
             'Local development',
             'Local application, API, mock payment, and isolated test-data defaults.',
-            environmentDefaults(),
+            environmentTemplateValue(environmentDefaults()),
           ),
         ]}
         category="ENVIRONMENT"
         onApply={(payload) => {
-          setValue(initialise(payload));
+          setValue((current) =>
+            initialise({
+              ...current,
+              ...payload,
+              configuration: {
+                ...current.configuration,
+                ...payload.configuration,
+                reset: {
+                  ...current.configuration.reset,
+                  ...payload.configuration.reset,
+                },
+                testData: {
+                  ...current.configuration.testData,
+                  ...payload.configuration.testData,
+                },
+                credentialReferences: current.configuration.credentialReferences,
+              },
+            }),
+          );
           setAuthorised(false);
         }}
         payloadSchema={environmentTemplatePayloadSchema}
@@ -170,7 +189,7 @@ export function EnvironmentForm({
             />
           </dl>
         )}
-        value={value}
+        value={environmentTemplateValue(value)}
       />
       <FormSection
         description="Name this test target and describe how it is used."
@@ -1017,6 +1036,18 @@ function TemplatePreviewItem({ label, value }: { label: string; value: string })
       </dd>
     </div>
   );
+}
+
+function environmentTemplateValue(value: EnvironmentInput): EnvironmentTemplatePayload {
+  const {
+    credentialReferences: _credentialReferences,
+    validationResults: _validationResults,
+    ...configuration
+  } = value.configuration;
+  const { credentialReference: _credentialReference, ...reset } = configuration.reset;
+  const { customerCredentialReference: _customerCredentialReference, ...testData } =
+    configuration.testData;
+  return { ...value, configuration: { ...configuration, reset, testData } };
 }
 
 function updateFeatureFlag(

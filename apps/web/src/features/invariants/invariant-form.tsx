@@ -4,6 +4,7 @@ import {
   TemplateManager,
   builtInTemplate,
   invariantTemplatePayloadSchema,
+  type InvariantTemplatePayload,
 } from '../templates/index.js';
 import type { InvariantInput, InvariantValidationResult } from './invariant-api.js';
 import {
@@ -131,11 +132,11 @@ export function InvariantForm({
               `invariant-built-in-${template.id}`,
               template.displayName,
               template.description,
-              templateValue(template),
+              invariantTemplateValue(templateValue(template)),
             ),
           )}
           category="INVARIANT"
-          onApply={(payload) => change(structuredClone(payload))}
+          onApply={(payload) => change({ ...structuredClone(payload), validationStatus: 'DRAFT' })}
           payloadSchema={invariantTemplatePayloadSchema}
           preview={(payload) => (
             <dl className="grid gap-3 text-sm sm:grid-cols-3">
@@ -147,7 +148,7 @@ export function InvariantForm({
               />
             </dl>
           )}
-          value={value}
+          value={invariantTemplateValue(value)}
         />
       ) : null}
 
@@ -413,6 +414,11 @@ function TemplatePreview({ label, value }: { label: string; value: string }) {
       </dd>
     </div>
   );
+}
+
+function invariantTemplateValue(value: InvariantFormValue): InvariantTemplatePayload {
+  const { validationStatus: _validationStatus, ...payload } = value;
+  return payload;
 }
 
 function runtimeCompatibility(

@@ -7,12 +7,14 @@ import {
   TemplateManager,
   builtInTemplate,
   journeyTemplatePayloadSchema,
+  type JourneyTemplatePayload,
 } from '../templates/index.js';
 import type { JourneyInput, JourneyValidationResult } from './journey-api.js';
 import {
   addStep,
   changeAction,
   checkoutTemplate,
+  clientId,
   duplicateStep,
   formErrors,
   moveStep,
@@ -126,11 +128,21 @@ export function JourneyForm({
               'journey-built-in-checkout',
               'Controlled checkout',
               'A complete mock checkout with visible evidence checkpoints.',
-              checkoutTemplate(value.environmentId),
+              journeyTemplateValue(checkoutTemplate(value.environmentId)),
             ),
           ]}
           category="JOURNEY"
-          onApply={(payload) => change(structuredClone(payload))}
+          onApply={(payload) =>
+            change({
+              ...structuredClone(payload),
+              environmentId: value.environmentId,
+              validationStatus: 'DRAFT',
+              steps: payload.steps.map((step) => ({
+                ...structuredClone(step),
+                clientId: clientId(),
+              })),
+            })
+          }
           payloadSchema={journeyTemplatePayloadSchema}
           preview={(payload) => (
             <dl className="grid gap-3 text-sm sm:grid-cols-3">
@@ -139,7 +151,7 @@ export function JourneyForm({
               <PreviewItem label="State" value={payload.state} />
             </dl>
           )}
-          value={value}
+          value={journeyTemplateValue(value)}
         />
       ) : null}
 
@@ -806,6 +818,14 @@ function PreviewItem({ label, value }: { label: string; value: string }) {
       </dd>
     </div>
   );
+}
+
+function journeyTemplateValue(value: JourneyFormValue): JourneyTemplatePayload {
+  const { environmentId: _environmentId, validationStatus: _validationStatus, ...payload } = value;
+  return {
+    ...payload,
+    steps: payload.steps.map(({ clientId: _clientId, ...step }) => structuredClone(step)),
+  };
 }
 
 function ValidationChecks({ result }: { result: JourneyValidationResult }) {

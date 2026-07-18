@@ -7,6 +7,7 @@ import {
   TemplateManager,
   builtInTemplate,
   scenarioTemplatePayloadSchema,
+  type ScenarioTemplatePayload,
 } from '../templates/index.js';
 import type { ScenarioLaunchInput, ScenarioPreflightResult } from './scenario-api.js';
 import { ScenarioConfigurationReview } from './scenario-configuration-review.js';
@@ -109,7 +110,7 @@ export function ScenarioForm({
             `scenario-built-in-${preset.id}`,
             preset.name,
             preset.description,
-            applyScenarioPreset(value, preset, invariants).value,
+            scenarioTemplateValue(applyScenarioPreset(value, preset, invariants).value),
           ),
         )}
         category="SCENARIO"
@@ -122,7 +123,7 @@ export function ScenarioForm({
             change(applied.value);
             setUnavailableInvariantTypes(applied.unavailableInvariantTypes);
           } else {
-            change(payload);
+            change({ ...value, scenario: structuredClone(payload.scenario) });
             setUnavailableInvariantTypes([]);
           }
         }}
@@ -137,10 +138,13 @@ export function ScenarioForm({
               label="Viewports"
               value={String(payload.scenario.controls.viewports.length)}
             />
-            <TemplatePreview label="Invariants" value={String(payload.invariantIds.length)} />
+            <TemplatePreview
+              label="Concurrency"
+              value={String(payload.scenario.controls.maximumConcurrentWorkers)}
+            />
           </dl>
         )}
-        value={value}
+        value={scenarioTemplateValue(value)}
       />
       {unavailableInvariantTypes.length ? (
         <p
@@ -407,4 +411,8 @@ function TemplatePreview({ label, value }: { label: string; value: string }) {
       </dd>
     </div>
   );
+}
+
+function scenarioTemplateValue(value: ScenarioFormValue): ScenarioTemplatePayload {
+  return { scenario: structuredClone(value.scenario) };
 }

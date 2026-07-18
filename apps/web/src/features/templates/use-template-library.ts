@@ -20,12 +20,14 @@ export function useTemplateLibrary<TPayload>(category: TemplateCategory) {
   const userId = useAuthStore((state) => state.user?.id);
   const organisationId = useAuthStore((state) => state.organisation?.id);
   const key = organisationId && userId ? templateStorageKey(organisationId, userId) : null;
-  const [allTemplates, setAllTemplates] = useState<RiftTemplate<unknown>[]>(() =>
-    key ? readStoredTemplates(browserStorage(), key) : [],
-  );
+  const [stored, setStored] = useState<{
+    key: string | null;
+    templates: RiftTemplate<unknown>[];
+  }>(() => ({ key, templates: key ? readStoredTemplates(browserStorage(), key) : [] }));
+  const allTemplates = stored.key === key ? stored.templates : [];
 
   useEffect(() => {
-    setAllTemplates(key ? readStoredTemplates(browserStorage(), key) : []);
+    setStored({ key, templates: key ? readStoredTemplates(browserStorage(), key) : [] });
   }, [key]);
 
   const templates = useMemo(
@@ -35,7 +37,7 @@ export function useTemplateLibrary<TPayload>(category: TemplateCategory) {
   );
 
   function persist(next: RiftTemplate<unknown>[]) {
-    setAllTemplates(next);
+    setStored({ key, templates: next });
     if (key) writeStoredTemplates(browserStorage(), key, next);
   }
 

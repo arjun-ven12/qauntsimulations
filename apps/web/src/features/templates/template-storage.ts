@@ -5,6 +5,7 @@ import {
   type RiftTemplate,
   type TemplateCategory,
 } from './template-model.js';
+import { templatePayloadSchemas } from './template-schemas.js';
 
 export interface TemplateStorage {
   getItem(key: string): string | null;
@@ -21,7 +22,31 @@ export function readStoredTemplates(storage: TemplateStorage | null, key: string
     const raw = storage.getItem(key);
     if (!raw) return [];
     const parsed = templateEnvelopeSchema.safeParse(JSON.parse(raw));
-    return parsed.success ? (parsed.data.templates as RiftTemplate<unknown>[]) : [];
+    if (!parsed.success) return [];
+    const names = new Set<string>();
+    const templates = parsed.data.templates.flatMap((template) => {
+      try {
+        const normalisedName = `${template.category}:${template.name.trim().toLocaleLowerCase()}`;
+        if (names.has(normalisedName)) return [];
+        const payload = parseTemplatePayload(
+          template.payload,
+          templatePayloadSchemas[template.category],
+        );
+        names.add(normalisedName);
+        return [{ ...template, payload } as RiftTemplate<unknown>];
+      } catch {
+        return [];
+      }
+    });
+    const normalised = JSON.stringify({ schemaVersion: 1, templates });
+    if (normalised !== raw) {
+      try {
+        storage.setItem(key, normalised);
+      } catch {
+        // The sanitised in-memory view remains usable when browser storage is read-only.
+      }
+    }
+    return templates;
   } catch {
     return [];
   }
@@ -59,8 +84,42 @@ export function parseImportedTemplate<TPayload>(
     name: template.name,
     ...(template.description ? { description: template.description } : {}),
     schemaVersion: 1,
-    payload: payloadSchema.parse(template.payload) as TPayload,
+    payload: parseTemplatePayload(template.payload, payloadSchema),
   };
+}
+
+export function parseTemplatePayload<TPayload>(
+  payload: unknown,
+  payloadSchema: z.ZodTypeAny,
+): TPayload {
+  const parsed = payloadSchema.parse(payload) as TPayload;
+  if (containsSensitiveValue(parsed)) {
+    throw new Error('Passwords, tokens, cookies, credentials, and secrets cannot be saved.');
+  }
+  return parsed;
+}
+
+function containsSensitiveValue(value: unknown): boolean {
+  if (!value || typeof value !== 'object') return false;
+  if (Array.isArray(value)) return value.some(containsSensitiveValue);
+  const record = value as Record<string, unknown>;
+  if (
+    record.action === 'FILL' &&
+    typeof record.value === 'string' &&
+    record.value.length > 0 &&
+    sensitiveText(`${String(record.selector ?? '')} ${String(record.name ?? '')}`)
+  ) {
+    return true;
+  }
+  return Object.entries(record).some(
+    ([key, entry]) =>
+      (sensitiveText(key) && entry !== null && entry !== '' && entry !== false) ||
+      containsSensitiveValue(entry),
+  );
+}
+
+function sensitiveText(value: string) {
+  return /(?:password|passwd|token|cookie|credential|secret|api[-_]?key)/i.test(value);
 }
 
 export function newTemplateId() {
