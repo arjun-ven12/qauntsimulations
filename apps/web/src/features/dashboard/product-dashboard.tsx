@@ -333,6 +333,7 @@ function RecentInvestigations({
                       <p className="truncate font-bold">{item.projectName}</p>
                       <StatusPill label={item.status} />
                     </div>
+                    <p className="mt-1 truncate text-sm text-slate-300">{item.name}</p>
                     <p className="mt-2 text-xs text-slate-500">
                       {optionalCount(item.worldCount, 'world')} · {optionalCount(item.findingCount, 'finding')}
                     </p>
@@ -373,7 +374,7 @@ function RecentFindings({
         <ul className="divide-y divide-slate-800">
           {items.map((item) => (
             <li className="py-4 first:pt-0 last:pb-0" key={item.id}>
-              <ActivityLink href={item.href ?? `/projects/${item.projectId}`}>
+              <ActivityLink href={item.href ?? (item.investigationId ? dashboardRoutes.finding(item.investigationId, item.id) : `/projects/${item.projectId}`)}>
                 <div className="flex min-w-0 items-start gap-3">
                   <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0 text-amber-300" size={18} />
                   <div className="min-w-0 flex-1">

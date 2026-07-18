@@ -18,6 +18,7 @@ describe('Dashboard Product data adapter', () => {
       environments: [environment('READY'), environment('DRAFT')],
       journeys: [journey('ENABLED', 'READY'), journey('ENABLED', 'DRAFT'), journey('DRAFT', 'READY')],
       invariants: [invariant(true, 'READY'), invariant(true, 'INVALID'), invariant(false, 'READY')],
+      activity: activityFixture({ projectId: 'project-real' }),
     });
 
     const result = await loadDashboardData(organisation, sources);
@@ -34,12 +35,77 @@ describe('Dashboard Product data adapter', () => {
         totalJourneyCount: 2,
         readyInvariantCount: 1,
         totalInvariantCount: 2,
+        recentInvestigationCount: 1,
+        openFindingCount: 1,
       }),
     ]);
+    expect(result.data.recentInvestigations).toEqual([
+      expect.objectContaining({
+        id: 'investigation-real',
+        href: '/investigations/investigation-real',
+        name: 'Latest checkout reliability run',
+      }),
+    ]);
+    expect(result.data.recentFindings).toEqual([
+      expect.objectContaining({
+        id: 'finding-real',
+        href: '/investigations/investigation-real/findings/finding-real',
+        status: 'CONFIRMED',
+      }),
+    ]);
+    expect(result.investigationsAvailable).toBe(true);
+    expect(result.findingsAvailable).toBe(true);
+    expect(sources.getActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps Project readiness visible when organisation activity is unavailable', async () => {
+    const sources = sourceFixture({ projects: [project('project-real', 'Checkout Reliability Lab')] });
+    sources.getActivity = vi.fn().mockRejectedValue(new Error('Activity unavailable'));
+
+    const result = await loadDashboardData(organisation, sources);
+
+    expect(result.data.projects).toHaveLength(1);
     expect(result.data.recentInvestigations).toEqual([]);
     expect(result.data.recentFindings).toEqual([]);
     expect(result.investigationsAvailable).toBe(false);
     expect(result.findingsAvailable).toBe(false);
+  });
+
+  it('limits real organisation activity to five items and never hardcodes demo IDs', async () => {
+    const sources = sourceFixture({
+      projects: [project('project-real', 'Checkout Reliability Lab')],
+      activity: {
+        investigations: Array.from({ length: 6 }, (_, index) => ({
+          id: `investigation-${index}`,
+          projectId: 'project-real',
+          projectName: 'Checkout Reliability Lab',
+          name: `Investigation ${index}`,
+          status: 'COMPLETED',
+          createdAt: '2026-07-18T00:00:00.000Z',
+          completedAt: null,
+          findingsCount: 0,
+        })),
+        findings: Array.from({ length: 6 }, (_, index) => ({
+          id: `finding-${index}`,
+          investigationId: `investigation-${index}`,
+          projectId: 'project-real',
+          projectName: 'Checkout Reliability Lab',
+          title: `Finding ${index}`,
+          severity: 'CRITICAL',
+          confidence: 'CONFIRMED',
+          status: null,
+          createdAt: '2026-07-18T00:00:00.000Z',
+        })),
+      },
+    });
+
+    const result = await loadDashboardData(organisation, sources);
+    const serialized = JSON.stringify(result.data);
+
+    expect(result.data.recentInvestigations).toHaveLength(5);
+    expect(result.data.recentFindings).toHaveLength(5);
+    expect(serialized).not.toContain('cmrol9cxh0001rurb8godxnh6');
+    expect(serialized).not.toContain('cmrol9ijr004drurbren30ov6');
   });
 
   it('does not mark another commerce demo as the primary seeded demo', async () => {
@@ -93,17 +159,48 @@ function sourceFixture({
   environments = [],
   journeys = [],
   invariants = [],
+  activity = { investigations: [], findings: [] },
 }: {
   projects: ProjectSummary[];
   environments?: Environment[];
   journeys?: Journey[];
   invariants?: Invariant[];
+  activity?: DashboardActivitySourcesReturn;
 }): DashboardDataSources {
   return {
     listProjects: vi.fn().mockResolvedValue(projects),
     listEnvironments: vi.fn().mockResolvedValue(environments),
     listJourneys: vi.fn().mockResolvedValue(journeys),
     listInvariants: vi.fn().mockResolvedValue(invariants),
+    getActivity: vi.fn().mockResolvedValue(activity),
+  };
+}
+
+type DashboardActivitySourcesReturn = Awaited<ReturnType<DashboardDataSources['getActivity']>>;
+
+function activityFixture({ projectId }: { projectId: string }): DashboardActivitySourcesReturn {
+  return {
+    investigations: [{
+      id: 'investigation-real',
+      projectId,
+      projectName: 'Checkout Reliability Lab',
+      name: 'Latest checkout reliability run',
+      status: 'COMPLETED',
+      createdAt: '2026-07-18T00:00:00.000Z',
+      completedAt: '2026-07-18T00:01:00.000Z',
+      findingsCount: 1,
+    }],
+    findings: [{
+      id: 'finding-real',
+      investigationId: 'investigation-real',
+      projectId,
+      projectName: 'Checkout Reliability Lab',
+      title: 'Duplicate payment request',
+      severity: 'CRITICAL',
+      confidence: 'CONFIRMED',
+      status: null,
+      createdAt: '2026-07-18T00:00:00.000Z',
+    }],
   };
 }
 

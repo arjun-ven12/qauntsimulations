@@ -45,6 +45,7 @@ describe('isolated Product Dashboard', () => {
           id: 'investigation-1',
           projectId: 'project_demo_checkout',
           projectName: 'Checkout Reliability Lab',
+          name: 'Duplicate checkout investigation',
           status: 'RUNNING',
           worldCount: 4,
           findingCount: 1,
@@ -66,6 +67,7 @@ describe('isolated Product Dashboard', () => {
     };
     const html = render(data);
     expect(html).toContain('RUNNING');
+    expect(html).toContain('Duplicate checkout investigation');
     expect(html).toContain('4 worlds');
     expect(html).toContain('1 finding');
     expect(html).toContain('Duplicate payment request');

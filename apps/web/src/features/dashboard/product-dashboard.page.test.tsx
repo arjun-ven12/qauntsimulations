@@ -37,12 +37,31 @@ describe('routed Product Dashboard page', () => {
             openFindingCount: 0,
           },
         ],
-        recentInvestigations: [],
-        recentFindings: [],
+        recentInvestigations: [{
+          id: 'investigation-current',
+          projectId: 'project-current',
+          projectName: 'Current Project',
+          name: 'Current Investigation',
+          status: 'COMPLETED',
+          findingCount: 1,
+          createdAt: '2026-07-18T00:00:00.000Z',
+          href: '/investigations/investigation-current',
+        }],
+        recentFindings: [{
+          id: 'finding-current',
+          investigationId: 'investigation-current',
+          projectId: 'project-current',
+          projectName: 'Current Project',
+          title: 'Current Finding',
+          severity: 'CRITICAL',
+          status: 'CONFIRMED',
+          createdAt: '2026-07-18T00:00:00.000Z',
+          href: '/investigations/investigation-current/findings/finding-current',
+        }],
       },
       configurationWarnings: [],
-      findingsAvailable: false,
-      investigationsAvailable: false,
+      findingsAvailable: true,
+      investigationsAvailable: true,
     };
 
     const html = renderToStaticMarkup(
@@ -52,7 +71,9 @@ describe('routed Product Dashboard page', () => {
     );
     expect(html).toContain('Current Organisation');
     expect(html).toContain('Current Project');
-    expect(html).toContain('Recent Investigations unavailable');
+    expect(html).toContain('Current Investigation');
+    expect(html).toContain('Current Finding');
+    expect(html).not.toContain('Recent Investigations unavailable');
     expect(html).not.toContain('TaskOS Demo');
     expect(html).not.toContain('project_demo_checkout');
   });

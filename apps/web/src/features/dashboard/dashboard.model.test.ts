@@ -88,6 +88,7 @@ function investigation(id: string, createdAt: string) {
     id,
     projectId: 'project-1',
     projectName: 'Project',
+    name: `Investigation ${id}`,
     status: 'RUNNING',
     createdAt,
   };
