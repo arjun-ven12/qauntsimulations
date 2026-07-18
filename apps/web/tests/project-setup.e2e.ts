@@ -253,9 +253,19 @@ test('Project custom templates persist and support apply, reset, rename, duplica
   await page.getByRole('button', { name: 'Save current' }).click();
   await expect(page.getByText('Saved to Rift', { exact: true })).toBeVisible();
 
+  await page.reload();
+  await page.getByLabel('Search templates').fill('Checkout template');
+  await expect(page.getByRole('heading', { name: 'Checkout template' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apply template' }).click();
+  await expect(page.getByLabel('Project name')).toHaveValue('Reusable checkout');
+  await expect(page.getByLabel('Application URL')).toHaveValue('https://templates.example.test');
+  await page.getByLabel('Search templates').fill('');
+
   await page.getByLabel('Custom template name').fill('checkout TEMPLATE');
   await page.getByRole('button', { name: 'Save current' }).click();
-  await expect(page.getByText('Template names must be unique.', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('A template with this name already exists in this category.', { exact: true }),
+  ).toBeVisible();
 
   await page.getByLabel('Project name').fill('Customised checkout');
   await expect(page.getByText('Customised', { exact: true })).toBeVisible();
@@ -264,16 +274,26 @@ test('Project custom templates persist and support apply, reset, rename, duplica
 
   await page.getByRole('button', { name: 'Duplicate' }).click();
   await expect(page.getByRole('heading', { name: 'Checkout template copy' })).toBeVisible();
-  page.once('dialog', (dialog) => dialog.accept('Checkout template'));
   await page.getByRole('button', { name: 'Rename' }).click();
-  await expect(page.getByText('Template names must be unique.', { exact: true })).toBeVisible();
-  page.once('dialog', (dialog) => dialog.accept('Renamed checkout'));
-  await page.getByRole('button', { name: 'Rename' }).click();
+  await page.getByRole('dialog').getByLabel('Template name').fill('Checkout template');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save name' }).click();
+  await expect(
+    page.getByText('A template with this name already exists in this category.', { exact: true }),
+  ).toBeVisible();
+  await page.getByRole('dialog').getByLabel('Template name').fill('Renamed checkout');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save name' }).click();
   await expect(page.getByRole('heading', { name: 'Renamed checkout' })).toBeVisible();
+
+  await page.getByLabel('Project name').fill('Updated reusable checkout');
+  await page.getByRole('button', { name: 'Update from current' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Update template' }).click();
+  await expect(page.getByText(/Template updated from the current configuration/)).toBeVisible();
 
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export JSON' }).click();
-  await expect(download).resolves.toBeTruthy();
+  const exported = await download;
+  const exportedPath = await exported.path();
+  if (!exportedPath) throw new Error('Expected an exported template file.');
 
   await page.getByLabel('Import template JSON file').setInputFiles({
     name: 'invalid.rift-template.json',
@@ -289,7 +309,7 @@ test('Project custom templates persist and support apply, reset, rename, duplica
       JSON.stringify({
         category: 'PROJECT',
         name: 'Future project',
-        schemaVersion: 2,
+        version: 2,
         payload: {},
       }),
     ),
@@ -304,28 +324,81 @@ test('Project custom templates persist and support apply, reset, rename, duplica
       JSON.stringify({
         category: 'PROJECT',
         name: 'Imported project',
-        schemaVersion: 1,
+        version: 1,
         payload: {
           name: 'Imported checkout',
           description: null,
           applicationUrl: 'https://imported.example.test',
           repositoryUrl: null,
-          credentialReferences: [],
           apiEndpoints: [],
           webhookEndpoints: [],
         },
       }),
     ),
   });
+  await expect(page.getByRole('dialog', { name: 'Preview imported template' })).toBeVisible();
+  await page.getByRole('dialog').getByRole('button', { name: 'Import template' }).click();
   await expect(page.getByRole('heading', { name: 'Imported project' })).toBeVisible();
 
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete template' }).click();
   await expect(page.getByRole('heading', { name: 'Imported project' })).toHaveCount(0);
+
+  await page.getByLabel('Search templates').fill('Renamed checkout');
+  await page.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete template' }).click();
+  await page.getByLabel('Import template JSON file').setInputFiles(exportedPath);
+  await page.getByRole('dialog').getByRole('button', { name: 'Import template' }).click();
+  await expect(page.getByRole('heading', { name: 'Renamed checkout' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apply template' }).click();
+  await expect(page.getByLabel('Project name')).toHaveValue('Updated reusable checkout');
   const templateStorageKeys = await page.evaluate(() =>
     Object.keys(localStorage).filter((key) => key.startsWith('rift.templates.')),
   );
   expect(templateStorageKeys).toEqual([]);
+});
+
+test('Invariant custom templates persist, restore structured fields, and remain manageable', async ({
+  page,
+}) => {
+  await page.goto('/projects/project-1/invariants/new');
+  await page.getByLabel('Name', { exact: true }).fill('No repeated capture');
+  await page
+    .getByLabel('Plain-language business rule')
+    .fill('A checkout must never create more than one successful payment capture.');
+  await page.getByLabel('Severity').selectOption('HIGH');
+  await page.getByLabel('Request paths').fill('/api/payments\n/api/captures');
+  await page.getByRole('checkbox', { name: 'PATCH', exact: true }).check();
+  await page.getByLabel('Custom template name').fill('Payment capture rule');
+  await page.getByRole('button', { name: 'Save current' }).click();
+  await expect(page.getByText('Custom template saved to Rift.')).toBeVisible();
+
+  await page.reload();
+  await page.getByLabel('Search templates').fill('Payment capture rule');
+  await expect(page.getByRole('heading', { name: 'Payment capture rule' })).toBeVisible();
+  await page.getByRole('button', { name: 'Apply template' }).click();
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('No repeated capture');
+  await expect(page.getByLabel('Severity')).toHaveValue('HIGH');
+  await expect(page.getByLabel('Request paths')).toHaveValue('/api/payments\n/api/captures');
+  await expect(page.getByRole('checkbox', { name: 'PATCH', exact: true })).toBeChecked();
+  await expect(page.getByText('DRAFT', { exact: true }).first()).toBeVisible();
+
+  await page.getByLabel('Name', { exact: true }).fill('Changed rule');
+  await expect(page.getByText('Customised', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Reset to applied template' }).click();
+  await expect(page.getByLabel('Name', { exact: true })).toHaveValue('No repeated capture');
+
+  await page.getByRole('button', { name: 'Duplicate' }).click();
+  await expect(page.getByRole('heading', { name: 'Payment capture rule copy' })).toBeVisible();
+  await page.getByRole('button', { name: 'Rename' }).click();
+  await page.getByRole('dialog').getByLabel('Template name').fill('Renamed payment rule');
+  await page.getByRole('dialog').getByRole('button', { name: 'Save name' }).click();
+  await expect(page.getByRole('heading', { name: 'Renamed payment rule' })).toBeVisible();
+  await page.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete template' }).click();
+  await page.reload();
+  await page.getByLabel('Search templates').fill('Renamed payment rule');
+  await expect(page.getByText('No templates match this search.')).toBeVisible();
 });
 
 test('New Project submits once to the real API contract and redirects with the project id', async ({

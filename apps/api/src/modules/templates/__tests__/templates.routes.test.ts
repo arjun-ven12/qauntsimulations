@@ -85,6 +85,13 @@ describe('Custom Template HTTP contract', () => {
       .expect(404);
   });
 
+  it('denies unauthenticated access to every operation', async () => {
+    await request(app).get('/api/templates').expect(401);
+    await request(app).post('/api/templates').send(projectInput()).expect(401);
+    await request(app).put('/api/templates/guessed').send({ name: 'No access' }).expect(401);
+    await request(app).delete('/api/templates/guessed').expect(401);
+  });
+
   it('isolates templates by organisation and authenticated user', async () => {
     await create('owner', 'org-1', projectInput());
     const otherUser = await request(app)
@@ -101,10 +108,62 @@ describe('Custom Template HTTP contract', () => {
     await create('owner', 'org-1', projectInput());
     const conflict = await create('owner', 'org-1', {
       ...projectInput(),
-      name: ' checkout PROJECT ',
+      name: ' checkout   PROJECT ',
     });
     expect(conflict.status).toBe(409);
     expect(conflict.body.error.code).toBe('TEMPLATE_NAME_CONFLICT');
+  });
+
+  it('persists the complete strict invariant payload', async () => {
+    const payload = {
+      name: 'No duplicate charge',
+      description: 'A checkout must never produce two successful charges.',
+      type: 'NO_DUPLICATE_PAYMENT',
+      severity: 'CRITICAL',
+      enabled: true,
+      configuration: { requestPatterns: ['/api/payments'], methods: ['POST', 'PATCH'] },
+    };
+    const created = await create('owner', 'org-1', {
+      category: 'INVARIANT',
+      name: 'Payment safety',
+      schemaVersion: 1,
+      payload,
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.payload).toEqual(payload);
+  });
+
+  it('rejects unknown, sensitive, and oversized payload fields', async () => {
+    await create('owner', 'org-1', {
+      ...projectInput(),
+      payload: { ...projectInput().payload, projectId: 'project-1' },
+    }).then((response) => expect(response.status).toBe(422));
+    await create('owner', 'org-1', {
+      ...projectInput(),
+      payload: { ...projectInput().payload, secret: 'do-not-save' },
+    }).then((response) => expect(response.status).toBe(422));
+    await create('owner', 'org-1', {
+      ...projectInput(),
+      payload: { ...projectInput().payload, description: 'x'.repeat(65 * 1024) },
+    }).then((response) => expect(response.status).toBe(422));
+  });
+
+  it('hides guessed foreign template ids for reads, updates, and deletes', async () => {
+    const created = await create('owner', 'org-2', projectInput());
+    const foreignId = created.body.id as string;
+    await request(app)
+      .get(`/api/templates/${foreignId}`)
+      .set('Cookie', cookie('owner', 'org-1'))
+      .expect(404);
+    await request(app)
+      .put(`/api/templates/${foreignId}`)
+      .set('Cookie', cookie('owner', 'org-1'))
+      .send({ name: 'Stolen' })
+      .expect(404);
+    await request(app)
+      .delete(`/api/templates/${foreignId}`)
+      .set('Cookie', cookie('owner', 'org-1'))
+      .expect(404);
   });
 
   it('allows viewers to read but not mutate templates', async () => {
