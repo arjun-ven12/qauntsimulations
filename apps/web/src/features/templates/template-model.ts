@@ -24,15 +24,15 @@ export type RiftTemplate<TPayload> = {
   updatedAt?: string | undefined;
 };
 
-export const importedTemplateSchema = z.object({
-  id: z.string().optional(),
-  category: templateCategorySchema,
-  source: z.enum(['BUILT_IN', 'CUSTOM']).optional(),
-  name: z.string().trim().min(1).max(120),
-  description: z.string().max(500).optional(),
-  schemaVersion: z.literal(1),
-  payload: z.unknown(),
-});
+export const importedTemplateSchema = z
+  .object({
+    version: z.literal(1),
+    category: templateCategorySchema,
+    name: z.string().trim().min(1).max(120),
+    description: z.string().max(500).optional(),
+    payload: z.unknown(),
+  })
+  .strict();
 
 export function builtInTemplate<TPayload>(
   category: TemplateCategory,

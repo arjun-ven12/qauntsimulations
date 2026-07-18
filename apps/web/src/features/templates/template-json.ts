@@ -5,12 +5,23 @@ import {
   type TemplateCategory,
 } from './template-model.js';
 
+export const maximumTemplateJsonBytes = 64 * 1024;
+
 export function parseImportedTemplate<TPayload>(
   raw: string,
   category: TemplateCategory,
   payloadSchema: z.ZodTypeAny,
 ): Omit<RiftTemplate<TPayload>, 'id' | 'source' | 'createdAt' | 'updatedAt'> {
-  const template = importedTemplateSchema.parse(JSON.parse(raw));
+  if (new TextEncoder().encode(raw).byteLength > maximumTemplateJsonBytes) {
+    throw new Error('Template JSON must be 64 KB or smaller.');
+  }
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    throw new Error('Choose a valid JSON template file.');
+  }
+  const template = importedTemplateSchema.parse(json);
   if (template.category !== category) throw new Error(`Import must be a ${category} template.`);
   return {
     category,
@@ -19,6 +30,20 @@ export function parseImportedTemplate<TPayload>(
     schemaVersion: 1,
     payload: parseTemplatePayload(template.payload, payloadSchema),
   };
+}
+
+export function exportTemplateJson<TPayload>(template: RiftTemplate<TPayload>) {
+  return JSON.stringify(
+    {
+      version: 1,
+      category: template.category,
+      name: template.name,
+      ...(template.description ? { description: template.description } : {}),
+      payload: template.payload,
+    },
+    null,
+    2,
+  );
 }
 
 export function parseTemplatePayload<TPayload>(

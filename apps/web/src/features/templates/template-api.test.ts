@@ -77,6 +77,23 @@ describe('Template API client', () => {
     expect(refresh).toHaveBeenCalledOnce();
     expect(fetch).toHaveBeenCalledTimes(2);
   });
+
+  it('retries a mutation only after one rejected unauthenticated attempt', async () => {
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(response({ error: { code: 'UNAUTHENTICATED' } }, 401))
+      .mockResolvedValueOnce(response(template, 201));
+    vi.stubGlobal('fetch', fetch);
+    const refresh = vi.spyOn(authApi, 'refresh').mockResolvedValue({} as never);
+
+    await expect(
+      templateApi.create({ category: 'PROJECT', name: 'Checkout', payload: template.payload }),
+    ).resolves.toMatchObject({ id: 'template-1' });
+
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls.every(([, init]) => init?.method === 'POST')).toBe(true);
+  });
 });
 
 function response(body: unknown, status = 200) {

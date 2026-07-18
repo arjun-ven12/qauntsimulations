@@ -139,13 +139,16 @@ export function InvariantForm({
           onApply={(payload) => change({ ...structuredClone(payload), validationStatus: 'DRAFT' })}
           payloadSchema={invariantTemplatePayloadSchema}
           preview={(payload) => (
-            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+            <dl className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
               <TemplatePreview label="Evaluator" value={payload.type} />
               <TemplatePreview label="Severity" value={payload.severity} />
+              <TemplatePreview label="Enabled" value={payload.enabled ? 'Yes' : 'No'} />
               <TemplatePreview
                 label="Request paths"
-                value={String(payload.configuration.requestPatterns.length)}
+                value={payload.configuration.requestPatterns.join(', ')}
               />
+              <TemplatePreview label="Methods" value={payload.configuration.methods.join(', ')} />
+              <TemplatePreview label="Failure meaning" value={payload.description} />
             </dl>
           )}
           value={invariantTemplateValue(value)}
