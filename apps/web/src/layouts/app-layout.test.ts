@@ -6,12 +6,15 @@ import { appNavigation } from './app-layout.js';
 const layoutSource = () => readFileSync(resolve(process.cwd(), 'apps/web/src/layouts/app-layout.tsx'), 'utf8');
 
 describe('Rift authenticated shell', () => {
-  it('uses a plain wordmark and compact workspace selector', () => {
+  it('uses a plain wordmark, grouped navigation, and compact workspace selector', () => {
     const source = layoutSource();
 
     expect(source).toContain('>RIFT</div>');
     expect(source).toContain('Workspace');
     expect(source).toContain('aria-label="Workspace selector"');
+    expect(source).toContain("label: 'Operations'");
+    expect(source).toContain("label: 'Manage'");
+    expect(source).toContain('lg:grid-cols-[240px_minmax(0,1fr)]');
     expect(source).not.toContain('FlaskConical');
     expect(source).not.toContain('RELIABILITY');
     expect(source).not.toContain('Active organisation');

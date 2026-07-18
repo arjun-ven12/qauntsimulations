@@ -50,8 +50,9 @@ describe('routed Product Dashboard page', () => {
         <DashboardResult canCreateProject result={result} />
       </MemoryRouter>,
     );
-    expect(html).toContain('Current Organisation');
+    expect(html).toContain('Dashboard');
     expect(html).toContain('Current Project');
+    expect(html).not.toContain('Current Organisation');
     expect(html).toContain('Activity is temporarily unavailable.');
     expect(html).not.toContain('Rift Demo');
     expect(html).not.toContain('project_demo_checkout');
@@ -62,7 +63,7 @@ describe('routed Product Dashboard page', () => {
       organisation: { id: 'org-new', name: 'New Organisation', slug: 'new', role: 'OWNER' },
     });
     const html = render(new QueryClient());
-    expect(html).toContain('Loading Dashboard');
+    expect(html).toContain('Loading dashboard');
     expect(html).not.toContain('Current Organisation');
     expect(html).not.toContain('Current Project');
   });
