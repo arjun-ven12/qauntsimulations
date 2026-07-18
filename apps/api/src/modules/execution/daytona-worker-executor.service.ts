@@ -52,8 +52,14 @@ export function sandboxEnvironment(config: DaytonaWorkerExecutorConfiguration): 
     HOST: '0.0.0.0',
     DEMO_STORE_URL: `http://127.0.0.1:${config.demoStorePort}`,
     DEMO_API_URL: `http://127.0.0.1:${config.demoStorePort}`,
+    NODE_OPTIONS: '--dns-result-order=ipv4first',
     PLAYWRIGHT_BROWSERS_PATH: '/home/daytona/.cache/ms-playwright',
   };
+}
+
+export function isLocalSandboxTarget(target: WorkerJob['target']): boolean {
+  const hostname = new URL(target.baseUrl).hostname.toLowerCase();
+  return hostname === 'localhost' || hostname === '127.0.0.1';
 }
 
 export function sandboxWorkerJob(input: WorkerJob, outputPath: string, port: number): WorkerJob {
@@ -62,6 +68,15 @@ export function sandboxWorkerJob(input: WorkerJob, outputPath: string, port: num
     ...input,
     target: { ...input.target, baseUrl, apiBaseUrl: baseUrl },
     evidence: { ...input.evidence, outputDirectory: outputPath },
+  });
+}
+
+export function daytonaWorkerJob(input: WorkerJob, outputPath: string, port: number): WorkerJob {
+  const parsed = workerJobSchema.parse(input);
+  if (isLocalSandboxTarget(parsed.target)) return sandboxWorkerJob(parsed, outputPath, port);
+  return workerJobSchema.parse({
+    ...parsed,
+    evidence: { ...parsed.evidence, outputDirectory: outputPath },
   });
 }
 
@@ -107,7 +122,9 @@ export class DaytonaPlaywrightWorkerExecutor implements WorkerExecutor {
     const deadline = lifecycleStartedAt + this.config.timeoutSeconds * 1_000;
     const localOutput = resolve(context.evidenceDirectory);
     this.assertLocalOutput(localOutput);
-    const job = sandboxWorkerJob(workerJobSchema.parse(input), this.config.outputPath, this.config.demoStorePort);
+    const parsedInput = workerJobSchema.parse(input);
+    const usesSandboxDemoStore = isLocalSandboxTarget(parsedInput.target);
+    const job = daytonaWorkerJob(parsedInput, this.config.outputPath, this.config.demoStorePort);
     const metadata: WorkerProviderMetadata = { provider: this.provider };
     let sandbox: SandboxHandle | undefined;
     let demoProcess: ProcessHandle | undefined;
@@ -151,9 +168,11 @@ export class DaytonaPlaywrightWorkerExecutor implements WorkerExecutor {
 
       const uploads = await this.bundles.createUploadManifest(job);
       const uploadStartedAt = now();
-      await this.event(context, 'demo_store_upload_started', 'Uploading demo-store production bundle.', sandbox.id);
-      await this.sandboxProvider.uploadFiles(sandbox, uploads.demoStore, this.remainingSeconds(deadline));
-      await this.event(context, 'demo_store_upload_completed', 'Demo-store production bundle uploaded.', sandbox.id, { fileCount: uploads.demoStore.length });
+      if (usesSandboxDemoStore) {
+        await this.event(context, 'demo_store_upload_started', 'Uploading demo-store production bundle.', sandbox.id);
+        await this.sandboxProvider.uploadFiles(sandbox, uploads.demoStore, this.remainingSeconds(deadline));
+        await this.event(context, 'demo_store_upload_completed', 'Demo-store production bundle uploaded.', sandbox.id, { fileCount: uploads.demoStore.length });
+      }
       await this.event(context, 'worker_upload_started', 'Uploading Playwright worker bundle.', sandbox.id);
       await this.sandboxProvider.uploadFiles(sandbox, [...uploads.worker, ...uploads.input], this.remainingSeconds(deadline));
       metadata.uploadDurationMs = duration(uploadStartedAt);
@@ -171,11 +190,17 @@ export class DaytonaPlaywrightWorkerExecutor implements WorkerExecutor {
       await this.event(context, 'worker_setup_completed', 'Sandbox Playwright runtime installed.', sandbox.id, { nodeVersion: metadata.nodeVersion, playwrightVersion: metadata.playwrightVersion });
 
       const demoStartedAt = now();
-      await this.event(context, 'demo_store_starting', 'Starting isolated demo store.', sandbox.id);
-      demoProcess = await this.sandboxProvider.startProcess(sandbox, demoStoreCommand(this.config));
-      await this.waitForDemoStore(sandbox, deadline);
+      if (usesSandboxDemoStore) {
+        await this.event(context, 'demo_store_starting', 'Starting isolated demo store.', sandbox.id);
+        demoProcess = await this.sandboxProvider.startProcess(sandbox, demoStoreCommand(this.config));
+        await this.waitForDemoStore(sandbox, deadline);
+        await this.event(context, 'demo_store_ready', 'Isolated demo store passed readiness, reset, and configuration checks.', sandbox.id);
+      } else {
+        await this.event(context, 'hosted_target_check_started', 'Checking hosted target from Daytona sandbox.', sandbox.id, { baseUrl: job.target.baseUrl });
+        await this.waitForHostedTarget(sandbox, job, deadline);
+        await this.event(context, 'hosted_target_ready', 'Hosted target passed readiness, reset, and configuration checks.', sandbox.id, { baseUrl: job.target.baseUrl });
+      }
       metadata.demoStoreSetupDurationMs = duration(demoStartedAt);
-      await this.event(context, 'demo_store_ready', 'Isolated demo store passed readiness, reset, and configuration checks.', sandbox.id);
 
       await this.assertNotCancelled(context);
       const workerStartedAt = now();
@@ -250,6 +275,43 @@ export class DaytonaPlaywrightWorkerExecutor implements WorkerExecutor {
       await new Promise((resolveWait) => setTimeout(resolveWait, 500));
     }
     throw new Error(`Demo-store readiness timed out: ${lastError}`);
+  }
+
+  private async waitForHostedTarget(sandbox: SandboxHandle, job: WorkerJob, deadline: number): Promise<void> {
+    const productUrl = new URL(job.target.journeyPath ?? '/products/test-product', job.target.baseUrl).toString();
+    const apiBaseUrl = job.target.apiBaseUrl ?? job.target.baseUrl;
+    const command = `
+const productUrl = ${JSON.stringify(productUrl)};
+const apiBaseUrl = ${JSON.stringify(apiBaseUrl)};
+const resetUrl = new URL('/api/test/reset', apiBaseUrl).toString();
+const configUrl = new URL('/api/test/config', apiBaseUrl).toString();
+const assert = (condition, message) => { if (!condition) throw new Error(message); };
+(async () => {
+  const product = await fetch(productUrl);
+  assert(product.status === 200, 'product status ' + product.status);
+  const reset = await fetch(resetUrl, { method: 'POST' });
+  assert(reset.ok, 'reset status ' + reset.status);
+  const resetBody = await reset.json();
+  assert(resetBody && resetBody.ok === true, 'reset body invalid');
+  const config = await fetch(configUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ duplicateSubmissionBug: false, paymentDelayMs: 0 }),
+  });
+  assert(config.ok, 'config status ' + config.status);
+  const configBody = await config.json();
+  assert(configBody.duplicateSubmissionBug === false && configBody.paymentDelayMs === 0, 'config body invalid');
+})().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  process.exit(1);
+});
+`;
+    await this.requireCommand(sandbox, {
+      executable: 'node',
+      args: ['-e', command],
+      environment: sandboxEnvironment(this.config),
+      timeoutSeconds: Math.min(30, this.remainingSeconds(deadline)),
+    }, deadline, 'Hosted target readiness');
   }
 
   private async downloadEvidence(
