@@ -130,7 +130,7 @@ function safePayload(category: TemplateCategory, payload: unknown) {
 }
 
 function normaliseName(name: string) {
-  return name.trim().toLocaleLowerCase();
+  return name.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
 }
 
 function templateNotFound() {

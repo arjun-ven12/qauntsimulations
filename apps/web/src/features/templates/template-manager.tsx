@@ -1,10 +1,23 @@
 import { Copy, Download, RotateCcw, Save, Search, Trash2, Upload } from 'lucide-react';
-import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import type { z } from 'zod';
 import { primaryButton, secondaryButton } from '../projects/project-ui.js';
 import type { RiftTemplate, TemplateCategory } from './template-model.js';
-import { parseImportedTemplate, parseTemplatePayload } from './template-json.js';
+import {
+  exportTemplateJson,
+  parseImportedTemplate,
+  parseTemplatePayload,
+} from './template-json.js';
 import { useTemplateLibrary } from './use-template-library.js';
+
+type Imported<TPayload> = Omit<RiftTemplate<TPayload>, 'id' | 'source' | 'createdAt' | 'updatedAt'>;
+
+type DialogState<TPayload> =
+  | { kind: 'RENAME'; template: RiftTemplate<TPayload>; name: string }
+  | { kind: 'DELETE'; template: RiftTemplate<TPayload> }
+  | { kind: 'UPDATE'; template: RiftTemplate<TPayload>; payload: TPayload }
+  | { kind: 'IMPORT'; imported: Imported<TPayload>; name: string }
+  | null;
 
 export function TemplateManager<TPayload>({
   category,
@@ -29,6 +42,7 @@ export function TemplateManager<TPayload>({
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [messageIsError, setMessageIsError] = useState(false);
+  const [dialog, setDialog] = useState<DialogState<TPayload>>(null);
   const importInput = useRef<HTMLInputElement>(null);
   const templates = useMemo(
     () => [...builtIns, ...library.templates],
@@ -39,8 +53,19 @@ export function TemplateManager<TPayload>({
     const text = `${template.name} ${template.description ?? ''}`.toLowerCase();
     return matchesSource && text.includes(query.trim().toLowerCase());
   });
-  const selected = templates.find((template) => template.id === selectedId) ?? filtered[0] ?? null;
-  const customised = Boolean(applied) && signature(value) !== signature(applied?.payload);
+  const selected = filtered.find((template) => template.id === selectedId) ?? filtered[0] ?? null;
+  const currentPayload = payloadSchema.safeParse(value);
+  const saveReason = library.mutating
+    ? 'A template request is already in progress.'
+    : !name.trim()
+      ? 'Enter a template name.'
+      : name.trim().length > 120
+        ? 'Use 120 characters or fewer.'
+        : !currentPayload.success
+          ? 'Complete the supported configuration before saving it.'
+          : '';
+  const customised =
+    Boolean(applied) && normalisedSignature(value) !== normalisedSignature(applied?.payload);
 
   function showMessage(text: string, isError = false) {
     setMessage(text);
@@ -48,68 +73,137 @@ export function TemplateManager<TPayload>({
   }
 
   function nameExists(nextName: string, exceptId?: string) {
-    const normalised = nextName.trim().toLocaleLowerCase();
+    const normalised = normaliseName(nextName);
     return templates.some(
-      (template) =>
-        template.id !== exceptId && template.name.trim().toLocaleLowerCase() === normalised,
+      (template) => template.id !== exceptId && normaliseName(template.name) === normalised,
     );
   }
 
   function apply(template: RiftTemplate<TPayload>) {
-    onApply(structuredClone(template.payload), template);
-    setApplied(template);
+    const snapshot = { ...template, payload: structuredClone(template.payload) };
+    onApply(structuredClone(snapshot.payload), snapshot);
+    setApplied(snapshot);
     setSelectedId(template.id);
     showMessage(`${template.name} applied.`);
   }
 
   async function saveCurrent() {
-    if (!name.trim()) {
-      showMessage('Enter a name for the custom template.', true);
-      return;
-    }
+    if (saveReason || !currentPayload.success) return;
     if (nameExists(name)) {
-      showMessage('Template names must be unique.', true);
+      showMessage('A template with this name already exists in this category.', true);
       return;
     }
     try {
-      const payload = parseTemplatePayload<TPayload>(value, payloadSchema);
-      const template = await library.create({ name, payload });
+      const payload = parseTemplatePayload<TPayload>(currentPayload.data, payloadSchema);
+      const description = descriptionFromPayload(payload);
+      const template = await library.create({
+        name: name.trim(),
+        ...(description ? { description } : {}),
+        payload,
+      });
       setName('');
       setSelectedId(template.id);
-      setApplied(template);
+      setApplied({ ...template, payload: structuredClone(template.payload) });
       showMessage('Custom template saved to Rift.');
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : 'Template could not be saved.', true);
+      showMessage(templateError(error, 'Template could not be saved.'), true);
     }
   }
 
-  async function importTemplate(event: ChangeEvent<HTMLInputElement>) {
+  async function chooseImport(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
     try {
       const parsed = parseImportedTemplate<TPayload>(await file.text(), category, payloadSchema);
-      if (nameExists(parsed.name)) throw new Error('Template names must be unique.');
-      const template = await library.create({
-        name: parsed.name,
-        ...(parsed.description ? { description: parsed.description } : {}),
-        payload: parsed.payload,
-      });
-      setSelectedId(template.id);
-      showMessage('Template imported and saved to Rift.');
+      showMessage('');
+      setDialog({ kind: 'IMPORT', imported: parsed, name: parsed.name });
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : 'Template import failed.', true);
+      showMessage(templateError(error, 'Template import failed.'), true);
+    }
+  }
+
+  async function confirmDialog() {
+    if (!dialog || library.mutating) return;
+    try {
+      if (dialog.kind === 'RENAME') {
+        const next = dialog.name.trim();
+        if (!next || next.length > 120) throw new Error('Enter a name of 120 characters or fewer.');
+        if (nameExists(next, dialog.template.id)) throw duplicateNameError();
+        const updated = await library.update(dialog.template.id, { name: next });
+        if (applied?.id === updated.id) setApplied({ ...applied, name: updated.name });
+        setQuery('');
+        setSelectedId(updated.id);
+        showMessage('Template renamed.');
+      } else if (dialog.kind === 'DELETE') {
+        await library.remove(dialog.template.id);
+        setSelectedId(builtIns[0]?.id ?? '');
+        if (applied?.id === dialog.template.id) setApplied(null);
+        showMessage('Template deleted. Current form values were kept.');
+      } else if (dialog.kind === 'UPDATE') {
+        const description = descriptionFromPayload(dialog.payload);
+        const updated = await library.update(dialog.template.id, {
+          payload: dialog.payload,
+          ...(description ? { description } : {}),
+        });
+        setApplied({ ...updated, payload: structuredClone(updated.payload) });
+        setSelectedId(updated.id);
+        showMessage('Template updated from the current configuration.');
+      } else {
+        const next = dialog.name.trim();
+        if (!next || next.length > 120) throw new Error('Enter a name of 120 characters or fewer.');
+        if (nameExists(next)) throw duplicateNameError();
+        const created = await library.create({
+          name: next,
+          ...(dialog.imported.description ? { description: dialog.imported.description } : {}),
+          payload: dialog.imported.payload,
+        });
+        setSelectedId(created.id);
+        showMessage('Template imported and saved to Rift.');
+      }
+      setDialog(null);
+    } catch (error) {
+      showMessage(templateError(error, 'Template action failed.'), true);
+    }
+  }
+
+  async function duplicate(template: RiftTemplate<TPayload>) {
+    try {
+      const copy = await library.create({
+        name: availableCopyName(template.name, templates),
+        ...(template.description ? { description: template.description } : {}),
+        payload: parseTemplatePayload<TPayload>(template.payload, payloadSchema),
+      });
+      setSelectedId(copy.id);
+      showMessage('Template duplicated as a custom template.');
+    } catch (error) {
+      showMessage(templateError(error, 'Template duplication failed.'), true);
+    }
+  }
+
+  function updateFromCurrent(template: RiftTemplate<TPayload>) {
+    try {
+      const payload = parseTemplatePayload<TPayload>(value, payloadSchema);
+      if (normalisedSignature(payload) === normalisedSignature(template.payload)) {
+        showMessage('The current configuration already matches this template.');
+        return;
+      }
+      showMessage('');
+      setDialog({ kind: 'UPDATE', template, payload });
+    } catch (error) {
+      showMessage(templateError(error, 'Current configuration cannot update this template.'), true);
     }
   }
 
   function exportTemplate(template: RiftTemplate<TPayload>) {
-    const blob = new Blob([JSON.stringify(template, null, 2)], { type: 'application/json' });
+    const blob = new Blob([exportTemplateJson(template)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
     anchor.download = `${slug(template.name)}.rift-template.json`;
     anchor.click();
     URL.revokeObjectURL(url);
+    showMessage('Template exported.');
   }
 
   return (
@@ -121,7 +215,8 @@ export function TemplateManager<TPayload>({
             Templates
           </h2>
           <p className="mt-1 text-sm text-[var(--rift-text-secondary)]">
-            Preview and apply built-in or account-saved configurations.
+            Preview and apply built-in configurations or private templates saved to your workspace
+            account.
           </p>
         </div>
         {applied ? (
@@ -165,7 +260,7 @@ export function TemplateManager<TPayload>({
             <button
               aria-pressed={selected?.id === template.id}
               className={`w-full rounded-lg border p-3 text-left transition ${selected?.id === template.id ? 'border-[var(--rift-border-strong)] bg-[var(--rift-surface-hover)]' : 'border-[var(--rift-border)] bg-[var(--rift-surface-raised)] hover:border-[var(--rift-border-strong)]'}`}
-              key={template.id}
+              key={`${template.source}:${template.id}`}
               onClick={() => setSelectedId(template.id)}
               type="button"
             >
@@ -187,9 +282,11 @@ export function TemplateManager<TPayload>({
               ) : null}
             </button>
           ))}
-          {!filtered.length ? (
+          {!filtered.length && !library.loading ? (
             <p className="rounded-lg border border-dashed border-[var(--rift-border)] p-4 text-sm text-[var(--rift-text-muted)]">
-              No templates match this search.
+              {source === 'CUSTOM'
+                ? 'No custom templates saved in this category.'
+                : 'No templates match this search.'}
             </p>
           ) : null}
           {library.loading ? (
@@ -221,27 +318,22 @@ export function TemplateManager<TPayload>({
               >
                 <Download aria-hidden="true" className="mr-2" size={15} /> Export JSON
               </button>
+              <button
+                className={secondaryButton}
+                disabled={library.mutating}
+                onClick={() => void duplicate(selected)}
+                type="button"
+              >
+                <Copy aria-hidden="true" className="mr-2" size={15} /> Duplicate
+              </button>
               {selected.source === 'CUSTOM' ? (
                 <>
                   <button
                     className={secondaryButton}
                     disabled={library.mutating}
-                    onClick={async () => {
-                      const next = window.prompt('Rename template', selected.name)?.trim();
-                      if (!next) return;
-                      if (nameExists(next, selected.id)) {
-                        showMessage('Template names must be unique.', true);
-                        return;
-                      }
-                      try {
-                        await library.update(selected.id, { name: next });
-                        showMessage('Template renamed.');
-                      } catch (error) {
-                        showMessage(
-                          error instanceof Error ? error.message : 'Template rename failed.',
-                          true,
-                        );
-                      }
+                    onClick={() => {
+                      showMessage('');
+                      setDialog({ kind: 'RENAME', template: selected, name: selected.name });
                     }}
                     type="button"
                   >
@@ -250,43 +342,17 @@ export function TemplateManager<TPayload>({
                   <button
                     className={secondaryButton}
                     disabled={library.mutating}
-                    onClick={async () => {
-                      try {
-                        const copy = await library.create({
-                          name: availableCopyName(selected.name, templates),
-                          ...(selected.description ? { description: selected.description } : {}),
-                          payload: selected.payload,
-                        });
-                        setSelectedId(copy.id);
-                        showMessage('Template duplicated.');
-                      } catch (error) {
-                        showMessage(
-                          error instanceof Error ? error.message : 'Template duplication failed.',
-                          true,
-                        );
-                      }
-                    }}
+                    onClick={() => updateFromCurrent(selected)}
                     type="button"
                   >
-                    <Copy aria-hidden="true" className="mr-2" size={15} /> Duplicate
+                    Update from current
                   </button>
                   <button
                     className={secondaryButton}
                     disabled={library.mutating}
-                    onClick={async () => {
-                      if (window.confirm(`Delete “${selected.name}”?`)) {
-                        try {
-                          await library.remove(selected.id);
-                          setSelectedId(builtIns[0]?.id ?? '');
-                          if (applied?.id === selected.id) setApplied(null);
-                          showMessage('Template deleted.');
-                        } catch (error) {
-                          showMessage(
-                            error instanceof Error ? error.message : 'Template deletion failed.',
-                            true,
-                          );
-                        }
-                      }
+                    onClick={() => {
+                      showMessage('');
+                      setDialog({ kind: 'DELETE', template: selected });
                     }}
                     type="button"
                   >
@@ -302,20 +368,24 @@ export function TemplateManager<TPayload>({
       <div className="grid gap-3 border-t border-[var(--rift-border)] pt-5 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
         <input
           aria-label="Custom template name"
+          maxLength={120}
           onChange={(event) => setName(event.target.value)}
           placeholder="Custom template name"
           value={name}
         />
         <button
           className={secondaryButton}
-          disabled={library.mutating}
+          disabled={Boolean(saveReason)}
           onClick={() => void saveCurrent()}
+          title={saveReason || undefined}
           type="button"
         >
-          <Save aria-hidden="true" className="mr-2" size={15} /> Save current
+          <Save aria-hidden="true" className="mr-2" size={15} />{' '}
+          {library.mutating ? 'Saving…' : 'Save current'}
         </button>
         <button
           className={secondaryButton}
+          disabled={library.mutating}
           onClick={() => importInput.current?.click()}
           type="button"
         >
@@ -325,17 +395,20 @@ export function TemplateManager<TPayload>({
           accept="application/json,.json"
           aria-label="Import template JSON file"
           className="sr-only"
-          onChange={(event) => void importTemplate(event)}
+          onChange={(event) => void chooseImport(event)}
           ref={importInput}
           type="file"
         />
       </div>
+      {saveReason && !library.mutating ? (
+        <p className="text-xs text-[var(--rift-text-muted)]">Save current: {saveReason}</p>
+      ) : null}
       {applied && customised ? (
         <button className={secondaryButton} onClick={() => apply(applied)} type="button">
           <RotateCcw aria-hidden="true" className="mr-2" size={15} /> Reset to applied template
         </button>
       ) : null}
-      {message ? (
+      {message && !dialog ? (
         <p
           className={`text-sm ${messageIsError ? 'text-[var(--status-fail)]' : 'text-[var(--rift-text-secondary)]'}`}
           role={messageIsError ? 'alert' : 'status'}
@@ -343,21 +416,212 @@ export function TemplateManager<TPayload>({
           {message}
         </p>
       ) : null}
-      {library.error && !message ? (
+      {library.error ? (
         <p className="text-sm text-[var(--status-fail)]" role="alert">
-          {library.error instanceof Error
-            ? library.error.message
-            : 'Saved templates could not be loaded.'}
+          {templateError(
+            library.error,
+            'Saved templates could not be loaded. Built-in templates remain available.',
+          )}
         </p>
+      ) : null}
+      {dialog ? (
+        <TemplateDialog
+          dialog={dialog}
+          error={messageIsError ? message : undefined}
+          mutating={library.mutating}
+          onCancel={() => setDialog(null)}
+          onChangeName={(next) =>
+            setDialog((current) =>
+              current?.kind === 'RENAME'
+                ? { ...current, name: next }
+                : current?.kind === 'IMPORT'
+                  ? { ...current, name: next }
+                  : current,
+            )
+          }
+          onConfirm={() => void confirmDialog()}
+          preview={preview}
+        />
       ) : null}
     </section>
   );
 }
 
-function signature(value: unknown) {
-  return JSON.stringify(value);
+function TemplateDialog<TPayload>({
+  dialog,
+  error,
+  mutating,
+  onCancel,
+  onChangeName,
+  onConfirm,
+  preview,
+}: {
+  dialog: Exclude<DialogState<TPayload>, null>;
+  error?: string | undefined;
+  mutating: boolean;
+  onCancel(): void;
+  onChangeName(value: string): void;
+  onConfirm(): void;
+  preview(payload: TPayload): ReactNode;
+}) {
+  const panel = useRef<HTMLDivElement>(null);
+  const cancel = useRef(onCancel);
+  cancel.current = onCancel;
+  useEffect(() => {
+    const previous = document.activeElement as HTMLElement | null;
+    panel.current?.querySelector<HTMLElement>('input, button')?.focus();
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancel.current();
+      if (event.key !== 'Tab' || !panel.current) return;
+      const controls = [
+        ...panel.current.querySelectorAll<HTMLElement>('input, button:not(:disabled)'),
+      ];
+      const first = controls[0];
+      const last = controls.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      previous?.focus();
+    };
+  }, []);
+  const name = dialog.kind === 'IMPORT' || dialog.kind === 'RENAME' ? dialog.name : undefined;
+  const title =
+    dialog.kind === 'RENAME'
+      ? 'Rename template'
+      : dialog.kind === 'DELETE'
+        ? 'Delete template'
+        : dialog.kind === 'UPDATE'
+          ? 'Update template from current configuration'
+          : 'Preview imported template';
+  const payload =
+    dialog.kind === 'IMPORT'
+      ? dialog.imported.payload
+      : dialog.kind === 'UPDATE'
+        ? dialog.payload
+        : null;
+  return (
+    <div
+      className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-black/70 p-4"
+      onMouseDown={(event) => event.target === event.currentTarget && onCancel()}
+    >
+      <div
+        aria-labelledby="template-dialog-title"
+        aria-modal="true"
+        className="card max-h-[90vh] w-full max-w-lg overflow-y-auto"
+        ref={panel}
+        role="dialog"
+      >
+        <h3 className="text-lg font-semibold" id="template-dialog-title">
+          {title}
+        </h3>
+        {dialog.kind === 'DELETE' ? (
+          <p className="mt-3 text-sm">
+            Delete “{dialog.template.name}”? The current form values will not change.
+          </p>
+        ) : null}
+        {dialog.kind === 'UPDATE' ? (
+          <p className="mt-3 text-sm">
+            Replace the saved payload for “{dialog.template.name}” with the current reusable
+            configuration?
+          </p>
+        ) : null}
+        {name !== undefined ? (
+          <label className="mt-4 block text-sm">
+            <span className="mb-2 block">Template name</span>
+            <input
+              autoFocus
+              className="w-full"
+              maxLength={120}
+              onChange={(event) => onChangeName(event.target.value)}
+              value={name}
+            />
+          </label>
+        ) : null}
+        {payload ? (
+          <div className="mt-4 rounded-lg border border-[var(--rift-border)] p-4">
+            {preview(payload)}
+          </div>
+        ) : null}
+        {error ? (
+          <p className="mt-4 text-sm text-[var(--status-fail)]" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button className={secondaryButton} disabled={mutating} onClick={onCancel} type="button">
+            Cancel
+          </button>
+          <button
+            className={dialog.kind === 'DELETE' ? secondaryButton : primaryButton}
+            disabled={mutating || (name !== undefined && !name.trim())}
+            onClick={onConfirm}
+            type="button"
+          >
+            {mutating
+              ? 'Working…'
+              : dialog.kind === 'DELETE'
+                ? 'Delete template'
+                : dialog.kind === 'IMPORT'
+                  ? 'Import template'
+                  : dialog.kind === 'UPDATE'
+                    ? 'Update template'
+                    : 'Save name'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
+function normalisedSignature(value: unknown) {
+  return JSON.stringify(normaliseReusable(value));
+}
+function normaliseReusable(value: unknown, key = ''): unknown {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (/method/i.test(key)) return trimmed.toUpperCase();
+    if (/(?:host|domain)/i.test(key)) return trimmed.toLowerCase();
+    return trimmed;
+  }
+  if (Array.isArray(value)) {
+    const next = value.map((entry) => normaliseReusable(entry, key));
+    return next.every((entry) => ['string', 'number', 'boolean'].includes(typeof entry))
+      ? [...next].sort((left, right) => String(left).localeCompare(String(right)))
+      : next;
+  }
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([entryKey, entry]) => [entryKey, normaliseReusable(entry, entryKey)]),
+    );
+  return value;
+}
+function normaliseName(value: string) {
+  return value.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+}
+function duplicateNameError() {
+  return new Error('A template with this name already exists in this category.');
+}
+function templateError(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
+function descriptionFromPayload(payload: unknown) {
+  if (!payload || typeof payload !== 'object' || !('description' in payload)) return undefined;
+  const description = (payload as { description?: unknown }).description;
+  return typeof description === 'string' && description.trim()
+    ? description.trim().slice(0, 500)
+    : undefined;
+}
 function slug(value: string) {
   return (
     value
@@ -366,11 +630,10 @@ function slug(value: string) {
       .replace(/(^-|-$)/g, '') || 'rift-template'
   );
 }
-
 function availableCopyName<TPayload>(original: string, templates: RiftTemplate<TPayload>[]) {
-  const names = new Set(templates.map((template) => template.name.trim().toLocaleLowerCase()));
+  const names = new Set(templates.map((template) => normaliseName(template.name)));
   let candidate = `${original} copy`;
   let suffix = 2;
-  while (names.has(candidate.toLocaleLowerCase())) candidate = `${original} copy ${suffix++}`;
+  while (names.has(normaliseName(candidate))) candidate = `${original} copy ${suffix++}`;
   return candidate;
 }

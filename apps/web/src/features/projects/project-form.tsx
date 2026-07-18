@@ -139,10 +139,9 @@ export function ProjectForm({
           items={[
             ['Project', payload.name || 'Untitled'],
             ['Application', projectHostname(payload.applicationUrl)],
-            [
-              'Access references',
-              String(payload.apiEndpoints.length + payload.webhookEndpoints.length),
-            ],
+            ['Repository', payload.repositoryUrl ? 'Configured' : 'Not configured'],
+            ['API endpoints', String(payload.apiEndpoints.length)],
+            ['Webhook endpoints', String(payload.webhookEndpoints.length)],
           ]}
         />
       )}

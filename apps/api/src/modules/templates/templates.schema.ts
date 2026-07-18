@@ -12,7 +12,11 @@ export const templateCategorySchema = z.enum(templateCategories);
 export type TemplateCategory = z.infer<typeof templateCategorySchema>;
 
 const nullableString = z.string().nullable();
-const labelledUrl = z.object({ label: z.string(), url: z.string() }).strict();
+const httpUrl = z
+  .string()
+  .url()
+  .refine((value) => /^https?:\/\//i.test(value), 'Use an HTTP or HTTPS URL');
+const labelledUrl = z.object({ label: z.string().trim().min(1), url: httpUrl }).strict();
 const httpMethod = z.enum(['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE']);
 const environmentAction = z.enum([
   'NAVIGATE_APPLICATION',
@@ -30,10 +34,10 @@ const environmentAction = z.enum([
 
 const projectPayload = z
   .object({
-    name: z.string(),
-    description: nullableString,
-    applicationUrl: z.string(),
-    repositoryUrl: nullableString,
+    name: z.string().trim().min(1).max(100),
+    description: z.string().max(1_000).nullable(),
+    applicationUrl: httpUrl,
+    repositoryUrl: httpUrl.nullable(),
     apiEndpoints: z.array(labelledUrl),
     webhookEndpoints: z.array(labelledUrl),
   })
@@ -152,15 +156,24 @@ const journeyPayload = z
 
 const invariantPayload = z
   .object({
-    name: z.string(),
-    description: z.string(),
+    name: z.string().trim().min(1).max(200),
+    description: z.string().trim().min(10).max(2_000),
     type: z.enum(['NO_DUPLICATE_PAYMENT', 'NO_DUPLICATE_ORDER']),
     severity: z.enum(['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']),
     enabled: z.boolean(),
     configuration: z
       .object({
-        requestPatterns: z.array(z.string()),
-        methods: z.array(z.enum(['POST', 'PUT', 'PATCH'])),
+        requestPatterns: z
+          .array(
+            z
+              .string()
+              .trim()
+              .regex(/^\/[A-Za-z0-9/_-]+$/)
+              .max(200),
+          )
+          .min(1)
+          .max(20),
+        methods: z.array(z.enum(['POST', 'PUT', 'PATCH'])).min(1),
         orderIdSelector: z.string().optional(),
       })
       .strict(),
@@ -201,13 +214,27 @@ const templateFields = {
   schemaVersion: z.literal(1),
 };
 
+const maximumPayloadBytes = 64 * 1024;
+
+function payloadWithinLimit(payload: unknown) {
+  try {
+    return Buffer.byteLength(JSON.stringify(payload), 'utf8') <= maximumPayloadBytes;
+  } catch {
+    return false;
+  }
+}
+
 export const createTemplateSchema = z
   .object({
     ...templateFields,
     category: templateCategorySchema,
     payload: z.unknown(),
   })
-  .strict();
+  .strict()
+  .refine((value) => payloadWithinLimit(value.payload), {
+    message: 'Template payload must be 64 KB or smaller',
+    path: ['payload'],
+  });
 
 export const updateTemplateSchema = z
   .object({
@@ -217,7 +244,11 @@ export const updateTemplateSchema = z
     payload: z.unknown().optional(),
   })
   .strict()
-  .refine((value) => Object.keys(value).length > 0, 'At least one field is required');
+  .refine((value) => Object.keys(value).length > 0, 'At least one field is required')
+  .refine((value) => value.payload === undefined || payloadWithinLimit(value.payload), {
+    message: 'Template payload must be 64 KB or smaller',
+    path: ['payload'],
+  });
 
 export type CreateTemplateInput = z.infer<typeof createTemplateSchema>;
 export type UpdateTemplateInput = z.infer<typeof updateTemplateSchema>;
