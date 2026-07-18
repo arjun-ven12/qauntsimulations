@@ -111,6 +111,9 @@ describe('LiveWorldLabPage runtime metadata helpers', () => {
     expect(findings).toHaveLength(1);
     expect(html).toContain('Investigation complete');
     expect(html).toContain('World exploration');
+    expect(html).toContain('Inspect world');
+    expect(html).not.toContain('>Browser</th>');
+    expect(html).not.toContain('>Viewport</th>');
     expect(html).toContain('Execution');
     expect(html).toContain('Business outcome');
     expect(html).toContain('Execution completed');
@@ -123,6 +126,8 @@ describe('LiveWorldLabPage runtime metadata helpers', () => {
     expect(html).toContain('Runtime event timeline');
     expect(html).toContain('Discovered finding');
     expect(html).toContain('Evidence availability');
+    expect(html).toContain('rift-semantic-status--pass');
+    expect(html).toContain('rift-semantic-status--fail');
     expect(html).not.toContain('<script>');
     expect(html).not.toContain('/Users/');
     expect(html).not.toContain('Final report\\n\\nDuplicate checkout submission');
@@ -157,6 +162,8 @@ describe('LiveWorldLabPage runtime metadata helpers', () => {
     expect(html).toContain('Failure boundary');
     expect(html).toContain('Confidence');
     expect(html).toContain('Evidence artifacts');
+    expect(html).toContain('rift-semantic-status--pass');
+    expect(html).toContain('rift-semantic-status--fail');
     expect(html).toContain('/repair-verifications/new');
     expect(html).not.toContain('bg-cyan');
     expect(html).not.toContain('text-emerald');

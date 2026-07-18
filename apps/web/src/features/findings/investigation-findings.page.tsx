@@ -17,7 +17,7 @@ export function InvestigationFindingsPage() {
         eyebrow={progress.data?.status ?? 'Findings'}
         title="Investigation findings"
         description={progress.data ? `${phaseLabel(progress.data.status)} · ${progress.data.findingsCount} findings recorded.` : 'Evidence-backed invariant findings.'}
-        action={<Link className="rounded-lg bg-cyan px-4 py-2 font-bold text-ink" to={`/investigations/${investigationId}`}>Back to overview</Link>}
+        action={<Link className="rift-button-secondary" to={`/investigations/${investigationId}`}>Back to overview</Link>}
       />
       <RuntimeNav investigationId={investigationId} />
       {findings.isLoading ? <PanelState title="Loading findings">Loading evidence-backed findings…</PanelState> : null}
