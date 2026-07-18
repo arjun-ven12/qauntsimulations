@@ -48,7 +48,7 @@ export function OrganisationPage() {
   if (current.isError) {
     return (
       <OrganisationMessage
-        description="WorldLab could not load your organisation. Try again in a moment."
+        description="Rift could not load your organisation. Try again in a moment."
         title="Organisation unavailable"
       />
     );
@@ -85,7 +85,7 @@ export function OrganisationPage() {
       setFormError(
         error instanceof InvitationApiError
           ? error.message
-          : 'WorldLab could not create this invitation.',
+          : 'Rift could not create this invitation.',
       );
     } finally {
       addInFlight.current = false;
@@ -104,7 +104,7 @@ export function OrganisationPage() {
       setStatus(
         error instanceof InvitationApiError
           ? error.message
-          : 'WorldLab could not revoke this invitation.',
+          : 'Rift could not revoke this invitation.',
       );
     } finally {
       setRevokingId('');
@@ -122,7 +122,7 @@ export function OrganisationPage() {
       setStatus(
         error instanceof OrganisationApiError
           ? error.message
-          : 'WorldLab could not update this role.',
+          : 'Rift could not update this role.',
       );
     } finally {
       setUpdatingId('');
@@ -141,7 +141,7 @@ export function OrganisationPage() {
       setStatus(
         error instanceof OrganisationApiError
           ? error.message
-          : 'WorldLab could not remove this member.',
+          : 'Rift could not remove this member.',
       );
     } finally {
       setRemovingId('');
@@ -151,7 +151,7 @@ export function OrganisationPage() {
   return (
     <section aria-labelledby="organisation-heading">
       <PageHeading
-        description="Membership and access for your current WorldLab organisation."
+        description="Membership and access for your current Rift organisation."
         eyebrow="Settings"
         title={current.data.organisation.name}
       />

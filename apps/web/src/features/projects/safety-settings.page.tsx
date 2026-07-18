@@ -5,6 +5,11 @@ import { useParams } from 'react-router-dom';
 import { PageHeading } from '../../components/page-heading.js';
 import { ProjectApiError, projectApi, type SafetyPolicy } from '../../services/project-api.js';
 import { useAuthStore } from '../../stores/auth.store.js';
+import {
+  TemplateManager,
+  builtInTemplate,
+  projectSafetyTemplatePayloadSchema,
+} from '../templates/index.js';
 import { primaryButton, ProjectLoading, ProjectMessage, secondaryButton } from './project-ui.js';
 
 const methods = ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'] as const;
@@ -20,6 +25,16 @@ const restrictions = [
   'Infrastructure changes denied',
   'Cross-organisation access denied',
 ];
+
+type SafetyTemplatePayload = Pick<
+  SafetyPolicy,
+  | 'domainAllowlist'
+  | 'prohibitedActions'
+  | 'allowedHttpMethods'
+  | 'permitCheckoutSubmission'
+  | 'permitMockPayment'
+  | 'permitTestOrderCreation'
+>;
 
 export function SafetySettingsPage() {
   const { projectId = '' } = useParams();
@@ -179,7 +194,7 @@ export function SafetySettingsPage() {
       setError(
         requestError instanceof ProjectApiError
           ? requestError.message
-          : 'WorldLab could not save safety settings.',
+          : 'Rift could not save safety settings.',
       );
     } finally {
       submissionInFlight.current = false;
@@ -190,7 +205,7 @@ export function SafetySettingsPage() {
   return (
     <section className="mx-auto max-w-5xl">
       <PageHeading
-        description="Define the exact boundary WorldLab must obey. Unknown targets remain denied."
+        description="Define the exact boundary Rift must obey. Unknown targets remain denied."
         eyebrow={project.data.name}
         title="Safety Settings"
       />
@@ -204,6 +219,53 @@ export function SafetySettingsPage() {
         <p className="mb-4 text-sm font-bold text-amber-300" role="status">
           Unsaved changes
         </p>
+      ) : null}
+      {canManage ? (
+        <div className="mt-6">
+          <TemplateManager
+            builtIns={[
+              builtInTemplate(
+                'PROJECT_SAFETY',
+                'project-safety-built-in-fail-closed',
+                'Fail-closed controls',
+                'Keep the current host boundary while disabling privileged actions.',
+                {
+                  domainAllowlist: [...value.domainAllowlist],
+                  prohibitedActions: [],
+                  allowedHttpMethods: ['GET'],
+                  permitCheckoutSubmission: false,
+                  permitMockPayment: false,
+                  permitTestOrderCreation: false,
+                } satisfies SafetyTemplatePayload,
+              ),
+            ]}
+            category="PROJECT_SAFETY"
+            onApply={(payload) => {
+              setValue({ ...value, ...structuredClone(payload) });
+              setAcknowledged(false);
+              setHostErrors({});
+              setActionErrors({});
+            }}
+            payloadSchema={projectSafetyTemplatePayloadSchema}
+            preview={(payload) => (
+              <dl className="grid gap-3 text-sm sm:grid-cols-3">
+                <SafetyTemplatePreview
+                  label="Allowed hosts"
+                  value={String(payload.domainAllowlist.length)}
+                />
+                <SafetyTemplatePreview
+                  label="HTTP methods"
+                  value={payload.allowedHttpMethods.join(', ') || 'None'}
+                />
+                <SafetyTemplatePreview
+                  label="Prohibited actions"
+                  value={String(payload.prohibitedActions.length)}
+                />
+              </dl>
+            )}
+            value={safetyTemplatePayload(value)}
+          />
+        </div>
       ) : null}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <section className="card min-w-0">
@@ -273,7 +335,10 @@ export function SafetySettingsPage() {
             <legend className="text-sm font-bold">Allowed HTTP methods</legend>
             <div className="mt-2 flex flex-wrap gap-3">
               {methods.map((method) => (
-                <label className="flex items-center gap-2 text-sm" key={method}>
+                <label
+                  className="rift-choice-control flex min-h-11 items-center gap-2 px-3 text-sm"
+                  key={method}
+                >
                   <input
                     checked={value.allowedHttpMethods.includes(method)}
                     onChange={(event) =>
@@ -339,14 +404,14 @@ export function SafetySettingsPage() {
 
       <section className="card mt-6 min-w-0">
         <h2 className="text-xl font-bold">Prohibited actions</h2>
-        <p className="mt-1 text-sm text-slate-400">Actions TaskOS must never perform.</p>
+        <p className="mt-1 text-sm text-slate-400">Actions Rift must never perform.</p>
         {value.prohibitedActions.length === 0 ? (
           <p className="mt-4 text-sm text-slate-500">No prohibited actions configured.</p>
         ) : (
           <ul className="mt-4 space-y-3" data-testid="prohibited-actions">
             {value.prohibitedActions.map((action, index) => (
               <li
-                className="grid min-w-0 gap-2 rounded-lg border border-slate-800 p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                className="rift-editable-row grid min-w-0 gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
                 key={index}
               >
                 {canManage ? (
@@ -460,7 +525,7 @@ function SafetyToggle({
   onChange(value: boolean): void;
 }) {
   return (
-    <label className="flex items-center gap-3 text-sm">
+    <label className="rift-choice-control flex min-h-11 items-center gap-3 px-3 text-sm">
       <input
         checked={checked}
         disabled={disabled}
@@ -469,6 +534,28 @@ function SafetyToggle({
       />
       {label}
     </label>
+  );
+}
+
+function safetyTemplatePayload(policy: SafetyPolicy): SafetyTemplatePayload {
+  return {
+    domainAllowlist: [...policy.domainAllowlist],
+    prohibitedActions: [...policy.prohibitedActions],
+    allowedHttpMethods: [...policy.allowedHttpMethods],
+    permitCheckoutSubmission: policy.permitCheckoutSubmission,
+    permitMockPayment: policy.permitMockPayment,
+    permitTestOrderCreation: policy.permitTestOrderCreation,
+  };
+}
+
+function SafetyTemplatePreview({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt>
+      <dd className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </dd>
+    </div>
   );
 }
 

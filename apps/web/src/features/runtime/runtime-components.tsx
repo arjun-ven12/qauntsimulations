@@ -5,6 +5,15 @@ import type { EvidenceArtifactResponse, EvidenceTextContentResponse, ExperimentP
 import { InvestigationApiError } from '../../services/api/index.js';
 import { useEvidenceTextContent } from './use-runtime-queries.js';
 import {
+  businessOutcomeTone,
+  conditionRoleTone,
+  confidenceTone,
+  executionStatusTone,
+  findingSeverityTone,
+  plannerStatusTone,
+  type SemanticStatusTone,
+} from './semantic-status.js';
+import {
   causalConditions,
   causalStatus,
   completedWorlds,
@@ -51,24 +60,18 @@ import {
   type WorldSort,
 } from './runtime-normalizers.js';
 
-export function StatusBadge({ children, tone = 'slate' }: { children: ReactNode; tone?: 'cyan' | 'green' | 'red' | 'amber' | 'slate' }) {
-  const classes = {
-    cyan: 'border-cyan/40 bg-cyan/10 text-cyan',
-    green: 'border-emerald-300/40 bg-emerald-300/10 text-emerald-200',
-    red: 'border-red-300/40 bg-red-300/10 text-red-200',
-    amber: 'border-amber-300/40 bg-amber-300/10 text-amber-100',
-    slate: 'border-slate-700 bg-slate-900 text-slate-300',
-  };
-  return <span className={`rounded-full border px-2 py-1 text-xs font-bold ${classes[tone]}`}>{children}</span>;
+export function StatusBadge({ children, tone = 'neutral' }: { children: ReactNode; tone?: SemanticStatusTone | 'cyan' | 'green' | 'red' | 'amber' | 'slate' }) {
+  const semanticTone: SemanticStatusTone = tone === 'green' ? 'pass' : tone === 'cyan' ? 'running' : tone === 'red' ? 'fail' : tone === 'amber' ? 'pending' : tone === 'slate' ? 'neutral' : tone;
+  return <span className={`rift-semantic-status rift-semantic-status--${semanticTone}`}>{children}</span>;
 }
 
 export function PanelState({ title, children, retry }: { title: string; children: string; retry?: () => void }) {
   return (
-    <section className="card" role="status">
-      <h2 className="font-bold">{title}</h2>
-      <p className="mt-2 text-sm text-slate-400">{children}</p>
+    <section className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface)] p-5" role="status">
+      <h2 className="font-semibold text-[var(--rift-text)]">{title}</h2>
+      <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{children}</p>
       {retry ? (
-        <button className="mt-4 rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200" onClick={retry} type="button">
+        <button className="rift-button-secondary mt-4 min-h-9 px-3 py-1.5 text-xs" onClick={retry} type="button">
           Retry
         </button>
       ) : null}
@@ -79,15 +82,16 @@ export function PanelState({ title, children, retry }: { title: string; children
 export function RuntimeNav({ investigationId }: { investigationId: string }) {
   const items = [
     { to: `/investigations/${investigationId}`, label: 'Overview' },
+    { to: `/investigations/${investigationId}/live`, label: 'Live run' },
     { to: `/investigations/${investigationId}/plan`, label: 'Plan' },
     { to: `/investigations/${investigationId}/worlds`, label: 'Worlds' },
     { to: `/investigations/${investigationId}/findings`, label: 'Findings' },
   ];
   return (
-    <nav aria-label="Investigation sections" className="mb-6 flex flex-wrap gap-2">
+    <nav aria-label="Investigation sections" className="mb-6 flex flex-wrap gap-1 border-b border-[var(--rift-border)]">
       {items.map((item) => (
         <NavLink
-          className={({ isActive }) => `rounded-full px-3 py-2 text-sm ${isActive ? 'bg-cyan text-ink' : 'bg-slate-900 text-slate-300 hover:bg-slate-800'}`}
+          className={({ isActive }) => `border-b-2 px-3 py-2.5 text-sm font-medium transition ${isActive ? 'border-white text-white' : 'border-transparent text-[var(--rift-text-muted)] hover:text-[var(--rift-text)]'}`}
           end={item.label === 'Overview'}
           key={item.to}
           to={item.to}
@@ -108,22 +112,22 @@ export function InvestigationOverviewHeader({ progress, plan, workerProvider }: 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex flex-wrap gap-2">
-            <StatusBadge tone={progress.status === 'COMPLETED' ? 'green' : progress.status === 'FAILED' ? 'red' : 'cyan'}>{phaseLabel(progress.status)}</StatusBadge>
-            <StatusBadge>{progress.status}</StatusBadge>
+            <StatusBadge tone={executionStatusTone(progress.status)}>{phaseLabel(progress.status)}</StatusBadge>
+            <StatusBadge tone={executionStatusTone(progress.status)}>{progress.status}</StatusBadge>
           </div>
           <h2 className="mt-4 text-2xl font-black">Investigation {shortId(progress.id, 12)}</h2>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">
             Planner: {plannerProviderLabel(provider.effective)} · Worker: {workerProvider ?? 'Not recorded'} · Findings: {progress.findingsCount.toLocaleString()} · Worlds: {progress.progress.totalWorlds.toLocaleString()}
           </p>
-          <p className="mt-1 text-xs text-slate-500">Raw status: {progress.status}</p>
+          <p className="mt-1 text-xs text-[var(--rift-text-muted)]">Raw status: {progress.status}</p>
         </div>
         <div className="min-w-48 text-right">
-          <div className="text-3xl font-black text-cyan">{percentage}%</div>
-          <div className="text-sm text-slate-400">{progressCopy(progress.progress)}</div>
+          <div className="text-3xl font-black text-white">{percentage}%</div>
+          <div className="text-sm text-[var(--rift-text-secondary)]">{progressCopy(progress.progress)}</div>
         </div>
       </div>
-      <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-800" aria-label={`${percentage}% complete`}>
-        <div className="h-full bg-cyan" style={{ width: `${percentage}%` }} />
+      <div className="mt-5 h-2 overflow-hidden rounded-full bg-[var(--rift-surface-hover)]" aria-label={`${percentage}% complete`}>
+        <div className="h-full bg-white" style={{ width: `${percentage}%` }} />
       </div>
       <PhaseTracker steps={steps} />
     </section>
@@ -131,14 +135,15 @@ export function InvestigationOverviewHeader({ progress, plan, workerProvider }: 
 }
 
 export function PhaseTracker({ steps }: { steps: ReturnType<typeof phaseTracker> }) {
-  const tone = (state: string) => state === 'completed' ? 'green' : state === 'active' ? 'cyan' : state === 'stopped' ? 'red' : state === 'skipped' ? 'amber' : 'slate';
+  const tone = (state: string): SemanticStatusTone => state === 'completed' ? 'pass' : state === 'active' ? 'running' : state === 'stopped' ? 'fail' : state === 'skipped' ? 'pending' : 'neutral';
   return (
-    <ol className="mt-5 grid gap-2 md:grid-cols-5" aria-label="Investigation phase tracker">
+    <ol className="mt-6 grid gap-4 md:grid-cols-5 md:gap-0" aria-label="Investigation phase tracker">
       {steps.map((step, index) => (
-        <li className="rounded-xl border border-slate-800 bg-slate-950 p-3" key={step.id}>
-          <div className="text-xs text-slate-500">Step {index + 1}</div>
-          <div className="mt-1 font-bold">{step.label}</div>
-          <div className="mt-2"><StatusBadge tone={tone(step.state)}>{humanize(step.state)}</StatusBadge></div>
+        <li className="relative border-t border-[var(--rift-border-strong)] pt-3 md:pr-3" key={step.id}>
+          <span className={`absolute -top-1 left-0 size-2 rounded-full ${semanticDotClass(tone(step.state))}`} />
+          <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--rift-text-muted)]">Step {index + 1}</div>
+          <div className="mt-1 text-sm font-semibold text-[var(--rift-text)]">{step.label}</div>
+          <div className="mt-1 text-xs"><span className={semanticTextClass(tone(step.state))}>{humanize(step.state)}</span></div>
         </li>
       ))}
     </ol>
@@ -158,11 +163,11 @@ export function ProgressSummary({ progress }: { progress: InvestigationProgress 
   return (
     <section className="card">
       <h2 className="font-bold">Runtime progress</h2>
-      <p className="mt-2 text-sm text-slate-400">{progressCopy(progress.progress)}. Attempts are tracked separately from worlds.</p>
+      <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{progressCopy(progress.progress)}. Attempts are tracked separately from worlds.</p>
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         {rows.map(([label, value]) => (
-          <div className="rounded-xl bg-slate-950 p-3" key={label}>
-            <div className="text-xs text-slate-500">{label}</div>
+          <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3" key={label}>
+            <div className="text-xs text-[var(--rift-text-muted)]">{label}</div>
             <div className="mt-1 text-xl font-bold">{value}</div>
           </div>
         ))}
@@ -174,12 +179,12 @@ export function ProgressSummary({ progress }: { progress: InvestigationProgress 
 export function CompletedRunSummary({ progress, findings }: { progress: InvestigationProgress; findings: Finding[] }) {
   if (!['COMPLETED', 'FAILED', 'CANCELLED'].includes(progress.status)) return null;
   return (
-    <section className="card border-cyan/30">
+    <section className="card border-[var(--rift-border-strong)]">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-bold">{progress.status === 'COMPLETED' ? 'Completed run summary' : 'Terminal run summary'}</h2>
-        <StatusBadge tone={progress.status === 'COMPLETED' ? 'green' : progress.status === 'FAILED' ? 'red' : 'amber'}>{humanize(progress.status)}</StatusBadge>
+        <StatusBadge tone={executionStatusTone(progress.status)}>{humanize(progress.status)}</StatusBadge>
       </div>
-      <p className="mt-3 text-sm text-slate-300">{terminalSummary(progress, findings)}</p>
+      <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">{terminalSummary(progress, findings)}</p>
     </section>
   );
 }
@@ -196,19 +201,19 @@ export function ExperimentPlanPanel({ plan }: { plan: ExperimentPlanResponse | n
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-bold">Experiment plan</h2>
         <div className="flex flex-wrap gap-2">
-          <StatusBadge tone="cyan">{plannerProviderLabel(provider.effective)}</StatusBadge>
-          <StatusBadge>{humanize(provider.status)}</StatusBadge>
+          <StatusBadge tone={plannerStatusTone(provider.status, provider.fallbackUsed)}>{plannerProviderLabel(provider.effective)}</StatusBadge>
+          <StatusBadge tone={plannerStatusTone(provider.status, provider.fallbackUsed)}>{humanize(provider.status)}</StatusBadge>
         </div>
       </div>
-      <p className="mt-4 text-slate-300">{plan.objective}</p>
-      <p className="mt-3 text-sm text-slate-400">{plan.planningExplanation}</p>
+      <p className="mt-4 text-[var(--rift-text-secondary)]">{plan.objective}</p>
+      <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">{plan.planningExplanation}</p>
       <dl className="mt-4 grid gap-3 md:grid-cols-4">
-        <div><dt className="text-xs text-slate-500">Planner requested</dt><dd className="font-bold">{plannerProviderLabel(provider.requested)}</dd></div>
-        <div><dt className="text-xs text-slate-500">Executed plan source</dt><dd className="font-bold">{plannerProviderLabel(provider.effective)}</dd></div>
-        <div><dt className="text-xs text-slate-500">Model</dt><dd className="font-bold">{provider.model ?? 'Not applicable'}</dd></div>
-        <div><dt className="text-xs text-slate-500">Fallback used</dt><dd className="font-bold">{provider.fallbackUsed ? 'Yes' : 'No'}</dd></div>
+        <div><dt className="text-xs text-[var(--rift-text-muted)]">Planner requested</dt><dd className="font-bold">{plannerProviderLabel(provider.requested)}</dd></div>
+        <div><dt className="text-xs text-[var(--rift-text-muted)]">Executed plan source</dt><dd className="font-bold">{plannerProviderLabel(provider.effective)}</dd></div>
+        <div><dt className="text-xs text-[var(--rift-text-muted)]">Model</dt><dd className="font-bold">{provider.model ?? 'Not applicable'}</dd></div>
+        <div><dt className="text-xs text-[var(--rift-text-muted)]">Fallback used</dt><dd className="font-bold">{provider.fallbackUsed ? 'Yes' : 'No'}</dd></div>
       </dl>
-      {fallback ? <p className="mt-4 rounded-xl border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-amber-100">{fallback}</p> : null}
+      {fallback ? <p className="mt-4 rounded-xl border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] p-3 text-sm text-[var(--status-pending)]">{fallback}</p> : null}
       <div className="mt-5 grid gap-3 md:grid-cols-3">
         <Metric label="Proposed worlds" value={plan.maximumWorldCount} />
         <Metric label="Accepted worlds" value={plan.worlds.length} />
@@ -216,7 +221,7 @@ export function ExperimentPlanPanel({ plan }: { plan: ExperimentPlanResponse | n
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
         <ListBlock title="Variables" items={plan.selectedVariables} empty="No variables recorded." />
-        <ListBlock title="Warnings" items={warnings} empty="No validation warnings." />
+        <ListBlock title="Warnings" items={warnings} empty="No validation warnings." tone={warnings.length ? 'pending' : 'neutral'} />
         <ListBlock title="Assumptions" items={assumptions} empty="No assumptions recorded." />
         <ListBlock title="World reasons" items={plan.worlds.map((world) => world.reason).filter((reason): reason is string => Boolean(reason))} empty="No world reasons recorded." />
       </div>
@@ -225,14 +230,14 @@ export function ExperimentPlanPanel({ plan }: { plan: ExperimentPlanResponse | n
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
-  return <div className="rounded-xl bg-slate-950 p-3"><div className="text-xs text-slate-500">{label}</div><div className="mt-1 text-xl font-bold text-cyan">{value}</div></div>;
+  return <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3"><div className="text-xs text-[var(--rift-text-muted)]">{label}</div><div className="mt-1 text-xl font-bold text-white">{value}</div></div>;
 }
 
-function ListBlock({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+function ListBlock({ title, items, empty, tone = 'neutral' }: { title: string; items: string[]; empty: string; tone?: SemanticStatusTone }) {
   return (
-    <div>
-      <h3 className="text-sm font-bold text-slate-200">{title}</h3>
-      {items.length ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-400">{items.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">{empty}</p>}
+    <div className={tone === 'pending' ? 'border-l-2 border-[var(--status-pending-border)] pl-3' : ''}>
+      <h3 className={`text-sm font-bold ${tone === 'pending' ? 'text-[var(--status-pending)]' : 'text-[var(--rift-text)]'}`}>{title}</h3>
+      {items.length ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[var(--rift-text-secondary)]">{items.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="mt-2 text-sm text-[var(--rift-text-muted)]">{empty}</p>}
     </div>
   );
 }
@@ -265,18 +270,18 @@ export function WorldTable({ worlds, experiments, workers = [], evidence }: { wo
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-bold">World exploration</h2>
-          <p className="mt-2 text-sm text-slate-400">{worlds.length.toLocaleString()} worlds. Select up to two rows to compare actual runtime conditions.</p>
+          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{worlds.length.toLocaleString()} worlds. Select up to two rows to compare actual runtime conditions.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <input aria-label="Search worlds" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200" onChange={(event) => setSearch(event.target.value)} placeholder="Search world, purpose, browser…" value={search} />
-          <select aria-label="Sort worlds" className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200" onChange={(event) => setSort(event.target.value as WorldSort)} value={sort}>
+          <input aria-label="Search worlds" className="rounded-lg border border-[var(--rift-border-strong)] bg-[var(--rift-surface-raised)] px-3 py-2 text-sm text-[var(--rift-text)]" onChange={(event) => setSearch(event.target.value)} placeholder="Search world, purpose, browser…" value={search} />
+          <select aria-label="Sort worlds" className="rounded-lg border border-[var(--rift-border-strong)] bg-[var(--rift-surface-raised)] px-3 py-2 text-sm text-[var(--rift-text)]" onChange={(event) => setSort(event.target.value as WorldSort)} value={sort}>
             {sorts.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
           </select>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="World filters">
         {filters.map((filter) => (
-          <button className={`rounded-full px-3 py-1 text-xs ${activeFilter === filter ? 'bg-cyan text-ink' : 'bg-slate-900 text-slate-300'}`} key={filter} onClick={() => setActiveFilter(filter)} role="tab" aria-selected={activeFilter === filter} type="button">
+          <button className={`rounded-full px-3 py-1 text-xs ${activeFilter === filter ? 'bg-white text-black' : 'bg-[var(--rift-surface-raised)] text-[var(--rift-text-secondary)]'}`} key={filter} onClick={() => setActiveFilter(filter)} role="tab" aria-selected={activeFilter === filter} type="button">
             {filter === 'ALL' ? 'All' : filter === 'INITIAL' || filter === 'ADAPTIVE_REPRODUCTION' || filter === 'MINIMISATION' ? worldOriginLabel(filter) : filterLabels[filter]}
           </button>
         ))}
@@ -285,40 +290,45 @@ export function WorldTable({ worlds, experiments, workers = [], evidence }: { wo
       {visible.length ? (
         <div className="mt-4 overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="text-xs uppercase text-slate-500">
+            <thead className="text-xs uppercase text-[var(--rift-text-muted)]">
               <tr>
-                {['Compare', 'World', 'Origin', 'Purpose', 'Browser', 'Viewport', 'Network', 'Payment delay', 'Repeated submit', 'Bug mode', 'Execution', 'Business outcome', 'Worker', 'Attempts', 'Evidence', 'Created / completed'].map((heading) => <th className="px-3 py-2" key={heading}>{heading}</th>)}
+                {['Compare', 'World', 'Stage and purpose', 'Tested trigger', 'Execution', 'Business outcome', 'Evidence', 'Details'].map((heading) => <th className="px-3 py-2" key={heading}>{heading}</th>)}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody className="divide-y divide-[var(--rift-border)]">
               {visible.map((row) => {
-                const resultTone = row.result === 'PASS' ? 'green' : row.result === 'FAIL' ? 'red' : row.result === 'RUNNING' ? 'cyan' : 'slate';
+                const resultTone = businessOutcomeTone(row.result);
                 const selectedRow = selected.includes(row.world.id);
                 return (
-                  <tr className={selectedRow ? 'bg-cyan/5' : undefined} key={row.world.id}>
-                    <td className="px-3 py-3"><button className="rounded border border-slate-700 px-2 py-1 text-xs" onClick={() => toggleSelection(row.world.id)} type="button" aria-pressed={selectedRow}>{selectedRow ? 'Selected' : 'Compare'}</button></td>
+                  <tr className={selectedRow ? 'bg-white/5' : undefined} key={row.world.id}>
+                    <td className="px-3 py-3"><button className="rounded border border-[var(--rift-border-strong)] px-2 py-1 text-xs" onClick={() => toggleSelection(row.world.id)} type="button" aria-pressed={selectedRow}>{selectedRow ? 'Selected' : 'Compare'}</button></td>
                     <td className="px-3 py-3 font-mono text-xs" title={row.world.id}>{shortId(row.world.id)}</td>
-                    <td className="px-3 py-3">{row.originLabel}</td>
-                    <td className="px-3 py-3">{row.purpose}</td>
-                    <td className="px-3 py-3">{row.browser}</td>
-                    <td className="px-3 py-3">{row.viewport}</td>
-                    <td className="px-3 py-3">{row.network}</td>
-                    <td className="px-3 py-3">{row.paymentDelay}</td>
-                    <td className="px-3 py-3">{row.repeatedSubmission}</td>
-                    <td className="px-3 py-3">{row.bugMode}</td>
-                    <td className="px-3 py-3">{row.status}</td>
+                    <td className="max-w-60 px-3 py-3"><span className="block font-medium text-[var(--rift-text)]">{row.originLabel}</span><span className="mt-1 block text-xs leading-5 text-[var(--rift-text-muted)]">{row.purpose}</span></td>
+                    <td className="px-3 py-3"><span className="block">{row.paymentDelay}</span><span className="mt-1 block text-xs text-[var(--rift-text-muted)]">Repeated submit: {row.repeatedSubmission}</span></td>
+                    <td className="px-3 py-3"><StatusBadge tone={executionStatusTone(row.status)}>{row.status}</StatusBadge></td>
                     <td className="px-3 py-3"><StatusBadge tone={resultTone}>{humanize(row.result)}</StatusBadge></td>
-                    <td className="px-3 py-3 font-mono text-xs" title={row.workerId}>{row.workerId ? shortId(row.workerId) : 'Not recorded'}</td>
-                    <td className="px-3 py-3">{row.attempts}</td>
                     <td className="px-3 py-3">{row.evidenceCount}</td>
-                    <td className="px-3 py-3 text-xs text-slate-400">{formatDate(row.world.createdAt)} → {formatDate(row.world.completedAt)}</td>
+                    <td className="px-3 py-3">
+                      <details className="min-w-40 text-xs text-[var(--rift-text-muted)]">
+                        <summary className="cursor-pointer font-medium text-[var(--rift-text-secondary)]">Inspect world</summary>
+                        <dl className="mt-2 grid gap-1.5">
+                          <div><dt className="inline">Browser: </dt><dd className="inline text-[var(--rift-text)]">{row.browser}</dd></div>
+                          <div><dt className="inline">Viewport: </dt><dd className="inline text-[var(--rift-text)]">{row.viewport}</dd></div>
+                          <div><dt className="inline">Network: </dt><dd className="inline text-[var(--rift-text)]">{row.network}</dd></div>
+                          <div><dt className="inline">Bug mode: </dt><dd className="inline text-[var(--rift-text)]">{row.bugMode}</dd></div>
+                          <div><dt className="inline">Worker: </dt><dd className="inline font-mono text-[var(--rift-text)]" title={row.workerId}>{row.workerId ? shortId(row.workerId) : 'Not recorded'}</dd></div>
+                          <div><dt className="inline">Attempts: </dt><dd className="inline text-[var(--rift-text)]">{row.attempts}</dd></div>
+                          <div><dt className="inline">Timing: </dt><dd className="inline text-[var(--rift-text)]">{formatDate(row.world.createdAt)} → {formatDate(row.world.completedAt)}</dd></div>
+                        </dl>
+                      </details>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      ) : <p className="mt-4 text-sm text-slate-500">No worlds match this filter. Worlds will appear after the experiment plan is accepted.</p>}
+      ) : <p className="mt-4 text-sm text-[var(--rift-text-muted)]">No worlds match this filter. Worlds will appear after the experiment plan is accepted.</p>}
     </section>
   );
 }
@@ -341,8 +351,8 @@ function WorldComparison({ rows, clear }: { rows: RuntimeWorldRow[]; clear: () =
     ['Evidence count', (row) => row.evidenceCount],
   ];
   return (
-    <div className="mt-4 rounded-xl border border-cyan/30 bg-slate-950 p-4" aria-live="polite">
-      <div className="flex items-center justify-between gap-3"><h3 className="font-bold">World comparison</h3><button className="text-xs font-bold text-cyan" onClick={clear} type="button">Clear selection</button></div>
+    <div className="mt-4 rounded-xl border border-[var(--rift-border-strong)] bg-[var(--rift-surface-raised)] p-4" aria-live="polite">
+      <div className="flex items-center justify-between gap-3"><h3 className="font-bold">World comparison</h3><button className="text-xs font-bold text-white" onClick={clear} type="button">Clear selection</button></div>
       <div className="mt-3 overflow-x-auto">
         <table className="min-w-full text-left text-sm">
           <thead><tr><th className="py-2 pr-4">Field</th>{rows.map((row) => <th className="py-2 pr-4 font-mono text-xs" key={row.world.id}>{shortId(row.world.id, 12)}</th>)}</tr></thead>
@@ -350,7 +360,7 @@ function WorldComparison({ rows, clear }: { rows: RuntimeWorldRow[]; clear: () =
             {fields.map(([label, reader]) => {
               const values = rows.map((row) => String(reader(row)));
               const differs = new Set(values).size > 1;
-              return <tr className="border-t border-slate-800" key={label}><td className="py-2 pr-4 text-slate-400">{label}</td>{values.map((value, index) => <td className={`py-2 pr-4 ${differs ? 'text-cyan' : 'text-slate-300'}`} key={`${label}-${rows[index]!.world.id}`}>{value}</td>)}</tr>;
+              return <tr className="border-t border-[var(--rift-border)]" key={label}><td className="py-2 pr-4 text-[var(--rift-text-secondary)]">{label}</td>{values.map((value, index) => <td className={`py-2 pr-4 ${differs ? 'text-white' : 'text-[var(--rift-text-secondary)]'}`} key={`${label}-${rows[index]!.world.id}`}>{value}</td>)}</tr>;
             })}
           </tbody>
         </table>
@@ -361,6 +371,22 @@ function WorldComparison({ rows, clear }: { rows: RuntimeWorldRow[]; clear: () =
 
 function useRuntimeFilter(): [WorldFilter, (filter: WorldFilter) => void] {
   return useState<WorldFilter>('ALL');
+}
+
+function semanticDotClass(tone: SemanticStatusTone) {
+  if (tone === 'pass') return 'bg-[var(--status-pass)]';
+  if (tone === 'running') return 'bg-[var(--status-running)]';
+  if (tone === 'pending') return 'bg-[var(--status-pending)]';
+  if (tone === 'fail') return 'bg-[var(--status-fail)]';
+  return 'bg-[var(--status-neutral)]';
+}
+
+function semanticTextClass(tone: SemanticStatusTone) {
+  if (tone === 'pass') return 'text-[var(--status-pass)]';
+  if (tone === 'running') return 'text-[var(--status-running)]';
+  if (tone === 'pending') return 'text-[var(--status-pending)]';
+  if (tone === 'fail') return 'text-[var(--status-fail)]';
+  return 'text-[var(--status-neutral)]';
 }
 
 export function WorldMatrix({ worlds, experiments, workers = [], evidence }: { worlds: InvestigationWorld[]; experiments: InvestigationExperiment[]; workers?: InvestigationWorker[]; evidence: EvidenceArtifactResponse[] }) {
@@ -374,26 +400,26 @@ export function WorldMatrix({ worlds, experiments, workers = [], evidence }: { w
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-bold">World matrix</h2>
-          <p className="mt-2 text-sm text-slate-400">Cohort: {matrix.cohortLabel}. {matrix.excludedWorldCount ? `${matrix.excludedWorldCount} incompatible comparable worlds excluded.` : 'No incompatible comparable worlds were mixed.'}</p>
+          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">Cohort: {matrix.cohortLabel}. {matrix.excludedWorldCount ? `${matrix.excludedWorldCount} incompatible comparable worlds excluded.` : 'No incompatible comparable worlds were mixed.'}</p>
         </div>
       </div>
       <div className="mt-4 overflow-x-auto">
         <table className="min-w-full text-center text-sm" aria-label="World outcome matrix by repeated submission and payment delay">
-          <thead className="text-xs uppercase text-slate-500">
+          <thead className="text-xs uppercase text-[var(--rift-text-muted)]">
             <tr><th className="px-3 py-2 text-left">Submission</th>{matrix.columns.map((delay) => <th className="px-3 py-2" key={delay}>{delay.toLocaleString()} ms</th>)}</tr>
           </thead>
           <tbody>
             {['Single submit', 'Double submit'].map((rowLabel) => (
-              <tr className="border-t border-slate-800" key={rowLabel}>
+              <tr className="border-t border-[var(--rift-border)]" key={rowLabel}>
                 <th className="px-3 py-3 text-left">{rowLabel}</th>
                 {matrix.columns.map((delay) => {
                   const cell = matrix.cells.find((item) => item.row === rowLabel && item.delayMs === delay)!;
-                  const tone = cell.outcome === 'PASS' ? 'green' : cell.outcome === 'FAIL' ? 'red' : cell.outcome === 'MIXED' ? 'amber' : cell.outcome === 'RUNNING' ? 'cyan' : 'slate';
+                  const tone = businessOutcomeTone(cell.outcome);
                   return (
                     <td className="px-3 py-3" key={`${rowLabel}-${delay}`}>
-                      <button className="rounded-lg border border-slate-700 px-3 py-2" onClick={() => setSelectedCell(`${cell.row}-${cell.delayMs}`)} type="button">
+                      <button className="rounded-lg border border-[var(--rift-border-strong)] px-3 py-2" onClick={() => setSelectedCell(`${cell.row}-${cell.delayMs}`)} type="button">
                         <StatusBadge tone={tone}>{cell.outcome}</StatusBadge>
-                        <span className="mt-1 block text-xs text-slate-500">{cell.worlds.length ? `${cell.worlds.length} world${cell.worlds.length === 1 ? '' : 's'}` : 'Not tested'}</span>
+                        <span className="mt-1 block text-xs text-[var(--rift-text-muted)]">{cell.worlds.length ? `${cell.worlds.length} world${cell.worlds.length === 1 ? '' : 's'}` : 'Not tested'}</span>
                       </button>
                     </td>
                   );
@@ -403,12 +429,12 @@ export function WorldMatrix({ worlds, experiments, workers = [], evidence }: { w
           </tbody>
         </table>
       </div>
-      <p className="mt-3 text-xs text-slate-500">Text alternative: {matrix.cells.map((cell) => `${cell.row} at ${cell.delayMs} ms: ${cell.outcome} (${cell.summary})`).join('; ')}.</p>
+      <p className="mt-3 text-xs text-[var(--rift-text-muted)]">Text alternative: {matrix.cells.map((cell) => `${cell.row} at ${cell.delayMs} ms: ${cell.outcome} (${cell.summary})`).join('; ')}.</p>
       {selected ? (
-        <div className="mt-4 rounded-xl bg-slate-950 p-3">
+        <div className="mt-4 rounded-xl bg-[var(--rift-surface-raised)] p-3">
           <h3 className="font-bold">{selected.row} at {selected.delayMs.toLocaleString()} ms</h3>
-          <p className="mt-1 text-sm text-slate-400">{selected.summary}</p>
-          {selected.worlds.length ? <ul className="mt-2 list-disc pl-5 text-sm text-slate-300">{selected.worlds.map((row) => <li key={row.world.id}>{shortId(row.world.id, 12)} · {row.purpose} · {row.result}</li>)}</ul> : <p className="mt-2 text-sm text-slate-500">This cell was not tested.</p>}
+          <p className="mt-1 text-sm text-[var(--rift-text-secondary)]">{selected.summary}</p>
+          {selected.worlds.length ? <ul className="mt-2 list-disc pl-5 text-sm text-[var(--rift-text-secondary)]">{selected.worlds.map((row) => <li key={row.world.id}>{shortId(row.world.id, 12)} · {row.purpose} · {row.result}</li>)}</ul> : <p className="mt-2 text-sm text-[var(--rift-text-muted)]">This cell was not tested.</p>}
         </div>
       ) : null}
     </section>
@@ -425,20 +451,20 @@ export function WorkerPanel({ workers, experiments = [] }: { workers: Investigat
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-bold">Workers and attempts</h2>
-          <p className="mt-2 text-sm text-slate-400">{workers.length.toLocaleString()} workers. Active workers appear first; completed workers are compact.</p>
+          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{workers.length.toLocaleString()} workers. Active workers appear first; completed workers are compact.</p>
         </div>
-        <StatusBadge tone={active.length ? 'cyan' : 'green'}>{active.length ? `${active.length} active` : 'No active workers'}</StatusBadge>
+        <StatusBadge tone={active.length ? 'running' : 'pass'}>{active.length ? `${active.length} active` : 'No active workers'}</StatusBadge>
       </div>
       {workers.length ? (
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           {rendered.map((item) => (
-            <details className="rounded-xl bg-slate-950 p-3" key={item.worker.id} open={item.active || item.retrying}>
+            <details className="rounded-xl bg-[var(--rift-surface-raised)] p-3" key={item.worker.id} open={item.active || item.retrying}>
               <summary className="cursor-pointer">
                 <span className="font-mono text-xs" title={item.worker.id}>{shortId(item.worker.id)}</span>
-                <span className="ml-2"><StatusBadge tone={item.active ? 'cyan' : item.state === 'Failed' ? 'red' : 'slate'}>{item.state}</StatusBadge></span>
+                <span className="ml-2"><StatusBadge tone={executionStatusTone(item.state)}>{item.state}</StatusBadge></span>
                 <span className="ml-2"><StatusBadge>{item.worker.provider}</StatusBadge></span>
               </summary>
-              <dl className="mt-3 grid gap-2 text-xs text-slate-400 md:grid-cols-2">
+              <dl className="mt-3 grid gap-2 text-xs text-[var(--rift-text-secondary)] md:grid-cols-2">
                 <div><dt>World</dt><dd className="font-mono">{item.worldId ? shortId(item.worldId, 14) : 'Not recorded'}</dd></div>
                 <div><dt>Business outcome</dt><dd>{item.finalOutcome}</dd></div>
                 <div><dt>Attempts</dt><dd>{item.attempts.length}{item.retrying ? ' · retry recorded' : ''}</dd></div>
@@ -446,23 +472,23 @@ export function WorkerPanel({ workers, experiments = [] }: { workers: Investigat
               </dl>
               <div className="mt-3 space-y-2">
                 {item.attempts.map((attempt) => (
-                  <div className="rounded-lg border border-slate-800 p-2 text-xs text-slate-400" key={attempt.id}>
+                  <div className="rounded-lg border border-[var(--rift-border)] p-2 text-xs text-[var(--rift-text-secondary)]" key={attempt.id}>
                     Attempt {attempt.number}: {attempt.status} · {attempt.duration}{attempt.exitCode !== undefined ? ` · exit ${attempt.exitCode}` : ''}
-                    {attempt.infrastructureFailure ? <span className="ml-2 text-amber-100">Infrastructure/runtime failure, not product finding</span> : null}
+                    {attempt.infrastructureFailure ? <span className="ml-2 text-[var(--rift-text-secondary)]">Infrastructure/runtime failure, not product finding</span> : null}
                   </div>
                 ))}
               </div>
             </details>
           ))}
         </div>
-      ) : <p className="mt-3 text-sm text-slate-500">No worker attempts have been recorded yet. Workers will appear after worlds are queued.</p>}
-      {completed.length > rendered.length ? <p className="mt-3 text-xs text-slate-500">Showing first {rendered.length} workers. Use the worker API for the full operational list.</p> : null}
+      ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">No worker attempts have been recorded yet. Workers will appear after worlds are queued.</p>}
+      {completed.length > rendered.length ? <p className="mt-3 text-xs text-[var(--rift-text-muted)]">Showing first {rendered.length} workers. Use the worker API for the full operational list.</p> : null}
     </section>
   );
 }
 
 export function EventTimeline({ events }: { events: InvestigationEvent[] }) {
-  const [filter, setFilter] = useState<'ALL' | 'IMPORTANT' | 'NORMAL' | 'TECHNICAL'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'IMPORTANT' | 'NORMAL' | 'TECHNICAL'>('IMPORTANT');
   const sorted = useMemo(() => [...events].sort((a, b) => a.createdAt.localeCompare(b.createdAt)), [events]);
   const visible = sorted.filter((event) => filter === 'ALL' || eventImportance(event.type, event.metadata) === filter);
   const groups = visible.reduce<Record<string, InvestigationEvent[]>>((accumulator, event) => {
@@ -473,26 +499,26 @@ export function EventTimeline({ events }: { events: InvestigationEvent[] }) {
   return (
     <section className="card">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-bold">Runtime event timeline</h2>
+        <div><h2 className="font-bold">Runtime event timeline</h2><p className="mt-1 text-xs text-[var(--rift-text-muted)]">Key decisions are shown first. Normal and technical events remain available.</p></div>
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Event importance filters">
-          {(['ALL', 'IMPORTANT', 'NORMAL', 'TECHNICAL'] as const).map((item) => <button className={`rounded-full px-3 py-1 text-xs ${filter === item ? 'bg-cyan text-ink' : 'bg-slate-900 text-slate-300'}`} key={item} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item} type="button">{humanize(item)}</button>)}
+          {(['ALL', 'IMPORTANT', 'NORMAL', 'TECHNICAL'] as const).map((item) => <button className={`rounded-full px-3 py-1 text-xs ${filter === item ? 'bg-white text-black' : 'bg-[var(--rift-surface-raised)] text-[var(--rift-text-secondary)]'}`} key={item} onClick={() => setFilter(item)} role="tab" aria-selected={filter === item} type="button">{humanize(item)}</button>)}
         </div>
       </div>
-      {events.length ? (
+      {visible.length ? (
         <div className="mt-4 space-y-5">
           {Object.entries(groups).map(([group, items]) => (
             <div key={group}>
-              <h3 className="text-sm font-bold text-slate-300">{group}</h3>
+              <h3 className="text-sm font-bold text-[var(--rift-text-secondary)]">{group}</h3>
               <ol className="mt-2 space-y-3">
                 {items.map((event) => {
                   const importance = eventImportance(event.type, event.metadata);
                   const metadata = safeEventMetadata(event);
                   return (
-                    <li className="border-l-2 border-cyan/40 pl-4" key={event.id}>
-                      <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{eventLabel(event.type)}</span><StatusBadge tone={importance === 'IMPORTANT' ? 'amber' : importance === 'TECHNICAL' ? 'slate' : 'cyan'}>{humanize(importance)}</StatusBadge></div>
-                      <p className="mt-1 text-sm text-slate-400">{event.message}</p>
-                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500"><time>{formatDate(event.createdAt)}</time>{event.worldId ? <span>World {shortId(event.worldId)}</span> : null}{eventMetadataSummary(event).slice(0, 4).map((item) => <span key={item}>{item}</span>)}</div>
-                      {Object.keys(metadata).length ? <details className="mt-2 text-xs text-slate-500"><summary className="cursor-pointer text-cyan">Technical metadata</summary><dl className="mt-2 grid gap-1 md:grid-cols-2">{Object.entries(metadata).map(([key, value]) => <div key={key}><dt>{key}</dt><dd className="text-slate-300">{value}</dd></div>)}</dl></details> : null}
+                    <li className="border-l-2 border-[var(--rift-border-strong)] pl-4" key={event.id}>
+                      <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{eventLabel(event.type)}</span><StatusBadge tone={importance === 'IMPORTANT' ? 'pending' : 'neutral'}>{humanize(importance)}</StatusBadge></div>
+                      <p className="mt-1 text-sm text-[var(--rift-text-secondary)]">{event.message}</p>
+                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-[var(--rift-text-muted)]"><time>{formatDate(event.createdAt)}</time>{event.worldId ? <span>World {shortId(event.worldId)}</span> : null}{eventMetadataSummary(event).slice(0, 4).map((item) => <span key={item}>{item}</span>)}</div>
+                      {Object.keys(metadata).length ? <details className="mt-2 text-xs text-[var(--rift-text-muted)]"><summary className="cursor-pointer text-white">Technical metadata</summary><dl className="mt-2 grid gap-1 md:grid-cols-2">{Object.entries(metadata).map(([key, value]) => <div key={key}><dt>{key}</dt><dd className="text-[var(--rift-text-secondary)]">{value}</dd></div>)}</dl></details> : null}
                     </li>
                   );
                 })}
@@ -500,7 +526,7 @@ export function EventTimeline({ events }: { events: InvestigationEvent[] }) {
             </div>
           ))}
         </div>
-      ) : <p className="mt-3 text-sm text-slate-500">No runtime events have been recorded yet.</p>}
+      ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">{events.length ? 'No events match this importance filter.' : 'No runtime events have been recorded yet.'}</p>}
     </section>
   );
 }
@@ -513,18 +539,18 @@ export function FindingsList({ investigationId, findings }: { investigationId: s
         const removed = Object.keys(conditionRecord(finding, 'removedConditions')).length;
         const hasReport = finalReportIds(finding).length > 0;
         return (
-          <Link className="card block hover:border-cyan/50" key={finding.id} to={`/investigations/${investigationId}/findings/${finding.id}`}>
+          <Link className="card block hover:border-white" key={finding.id} to={`/investigations/${investigationId}/findings/${finding.id}`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <StatusBadge tone={finding.severity === 'CRITICAL' || finding.severity === 'HIGH' ? 'red' : 'amber'}>{finding.severity}</StatusBadge>
-              <span className="text-xs text-cyan">{finding.confidence} · {finding.reproductionCount} reproductions</span>
+              <StatusBadge tone={findingSeverityTone(finding.severity)}>{finding.severity}</StatusBadge>
+              <span className="text-xs text-white">{finding.confidence} · {finding.reproductionCount} reproductions</span>
             </div>
             <h2 className="mt-4 text-xl font-bold">{finding.title}</h2>
-            <p className="mt-2 text-slate-400">{finding.summary}</p>
+            <p className="mt-2 text-[var(--rift-text-secondary)]">{finding.summary}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <StatusBadge>{humanize(causalStatus(finding))}</StatusBadge>
-              <StatusBadge>{retained} retained</StatusBadge>
-              <StatusBadge>{removed} removed</StatusBadge>
-              {hasReport ? <StatusBadge tone="green">Final report</StatusBadge> : <StatusBadge>No final report</StatusBadge>}
+              <StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(causalStatus(finding))}</StatusBadge>
+              <StatusBadge tone={conditionRoleTone('retained')}>{retained} retained</StatusBadge>
+              <StatusBadge tone={conditionRoleTone('removed')}>{removed} removed</StatusBadge>
+              {hasReport ? <StatusBadge tone="pass">Final report</StatusBadge> : <StatusBadge>No final report</StatusBadge>}
             </div>
           </Link>
         );
@@ -542,7 +568,7 @@ export function LiveFindingSummary({ investigationId, findings, investigationSta
     <section className="card">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-bold">Discovered finding</h2>
-        <Link className="text-sm font-bold text-cyan" to={`/investigations/${investigationId}/findings`}>Open all findings</Link>
+        <Link className="text-sm font-bold text-white" to={`/investigations/${investigationId}/findings`}>Open all findings</Link>
       </div>
       <div className="mt-4 grid gap-3">
         {findings.slice(0, 3).map((finding) => {
@@ -551,16 +577,16 @@ export function LiveFindingSummary({ investigationId, findings, investigationSta
           const supported = causalStatus(finding);
           const active = !['COMPLETED', 'FAILED', 'CANCELLED'].includes(investigationStatus);
           return (
-            <Link className="rounded-xl border border-slate-800 bg-slate-950 p-4 hover:border-cyan/50" key={finding.id} to={`/investigations/${investigationId}/findings/${finding.id}`}>
+            <Link className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface-raised)] p-4 hover:border-white" key={finding.id} to={`/investigations/${investigationId}/findings/${finding.id}`}>
               <div className="flex flex-wrap gap-2">
-                <StatusBadge tone={finding.severity === 'CRITICAL' || finding.severity === 'HIGH' ? 'red' : 'amber'}>{finding.severity}</StatusBadge>
-                <StatusBadge>{active && finding.confidence !== 'CONFIRMED' ? 'Possible violation' : finding.confidence}</StatusBadge>
-                <StatusBadge>{humanize(supported)}</StatusBadge>
-                {hasReport ? <StatusBadge tone="green">Final report available</StatusBadge> : null}
+                <StatusBadge tone={findingSeverityTone(finding.severity)}>{finding.severity}</StatusBadge>
+                <StatusBadge tone={confidenceTone(finding.confidence)}>{active && finding.confidence !== 'CONFIRMED' ? 'Possible violation' : finding.confidence}</StatusBadge>
+                <StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(supported)}</StatusBadge>
+                {hasReport ? <StatusBadge tone="pass">Final report available</StatusBadge> : null}
               </div>
               <h3 className="mt-3 text-lg font-bold">{finding.title}</h3>
-              <p className="mt-2 text-sm text-slate-400">{finding.summary}</p>
-              <p className="mt-3 text-sm text-slate-300">{finding.reproductionCount.toLocaleString()} validated reproductions · {Object.keys(retained).length} retained trigger conditions.</p>
+              <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{finding.summary}</p>
+              <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">{finding.reproductionCount.toLocaleString()} validated reproductions · {Object.keys(retained).length} retained trigger conditions.</p>
             </Link>
           );
         })}
@@ -577,36 +603,36 @@ export function EvidenceSummary({ evidence }: { evidence: EvidenceArtifactRespon
   return (
     <section className="card">
       <h2 className="font-bold">Evidence availability</h2>
-      <p className="mt-2 text-sm text-slate-400">{evidence.length.toLocaleString()} artifacts are available. Report bodies are not fetched on this overview page.</p>
+      <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{evidence.length.toLocaleString()} artifacts are available. Report bodies are not fetched on this overview page.</p>
       {evidence.length ? (
         <dl className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
           {Object.entries(counts).sort(([a], [b]) => a.localeCompare(b)).map(([type, count]) => (
-            <div className="rounded-xl bg-slate-950 p-3" key={type}>
-              <dt className="text-xs text-slate-500">{humanize(type)}</dt>
+            <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3" key={type}>
+              <dt className="text-xs text-[var(--rift-text-muted)]">{humanize(type)}</dt>
               <dd className="mt-1 text-xl font-bold">{count}</dd>
             </div>
           ))}
         </dl>
-      ) : <p className="mt-3 text-sm text-slate-500">Evidence will appear as workers capture browser, console, network, and final-report artifacts.</p>}
+      ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">Evidence will appear as workers capture browser, console, network, and final-report artifacts.</p>}
     </section>
   );
 }
 
-export function ConditionBlock({ title, conditions, empty }: { title: string; conditions: Record<string, unknown>; empty: string }) {
+export function ConditionBlock({ title, conditions, empty, tone = 'neutral' }: { title: string; conditions: Record<string, unknown>; empty: string; tone?: SemanticStatusTone }) {
   const entries = Object.entries(conditions);
   return (
     <section className="card">
-      <h2 className="font-bold">{title}</h2>
+      <div className="flex items-center justify-between gap-3"><h2 className="font-bold">{title}</h2><StatusBadge tone={tone}>{entries.length}</StatusBadge></div>
       {entries.length ? (
         <dl className="mt-4 grid gap-3 md:grid-cols-2">
           {entries.map(([key, value]) => (
-            <div className="rounded-xl bg-slate-950 p-3" key={key}>
-              <dt className="text-xs uppercase tracking-widest text-slate-500" title={key}>{formatConditionKey(key)}</dt>
-              <dd className="mt-1 font-semibold text-slate-100">{formatConditionValue(key, value)}</dd>
+            <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3" key={key}>
+              <dt className="text-xs uppercase tracking-widest text-[var(--rift-text-muted)]" title={key}>{formatConditionKey(key)}</dt>
+              <dd className="mt-1 font-semibold text-[var(--rift-text)]">{formatConditionValue(key, value)}</dd>
             </div>
           ))}
         </dl>
-      ) : <p className="mt-3 text-sm text-slate-500">{empty}</p>}
+      ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">{empty}</p>}
     </section>
   );
 }
@@ -620,33 +646,31 @@ export function FailureRange({ finding, boundary }: { finding: Finding | Finding
       <h2 className="font-bold">Observed failure boundary</h2>
       {hasPassingBound || hasFailingBound ? (
         <>
-          <div className="mt-5 grid gap-2 text-center text-xs text-slate-400 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-center">
-            <div className="rounded-lg bg-emerald-300/10 p-2 text-emerald-200">Observed stable</div>
+          <div className="mt-5 grid gap-2 text-center text-xs text-[var(--rift-text-secondary)] md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-center">
+            <div className="rounded-lg border border-[var(--status-pass-border)] bg-[var(--status-pass-bg)] p-2 text-[var(--status-pass)]">Observed stable</div>
             <div aria-label="Passing bound">{hasPassingBound ? `≤ ${range.passingBoundMs!.toLocaleString()} ms` : 'No passing bound'}</div>
-            <div className="rounded-lg bg-amber-300/10 p-2 text-amber-100">Untested interval</div>
+            <div className="rounded-lg border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] p-2 text-[var(--status-pending)]">Untested interval</div>
             <div aria-label="Failing bound">{hasFailingBound ? `≥ ${range.failingBoundMs!.toLocaleString()} ms` : 'No failing bound'}</div>
-            <div className="rounded-lg bg-red-300/10 p-2 text-red-200">Failure observed</div>
+            <div className="rounded-lg border border-[var(--status-fail-border)] bg-[var(--status-fail-bg)] p-2 text-[var(--status-fail)]">Failure observed</div>
           </div>
           {hasPassingBound && hasFailingBound ? (
-            <p className="mt-3 text-sm text-slate-400">
+            <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">
               The failure boundary was narrowed to the tested interval between {range.passingBoundMs!.toLocaleString()} ms and {range.failingBoundMs!.toLocaleString()} ms.
               Values inside this interval were not fully established.
             </p>
           ) : (
-            <p className="mt-3 text-sm text-slate-400">Only one side of the boundary was recorded. This is not an exact causal threshold.</p>
+            <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">Only one side of the boundary was recorded. This is not an exact causal threshold.</p>
           )}
-          <p className="mt-2 text-sm text-slate-500">Target precision: {range.targetPrecisionMs !== undefined ? `${range.targetPrecisionMs.toLocaleString()} ms` : 'Not recorded'}.</p>
+          <p className="mt-2 text-sm text-[var(--rift-text-muted)]">Target precision: {range.targetPrecisionMs !== undefined ? `${range.targetPrecisionMs.toLocaleString()} ms` : 'Not recorded'}.</p>
           {range.testedPoints.length ? (
             <ul className="mt-3 flex flex-wrap gap-2" aria-label="Tested delay points">
               {range.testedPoints.map((point) => (
-                <li className={`rounded-full border px-3 py-1 text-xs ${point.outcome === 'PASS' ? 'border-emerald-300/40 text-emerald-200' : point.outcome === 'FAIL' ? 'border-red-300/40 text-red-200' : 'border-amber-300/40 text-amber-100'}`} key={`${point.valueMs}-${point.outcome}-${point.worldId ?? ''}`}>
-                  {point.valueMs.toLocaleString()} ms · {humanize(point.outcome)}
-                </li>
+                <li key={`${point.valueMs}-${point.outcome}-${point.worldId ?? ''}`}><StatusBadge tone={businessOutcomeTone(point.outcome)}>{point.valueMs.toLocaleString()} ms · {humanize(point.outcome)}</StatusBadge></li>
               ))}
             </ul>
           ) : null}
         </>
-      ) : <p className="mt-3 text-sm text-slate-500">A bounded timing range could not be established.</p>}
+      ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">A bounded timing range could not be established.</p>}
     </section>
   );
 }
@@ -656,7 +680,7 @@ export function ReproductionSteps({ finding }: { finding: Finding | FindingDetai
   return (
     <section className="card">
       <h2 className="font-bold">Deterministic reproduction steps</h2>
-      {steps.length ? <ol className="mt-4 list-decimal space-y-2 pl-5 text-slate-300">{steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol> : <p className="mt-3 text-sm text-slate-500">Structured reproduction steps were not generated for this finding.</p>}
+      {steps.length ? <ol className="mt-4 list-decimal space-y-2 pl-5 text-[var(--rift-text-secondary)]">{steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol> : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">Structured reproduction steps were not generated for this finding.</p>}
     </section>
   );
 }
@@ -691,11 +715,11 @@ export function EvidenceViewer({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-bold">Evidence</h2>
-          <p className="mt-2 text-sm text-slate-400">{evidence.length.toLocaleString()} artifacts grouped by runtime stage. Report bodies load only when opened.</p>
+          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{evidence.length.toLocaleString()} artifacts grouped by runtime stage. Report bodies load only when opened.</p>
         </div>
         <input
           aria-label="Search evidence"
-          className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-200"
+          className="rounded-lg border border-[var(--rift-border-strong)] bg-[var(--rift-surface-raised)] px-3 py-2 text-sm text-[var(--rift-text)]"
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Search filename, world, type…"
           value={search}
@@ -704,7 +728,7 @@ export function EvidenceViewer({
       <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Evidence type filters">
         {filters.map((filter) => (
           <button
-            className={`rounded-full px-3 py-1 text-xs ${typeFilter === filter ? 'bg-cyan text-ink' : 'bg-slate-900 text-slate-300'}`}
+            className={`rounded-full px-3 py-1 text-xs ${typeFilter === filter ? 'bg-white text-black' : 'bg-[var(--rift-surface-raised)] text-[var(--rift-text-secondary)]'}`}
             key={filter}
             onClick={() => setTypeFilter(filter)}
             role="tab"
@@ -717,11 +741,11 @@ export function EvidenceViewer({
       </div>
       <div className="mt-4 space-y-4">
         {visibleGroups.map(([label, items]) => (
-          <details className="rounded-xl bg-slate-950 p-3" key={label} open={label === 'Final reports' || label === 'Original observation'}>
+          <details className="rounded-xl bg-[var(--rift-surface-raised)] p-3" key={label} open={label === 'Final reports' || label === 'Original observation'}>
             <summary className="cursor-pointer font-semibold">{label} ({items.length})</summary>
             {items.length ? (
               <EvidenceGroupItems items={items} investigationId={investigationId} experiments={experiments} />
-            ) : <p className="mt-3 text-sm text-slate-500">No {label.toLowerCase()} evidence is available.</p>}
+            ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">No {label.toLowerCase()} evidence is available.</p>}
           </details>
         ))}
       </div>
@@ -740,7 +764,7 @@ function EvidenceGroupItems({ items, investigationId, experiments }: { items: Ev
         ))}
       </div>
       {items.length > visible.length ? (
-        <button className="mt-3 rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-200" onClick={() => setLimit((value) => value + 8)} type="button">
+        <button className="mt-3 rounded-lg border border-[var(--rift-border-strong)] px-3 py-2 text-xs text-[var(--rift-text)]" onClick={() => setLimit((value) => value + 8)} type="button">
           Show more evidence ({items.length - visible.length} remaining)
         </button>
       ) : null}
@@ -752,20 +776,20 @@ function EvidenceCard({ artifact, investigationId, experiments }: { artifact: Ev
   const worldId = experiments.find((experiment) => experiment.id === artifact.experimentId)?.worldId;
   const filename = evidenceFilename(artifact);
   return (
-    <div className="rounded-lg border border-slate-800 p-3 text-sm">
+    <div className="rounded-lg border border-[var(--rift-border)] p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-semibold">{humanize(artifact.type)}</span>
-        <span className="text-xs text-slate-500">{artifact.mimeType} · {artifact.sizeBytes.toLocaleString()} bytes</span>
+        <span className="text-xs text-[var(--rift-text-muted)]">{artifact.mimeType} · {artifact.sizeBytes.toLocaleString()} bytes</span>
       </div>
-      <dl className="mt-2 grid gap-2 text-xs text-slate-500 md:grid-cols-3">
-        <div><dt className="sr-only">Filename</dt><dd className="font-mono text-slate-400">{filename}</dd></div>
+      <dl className="mt-2 grid gap-2 text-xs text-[var(--rift-text-muted)] md:grid-cols-3">
+        <div><dt className="sr-only">Filename</dt><dd className="font-mono text-[var(--rift-text-secondary)]">{filename}</dd></div>
         <div><dt>World</dt><dd className="font-mono">{worldId ? shortId(worldId, 14) : 'Not recorded'}</dd></div>
         <div><dt>Created</dt><dd>{formatDate(artifact.createdAt)}</dd></div>
         {artifact.checksum ? <div><dt>Checksum</dt><dd className="font-mono">{shortId(artifact.checksum, 14)}</dd></div> : null}
       </dl>
       {artifact.type === 'FINAL_REPORT'
         ? <FinalReportPreview artifact={artifact} investigationId={investigationId} />
-        : <p className="mt-2 text-xs text-slate-400">{artifact.type === 'SCREENSHOT'
+        : <p className="mt-2 text-xs text-[var(--rift-text-secondary)]">{artifact.type === 'SCREENSHOT'
           ? 'Screenshot preview is unavailable. Artifact metadata is preserved.'
           : artifact.type === 'TRACE'
             ? 'Playwright trace archive. Trace download is not currently exposed through the public API.'
@@ -780,14 +804,14 @@ function FinalReportPreview({ artifact, investigationId }: { artifact: EvidenceA
   return (
     <div className="mt-3">
       <button
-        className="rounded-lg border border-cyan/40 px-3 py-2 text-xs font-bold text-cyan"
+        className="rounded-lg border border-[var(--rift-border-strong)] px-3 py-2 text-xs font-bold text-white"
         onClick={() => setOpen((value) => !value)}
         type="button"
       >
         {open ? 'Hide report' : 'View report'}
       </button>
-      {!open ? <p className="mt-2 text-xs text-slate-400">Report body is fetched only when opened.</p> : null}
-      {open && query.isLoading ? <p className="mt-3 text-xs text-slate-400">Loading report content…</p> : null}
+      {!open ? <p className="mt-2 text-xs text-[var(--rift-text-secondary)]">Report body is fetched only when opened.</p> : null}
+      {open && query.isLoading ? <p className="mt-3 text-xs text-[var(--rift-text-secondary)]">Loading report content…</p> : null}
       {open && query.isError ? <ReportError error={query.error} /> : null}
       {open && query.data ? <ReportContent content={query.data} /> : null}
     </div>
@@ -800,21 +824,21 @@ function ReportError({ error }: { error: unknown }) {
     : error instanceof InvestigationApiError && error.kind === 'UNSUPPORTED_CONTENT'
       ? 'This artifact cannot be previewed safely.'
       : 'Final report content is unavailable.';
-  return <p className="mt-3 rounded-lg border border-red-300/30 bg-red-300/10 p-3 text-xs text-red-100">{message}</p>;
+  return <p className="mt-3 rounded-lg border border-[var(--rift-border-strong)] bg-white/5 p-3 text-xs text-[var(--rift-text-secondary)]">{message}</p>;
 }
 
 export function ReportContent({ content }: { content: EvidenceTextContentResponse }) {
   if (content.format === 'JSON') return <JsonReport content={content.content} />;
   if (content.format === 'MARKDOWN') return <MarkdownReport content={content.content} />;
-  return <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-slate-950 p-3 text-xs text-slate-300 whitespace-pre-wrap">{content.content}</pre>;
+  return <pre className="mt-3 max-h-96 overflow-auto rounded-lg bg-[var(--rift-surface-raised)] p-3 text-xs text-[var(--rift-text-secondary)] whitespace-pre-wrap">{content.content}</pre>;
 }
 
 function MarkdownReport({ content }: { content: string }) {
   return (
-    <div className="mt-3 max-h-[32rem] overflow-auto rounded-lg bg-slate-950 p-4 text-sm text-slate-300">
+    <div className="mt-3 max-h-[32rem] overflow-auto rounded-lg bg-[var(--rift-surface-raised)] p-4 text-sm text-[var(--rift-text-secondary)]">
       {content.split(/\r?\n/).map((line, index) => {
-        if (line.startsWith('# ')) return <h3 className="mt-2 text-lg font-bold text-slate-100" key={`${index}-${line}`}>{line.slice(2)}</h3>;
-        if (line.startsWith('## ')) return <h4 className="mt-3 font-bold text-slate-100" key={`${index}-${line}`}>{line.slice(3)}</h4>;
+        if (line.startsWith('# ')) return <h3 className="mt-2 text-lg font-bold text-[var(--rift-text)]" key={`${index}-${line}`}>{line.slice(2)}</h3>;
+        if (line.startsWith('## ')) return <h4 className="mt-3 font-bold text-[var(--rift-text)]" key={`${index}-${line}`}>{line.slice(3)}</h4>;
         if (line.startsWith('- ')) return <p className="ml-4" key={`${index}-${line}`}>• {line.slice(2)}</p>;
         return <p className={line ? 'mt-1' : 'h-3'} key={`${index}-${line}`}>{line}</p>;
       })}
@@ -827,23 +851,23 @@ function JsonReport({ content }: { content: string }) {
   try {
     parsed = JSON.parse(content);
   } catch {
-    return <p className="mt-3 rounded-lg border border-red-300/30 bg-red-300/10 p-3 text-xs text-red-100">Final report JSON could not be parsed safely.</p>;
+    return <p className="mt-3 rounded-lg border border-[var(--rift-border-strong)] bg-white/5 p-3 text-xs text-[var(--rift-text-secondary)]">Final report JSON could not be parsed safely.</p>;
   }
   const record = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
   const rows = ['reportVersion', 'summary', 'businessImpact', 'originalObservation', 'reproduction', 'minimisation', 'confidence', 'retainedConditions', 'removedConditions', 'boundedRange', 'reproductionSteps', 'evidenceReferences', 'limitations', 'provenance'];
   return (
-    <div className="mt-3 rounded-lg bg-slate-950 p-4 text-sm">
+    <div className="mt-3 rounded-lg bg-[var(--rift-surface-raised)] p-4 text-sm">
       <dl className="grid gap-3">
         {rows.filter((key) => record[key] !== undefined).map((key) => (
           <div key={key}>
-            <dt className="text-xs uppercase tracking-widest text-slate-500">{humanize(key)}</dt>
-            <dd className="mt-1 whitespace-pre-wrap text-slate-300">{formatValue(record[key])}</dd>
+            <dt className="text-xs uppercase tracking-widest text-[var(--rift-text-muted)]">{humanize(key)}</dt>
+            <dd className="mt-1 whitespace-pre-wrap text-[var(--rift-text-secondary)]">{formatValue(record[key])}</dd>
           </div>
         ))}
       </dl>
       <details className="mt-4">
-        <summary className="cursor-pointer text-xs font-bold text-cyan">Raw JSON</summary>
-        <pre className="mt-2 max-h-80 overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-300">{JSON.stringify(parsed, null, 2)}</pre>
+        <summary className="cursor-pointer text-xs font-bold text-white">Raw JSON</summary>
+        <pre className="mt-2 max-h-80 overflow-auto rounded bg-[var(--rift-surface-raised)] p-3 text-xs text-[var(--rift-text-secondary)]">{JSON.stringify(parsed, null, 2)}</pre>
       </details>
     </div>
   );
@@ -889,15 +913,15 @@ export function FindingDetailSections({
     <div className="space-y-5">
       <section className="card">
         <div className="flex flex-wrap gap-2">
-          <StatusBadge tone="red">{finding.severity}</StatusBadge>
-          <StatusBadge tone="green">{finding.confidence}</StatusBadge>
-          <StatusBadge>{humanize(causalStatus(finding))}</StatusBadge>
-          {investigationStatus ? <StatusBadge tone={investigationStatus === 'COMPLETED' ? 'green' : 'slate'}>{humanize(investigationStatus)}</StatusBadge> : null}
-          {finalReports.length ? <StatusBadge tone="cyan">Final report available</StatusBadge> : null}
+          <StatusBadge tone={findingSeverityTone(finding.severity)}>{finding.severity}</StatusBadge>
+          <StatusBadge tone={confidenceTone(finding.confidence)}>{finding.confidence}</StatusBadge>
+          <StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(causalStatus(finding))}</StatusBadge>
+          {investigationStatus ? <StatusBadge tone={executionStatusTone(investigationStatus)}>{humanize(investigationStatus)}</StatusBadge> : null}
+          {finalReports.length ? <StatusBadge tone="pass">Final report available</StatusBadge> : null}
         </div>
         <h2 className="mt-4 text-2xl font-bold">{finding.title}</h2>
-        <p className="mt-3 text-slate-300">{finding.summary}</p>
-        <p className="mt-3 text-sm text-slate-400">
+        <p className="mt-3 text-[var(--rift-text-secondary)]">{finding.summary}</p>
+        <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">
           {finding.reproductionCount} validated reproductions. This is a supported minimal-tested
           condition set, not an absolute claim of global minimality.
         </p>
@@ -919,35 +943,42 @@ export function FindingDetailSections({
           <Metric label="Exact reproduction" value={reproducedRuns > 0 ? 'Reproduced' : 'Not recorded'} />
           <Metric label="Contradictory/control runs" value={contradictoryRuns} />
         </div>
-        {confidenceExplanation ? <p className="mt-4 text-sm text-slate-400">{confidenceExplanation}</p> : null}
+        {confidenceExplanation ? <p className="mt-4 text-sm text-[var(--rift-text-secondary)]">{confidenceExplanation}</p> : null}
       </section>
       <MinimalConditionSummary finding={finding} boundary={boundary} />
       <div className="grid gap-5 lg:grid-cols-3">
-        <ConditionBlock title="Retained in minimal tested set" conditions={retained} empty="No retained conditions were recorded." />
-        <ConditionBlock title="Removed conditions" conditions={removed} empty="No removed conditions were recorded." />
-        <ConditionBlock title="Inconclusive conditions" conditions={inconclusive} empty="No inconclusive conditions were recorded." />
+        <ConditionBlock title="Retained in minimal tested set" conditions={retained} empty="No retained conditions were recorded." tone={conditionRoleTone('retained')} />
+        <ConditionBlock title="Removed conditions" conditions={removed} empty="No removed conditions were recorded." tone={conditionRoleTone('removed')} />
+        <ConditionBlock title="Inconclusive conditions" conditions={inconclusive} empty="No inconclusive conditions were recorded." tone={conditionRoleTone('inconclusive')} />
       </div>
       <FailureRange finding={finding} boundary={boundary} />
       <ReproductionSteps finding={finding} />
-      <ExperimentHistory worlds={worlds} experiments={experiments} evidence={allEvidence} />
-      <CausalSequence finding={finding} />
+      <details className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface)]">
+        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-[var(--rift-text)] marker:hidden">Supporting experiment record</summary>
+        <div className="grid gap-5 border-t border-[var(--rift-border)] p-5">
+          <ExperimentHistory worlds={worlds} experiments={experiments} evidence={allEvidence} />
+          <CausalSequence finding={finding} />
+        </div>
+      </details>
       <EvidenceViewer evidence={allEvidence} investigationId={finding.investigationId} finding={finding} worlds={worlds} experiments={experiments} />
-      <section className="card">
-        <h2 className="font-bold">Limitations</h2>
-        {limitations.length ? <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-300">{limitations.map((item) => <li key={item}>{item}</li>)}</ul> : (
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-slate-300">
-            <li>Minimality is based on deterministic recorded worlds, not exhaustive global search.</li>
-            <li>The timing result is bounded between observed passing and failing values, not an exact universal threshold.</li>
-            <li>The result is tied to the configured checkout fixture and provider execution context.</li>
-          </ul>
-        )}
-      </section>
+      <details className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface)]">
+        <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-[var(--rift-text)] marker:hidden">Limitations</summary>
+        <div className="border-t border-[var(--rift-border)] px-5 py-4">
+          {limitations.length ? <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--rift-text-secondary)]">{limitations.map((item) => <li key={item}>{item}</li>)}</ul> : (
+            <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--rift-text-secondary)]">
+              <li>Minimality is based on deterministic recorded worlds, not exhaustive global search.</li>
+              <li>The timing result is bounded between observed passing and failing values, not an exact universal threshold.</li>
+              <li>The result is tied to the configured checkout fixture and provider execution context.</li>
+            </ul>
+          )}
+        </div>
+      </details>
     </div>
   );
 }
 
 function SummaryBlock({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="rounded-xl bg-slate-950 p-3"><h3 className="text-xs uppercase tracking-widest text-slate-500">{title}</h3><p className="mt-2 text-sm text-slate-300">{children}</p></div>;
+  return <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3"><h3 className="text-xs uppercase tracking-widest text-[var(--rift-text-muted)]">{title}</h3><p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{children}</p></div>;
 }
 
 function MinimalConditionSummary({ finding, boundary }: { finding: FindingDetail; boundary?: FailureBoundaryViewModel | undefined }) {
@@ -955,9 +986,9 @@ function MinimalConditionSummary({ finding, boundary }: { finding: FindingDetail
   const range = boundary ?? failureBoundaryViewModel(finding);
   const finalConfirmation = finding.reproductions.some((run) => run.reproduced) ? 'Reproduced' : 'Not recorded';
   return (
-    <section className="card border-cyan/30">
+    <section className="card border-[var(--rift-border-strong)]">
       <h2 className="font-bold">Minimal tested condition set</h2>
-      <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-slate-300">
+      <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-[var(--rift-text-secondary)]">
         {Object.entries(retained).map(([key, value]) => <li key={key}>{formatConditionKey(key)}: {formatConditionValue(key, value)}</li>)}
         {range.failingBoundMs !== undefined ? <li>Failure observed at {range.failingBoundMs.toLocaleString()} ms</li> : null}
         {range.passingBoundMs !== undefined ? <li>Passing behaviour observed at {range.passingBoundMs.toLocaleString()} ms</li> : null}
@@ -976,7 +1007,7 @@ function ExperimentHistory({ worlds, experiments, evidence }: { worlds: Investig
       <h2 className="font-bold">Experiment history</h2>
       <div className="mt-4 overflow-x-auto">
         <table className="min-w-full text-left text-sm">
-          <thead className="text-xs uppercase tracking-widest text-slate-500">
+          <thead className="text-xs uppercase tracking-widest text-[var(--rift-text-muted)]">
             <tr>
               <th className="py-2 pr-4">World</th>
               <th className="py-2 pr-4">Stage</th>
@@ -990,11 +1021,11 @@ function ExperimentHistory({ worlds, experiments, evidence }: { worlds: Investig
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr className="border-t border-slate-800" key={row.worldId}>
+              <tr className="border-t border-[var(--rift-border)]" key={row.worldId}>
                 <td className="py-2 pr-4 font-mono text-xs" title={row.worldId}>{shortId(row.worldId, 14)}</td>
                 <td className="py-2 pr-4">{humanize(row.stage)}</td>
                 <td className="py-2 pr-4">{row.purpose}</td>
-                <td className="py-2 pr-4"><StatusBadge tone={row.outcome === 'PASS' ? 'green' : row.outcome === 'FAIL' ? 'red' : 'slate'}>{row.outcome}</StatusBadge></td>
+                <td className="py-2 pr-4"><StatusBadge tone={businessOutcomeTone(row.outcome)}>{row.outcome}</StatusBadge></td>
                 <td className="py-2 pr-4">{row.paymentDelay}</td>
                 <td className="py-2 pr-4">{row.repeatedSubmit}</td>
                 <td className="py-2 pr-4">{row.bugMode}</td>
@@ -1014,10 +1045,10 @@ function CausalSequence({ finding }: { finding: FindingDetail }) {
     <section className="card">
       <h2 className="font-bold">Evidence-supported sequence</h2>
       {sequence.length ? (
-        <ol className="mt-4 space-y-2 text-sm text-slate-300">
-          {sequence.map((item, index) => <li className="rounded-xl bg-slate-950 p-3" key={`${index}-${item}`}>{index + 1}. {item}</li>)}
+        <ol className="mt-4 space-y-2 text-sm text-[var(--rift-text-secondary)]">
+          {sequence.map((item, index) => <li className="rounded-xl bg-[var(--rift-surface-raised)] p-3" key={`${index}-${item}`}>{index + 1}. {item}</li>)}
         </ol>
-      ) : <p className="mt-3 text-sm text-slate-500">A structured causal sequence was not recorded for this finding.</p>}
+      ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">A structured causal sequence was not recorded for this finding.</p>}
     </section>
   );
 }

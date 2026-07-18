@@ -1,7 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PageHeading } from '../../components/page-heading.js';
 import { ProjectApiError, projectApi, type ProjectSetupInput } from '../../services/project-api.js';
 import { useAuthStore } from '../../stores/auth.store.js';
 import { ProjectForm } from './project-form.js';
@@ -40,7 +39,7 @@ export function NewProjectPage() {
       setError(
         requestError instanceof ProjectApiError
           ? requestError.message
-          : 'WorldLab could not create the project.',
+          : 'Rift could not create the project.',
       );
       return false;
     } finally {
@@ -49,14 +48,19 @@ export function NewProjectPage() {
   }
 
   return (
-    <section className="mx-auto max-w-4xl">
-      <PageHeading
-        description="Connect one authorised application and establish its initial safety boundary."
-        eyebrow="Project setup"
-        title="New Project"
-      />
+    <section className="mx-auto min-w-0 max-w-[1200px]">
+      <header className="mb-7 border-b border-[var(--rift-border)] pb-6">
+        <p className="eyebrow">Project setup</p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] text-[var(--rift-text)] lg:text-[2.5rem]">
+          New Project
+        </h1>
+        <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">
+          Connect one authorised application and establish its initial safety boundary.
+        </p>
+      </header>
       <ProjectForm
         formError={error}
+        guided
         onSubmit={create}
         pending={pending}
         requireAcknowledgement

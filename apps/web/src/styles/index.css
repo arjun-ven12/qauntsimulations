@@ -1,10 +1,47 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --rift-bg: #050505;
+  --rift-sidebar: #070707;
+  --rift-surface: #0b0b0b;
+  --rift-surface-raised: #101010;
+  --rift-surface-hover: #171717;
+  --rift-border: #262626;
+  --rift-border-strong: #343434;
+  --rift-text: #f5f5f5;
+  --rift-text-secondary: #a1a1aa;
+  --rift-text-muted: #686868;
+  --rift-primary: #ffffff;
+  --rift-primary-text: #050505;
+  --rift-pass: #34c98f;
+  --rift-warning: #f59e0b;
+  --rift-fail: #ef4444;
+  --status-pass: #34d399;
+  --status-pass-bg: rgba(52, 211, 153, 0.09);
+  --status-pass-border: rgba(52, 211, 153, 0.28);
+  --status-running: #60a5fa;
+  --status-running-bg: rgba(96, 165, 250, 0.09);
+  --status-running-border: rgba(96, 165, 250, 0.28);
+  --status-pending: #fbbf24;
+  --status-pending-bg: rgba(251, 191, 36, 0.09);
+  --status-pending-border: rgba(251, 191, 36, 0.28);
+  --status-fail: #fb7185;
+  --status-fail-bg: rgba(251, 113, 133, 0.09);
+  --status-fail-border: rgba(251, 113, 133, 0.28);
+  --status-neutral: #a1a1aa;
+  --status-neutral-bg: rgba(161, 161, 170, 0.08);
+  --status-neutral-border: rgba(161, 161, 170, 0.24);
+}
+
 @layer base {
   body {
-    @apply m-0 min-h-screen bg-ink text-slate-100 antialiased;
+    @apply m-0 min-h-screen antialiased;
+    background: var(--rift-bg);
+    color: var(--rift-text);
     font-family: Outfit, ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
   input,
   textarea,
@@ -12,17 +49,181 @@
   button {
     font-family: inherit;
   }
-  input,
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
   textarea,
   select {
-    @apply rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-slate-100 outline-none focus:border-cyan;
+    @apply min-h-11 px-3 py-2 outline-none;
+    border: 1px solid #303030;
+    border-radius: 8px;
+    background: #0b0b0b;
+    color: var(--rift-text);
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+  }
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    border: 1px solid #303030;
+    background: #0b0b0b;
+    accent-color: #f5f5f5;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--rift-text-muted);
+  }
+  input:not([type='checkbox']):not([type='radio']):focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    border-color: #737373;
+    box-shadow: 0 0 0 3px rgb(255 255 255 / 0.08);
+  }
+  input[type='checkbox']:focus-visible,
+  input[type='radio']:focus-visible {
+    outline: 2px solid #a1a1aa;
+    outline-offset: 3px;
+  }
+  input[aria-invalid='true'],
+  textarea[aria-invalid='true'],
+  select[aria-invalid='true'] {
+    border-color: var(--status-fail-border);
+  }
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    cursor: not-allowed;
+    background: #090909;
+    color: var(--rift-text-muted);
+    opacity: 0.72;
+  }
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-text-fill-color: var(--rift-text);
+    box-shadow: 0 0 0 1000px #0b0b0b inset;
+    caret-color: var(--rift-text);
   }
 }
 @layer components {
+  .rift-choice-control {
+    border: 1px solid #303030;
+    border-radius: 8px;
+    background: #0b0b0b;
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+  .rift-choice-control:hover:not(:has(input:disabled)) {
+    border-color: var(--rift-border-strong);
+    background: var(--rift-surface-raised);
+  }
+  .rift-choice-control:focus-within {
+    border-color: #737373;
+    box-shadow: 0 0 0 3px rgb(255 255 255 / 0.08);
+  }
+  .rift-editable-row {
+    border: 1px solid #303030;
+    border-radius: 8px;
+    background: #090909;
+  }
   .card {
-    @apply rounded-2xl border border-slate-800 bg-panel p-5 shadow-xl shadow-black/10;
+    @apply rounded-xl p-5;
+    border-color: var(--rift-border);
+    background: var(--rift-surface);
+    box-shadow: 0 16px 36px rgb(0 0 0 / 0.2);
   }
   .eyebrow {
-    @apply text-xs font-bold uppercase tracking-[0.2em] text-cyan;
+    color: var(--rift-text-muted);
+    @apply text-[11px] font-semibold uppercase tracking-[0.18em];
+  }
+  .rift-surface {
+    border: 1px solid var(--rift-border);
+    background: var(--rift-surface);
+  }
+  .rift-surface-raised {
+    border: 1px solid var(--rift-border);
+    background: var(--rift-surface-raised);
+  }
+  .rift-button-primary,
+  .rift-button-secondary {
+    @apply inline-flex min-h-11 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+    transition-property: background-color, border-color, color, box-shadow, transform;
+  }
+  .rift-button-primary {
+    border: 1px solid var(--rift-primary);
+    background: var(--rift-primary);
+    color: var(--rift-primary-text);
+  }
+  .rift-button-primary:hover:not(:disabled) {
+    background: #e4e4e7;
+    transform: translateY(-1px);
+  }
+  .rift-button-secondary {
+    border: 1px solid var(--rift-border);
+    background: transparent;
+    color: var(--rift-text-secondary);
+  }
+  .rift-button-secondary:hover:not(:disabled) {
+    border-color: var(--rift-border-strong);
+    background: var(--rift-surface-hover);
+    color: var(--rift-text);
+  }
+  .rift-status {
+    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
+    border-color: var(--rift-border);
+    background: var(--rift-surface-raised);
+    color: var(--rift-text-secondary);
+  }
+  .rift-status--pass {
+    border-color: color-mix(in srgb, var(--rift-pass) 45%, var(--rift-border));
+    color: var(--rift-pass);
+  }
+  .rift-status--warning {
+    border-color: color-mix(in srgb, var(--rift-warning) 45%, var(--rift-border));
+    color: var(--rift-warning);
+  }
+  .rift-status--fail {
+    border-color: color-mix(in srgb, var(--rift-fail) 45%, var(--rift-border));
+    color: var(--rift-fail);
+  }
+  .rift-semantic-status {
+    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
+  }
+  .rift-semantic-status--pass {
+    border-color: var(--status-pass-border);
+    background: var(--status-pass-bg);
+    color: var(--status-pass);
+  }
+  .rift-semantic-status--running {
+    border-color: var(--status-running-border);
+    background: var(--status-running-bg);
+    color: var(--status-running);
+  }
+  .rift-semantic-status--pending {
+    border-color: var(--status-pending-border);
+    background: var(--status-pending-bg);
+    color: var(--status-pending);
+  }
+  .rift-semantic-status--fail {
+    border-color: var(--status-fail-border);
+    background: var(--status-fail-bg);
+    color: var(--status-fail);
+  }
+  .rift-semantic-status--neutral {
+    border-color: var(--status-neutral-border);
+    background: var(--status-neutral-bg);
+    color: var(--status-neutral);
+  }
+  .badge {
+    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
+    border-color: var(--rift-border);
+    background: var(--rift-surface-raised);
+    color: var(--rift-text-secondary);
   }
 }

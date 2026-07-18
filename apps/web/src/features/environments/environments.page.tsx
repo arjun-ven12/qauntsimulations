@@ -25,7 +25,7 @@ export function EnvironmentsPage() {
             </Link>
           ) : undefined
         }
-        description="Define where TaskOS may run journeys and experiments."
+        description="Define where Rift may run journeys and experiments."
         eyebrow="Project setup"
         title="Environments"
       />
@@ -34,7 +34,7 @@ export function EnvironmentsPage() {
       ) : null}
       {query.data.length === 0 ? (
         <div className="card mt-6">
-          Create an environment to define where TaskOS may run journeys and experiments.
+          Create an environment to define where Rift may run journeys and experiments.
         </div>
       ) : (
         <div className="mt-6 grid gap-4 md:grid-cols-2">

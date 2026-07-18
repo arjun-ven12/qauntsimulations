@@ -7,6 +7,7 @@ import { MockInvestigationApi, MOCK_INVESTIGATION_ID } from '../../services/api/
 import { CompletedRunSummary, EventTimeline, EvidenceSummary, ExperimentPlanPanel, InvestigationOverviewHeader, LiveFindingSummary, ProgressSummary, WorkerPanel, WorldMatrix, WorldTable } from '../runtime/runtime-components.js';
 import { polling } from '../runtime/use-runtime-queries.js';
 import { cleanupWarning, plannerLabels, providerLabel, timingLabels } from './live-worldlab.page.js';
+import { InvestigationReport } from './investigation-report.js';
 
 const event = (metadata?: InvestigationEvent['metadata']): InvestigationEvent => ({
   id: 'event-1',
@@ -110,6 +111,9 @@ describe('LiveWorldLabPage runtime metadata helpers', () => {
     expect(findings).toHaveLength(1);
     expect(html).toContain('Investigation complete');
     expect(html).toContain('World exploration');
+    expect(html).toContain('Inspect world');
+    expect(html).not.toContain('>Browser</th>');
+    expect(html).not.toContain('>Viewport</th>');
     expect(html).toContain('Execution');
     expect(html).toContain('Business outcome');
     expect(html).toContain('Execution completed');
@@ -122,9 +126,48 @@ describe('LiveWorldLabPage runtime metadata helpers', () => {
     expect(html).toContain('Runtime event timeline');
     expect(html).toContain('Discovered finding');
     expect(html).toContain('Evidence availability');
+    expect(html).toContain('rift-semantic-status--pass');
+    expect(html).toContain('rift-semantic-status--fail');
     expect(html).not.toContain('<script>');
     expect(html).not.toContain('/Users/');
     expect(html).not.toContain('Final report\\n\\nDuplicate checkout submission');
+  });
+
+  it('renders the monochrome report hierarchy from real investigation data', async () => {
+    const api = new MockInvestigationApi();
+    const progress = await api.getInvestigation(MOCK_INVESTIGATION_ID);
+    const findings = await api.listFindings(MOCK_INVESTIGATION_ID);
+    const evidence = await api.getEvidence(MOCK_INVESTIGATION_ID);
+    const worlds = await api.getWorlds(MOCK_INVESTIGATION_ID);
+    const experiments = await api.getExperiments(MOCK_INVESTIGATION_ID);
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <InvestigationReport
+          canVerifyRepair
+          evidence={evidence}
+          experiments={experiments}
+          findings={findings}
+          investigationId={MOCK_INVESTIGATION_ID}
+          progress={progress}
+          worlds={worlds}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(html).toContain('Investigation conclusion');
+    expect(html).toContain('Confirmed finding');
+    expect(html).toContain('Minimal tested trigger');
+    expect(html).toContain('Final report');
+    expect(html).toContain('Repair Verification');
+    expect(html).toContain('Failure boundary');
+    expect(html).toContain('Confidence');
+    expect(html).toContain('Evidence artifacts');
+    expect(html).toContain('rift-semantic-status--pass');
+    expect(html).toContain('rift-semantic-status--fail');
+    expect(html).toContain('/repair-verifications/new');
+    expect(html).not.toContain('bg-cyan');
+    expect(html).not.toContain('text-emerald');
+    expect(html).not.toContain('text-red');
   });
 
   it('documents polling intervals used by active investigations', () => {

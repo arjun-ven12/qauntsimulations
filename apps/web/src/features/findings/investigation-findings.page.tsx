@@ -17,11 +17,11 @@ export function InvestigationFindingsPage() {
         eyebrow={progress.data?.status ?? 'Findings'}
         title="Investigation findings"
         description={progress.data ? `${phaseLabel(progress.data.status)} · ${progress.data.findingsCount} findings recorded.` : 'Evidence-backed invariant findings.'}
-        action={<Link className="rounded-lg bg-cyan px-4 py-2 font-bold text-ink" to={`/investigations/${investigationId}`}>Back to overview</Link>}
+        action={<Link className="rift-button-secondary" to={`/investigations/${investigationId}`}>Back to overview</Link>}
       />
       <RuntimeNav investigationId={investigationId} />
       {findings.isLoading ? <PanelState title="Loading findings">Loading evidence-backed findings…</PanelState> : null}
-      {findings.error ? <PanelState title="Findings unavailable" retry={() => void findings.refetch()}>{findings.error instanceof Error ? findings.error.message : 'WorldLab could not load findings.'}</PanelState> : null}
+      {findings.error ? <PanelState title="Findings unavailable" retry={() => void findings.refetch()}>{findings.error instanceof Error ? findings.error.message : 'Rift could not load findings.'}</PanelState> : null}
       {!findings.isLoading && !findings.error ? <FindingsList investigationId={investigationId} findings={findings.data ?? []} /> : null}
     </>
   );

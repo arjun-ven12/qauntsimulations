@@ -162,7 +162,7 @@ class HttpEnvironmentApi {
         headers: { 'Content-Type': 'application/json', ...init?.headers },
       });
     } catch {
-      throw new EnvironmentApiError('WorldLab could not reach the environment service.', 0);
+      throw new EnvironmentApiError('Rift could not reach the environment service.', 0);
     }
     const data = (await response.json()) as T & { error?: { message?: string } };
     if (response.status === 401 && retry) {

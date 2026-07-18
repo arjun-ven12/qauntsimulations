@@ -35,7 +35,7 @@ export function InvitationsPage() {
       setError(
         requestError instanceof InvitationApiError
           ? requestError.message
-          : 'WorldLab could not accept this invitation.',
+          : 'Rift could not accept this invitation.',
       );
     } finally {
       setPendingId('');
@@ -54,7 +54,7 @@ export function InvitationsPage() {
       setError(
         requestError instanceof InvitationApiError
           ? requestError.message
-          : 'WorldLab could not decline this invitation.',
+          : 'Rift could not decline this invitation.',
       );
     } finally {
       setPendingId('');
@@ -72,7 +72,7 @@ export function InvitationsPage() {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : 'WorldLab could not switch organisations.',
+          : 'Rift could not switch organisations.',
       );
       setPendingId('');
     }

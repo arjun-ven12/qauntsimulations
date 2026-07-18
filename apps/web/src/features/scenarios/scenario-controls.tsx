@@ -51,9 +51,7 @@ export function ScenarioControlsEditor({
             disabled={disabled}
             max={100}
             min={1}
-            onChange={(event) =>
-              onChange({ ...value, maximumWorlds: Number(event.target.value) })
-            }
+            onChange={(event) => onChange({ ...value, maximumWorlds: Number(event.target.value) })}
             type="number"
             value={value.maximumWorlds}
           />
@@ -95,7 +93,7 @@ function ControlOptions({
       <div className="mt-2 flex flex-wrap gap-3">
         {options.map((option) => (
           <label
-            className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-700 px-4"
+            className="rift-choice-control flex min-h-11 items-center gap-2 px-4"
             key={option.value}
           >
             <input
@@ -113,7 +111,11 @@ function ControlOptions({
           </label>
         ))}
       </div>
-      {error ? <p className="mt-2 text-sm text-red-300" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="mt-2 text-sm text-red-300" role="alert">
+          {error}
+        </p>
+      ) : null}
     </fieldset>
   );
 }

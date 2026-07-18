@@ -45,7 +45,7 @@ test('invitation link shows a safe preview and login preserves the raw-link rout
   await page.getByRole('link', { name: 'Log in' }).click();
   await page.getByLabel('Email address').fill('mira.member@taskos.test');
   await page.getByLabel('Password', { exact: true }).fill('test-password-value');
-  await page.getByRole('button', { name: 'Continue to WorldLab' }).click();
+  await page.getByRole('button', { name: 'Continue to Rift' }).click();
   await expect(page).toHaveURL(new RegExp(`/invitations/accept\\?token=${rawToken}$`));
 });
 
@@ -110,10 +110,16 @@ test('organisation switcher calls the session API and removes stale projects', a
   );
   await page.goto('/projects');
   await expect(page.getByRole('heading', { name: 'Home checkout' })).toBeVisible();
-  await page.getByLabel('Active organisation').selectOption('org-joined');
+  const workspaceSelector = page.getByRole('combobox', { name: 'Workspace selector' });
+  await workspaceSelector.selectOption('org-joined');
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(workspaceSelector).toHaveValue('org-joined');
+  await page.goto('/projects');
   await expect(page.getByRole('heading', { name: 'Joined commerce' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Home checkout' })).toHaveCount(0);
-  await expect(page.getByLabel('Active organisation')).toHaveValue('org-joined');
+  await expect(page.getByRole('combobox', { name: 'Workspace selector' })).toHaveValue(
+    'org-joined',
+  );
 });
 
 test('failed organisation switch remains visible and does not change active context', async ({
@@ -135,9 +141,11 @@ test('failed organisation switch remains visible and does not change active cont
   await page.route('**/api/invitations', async (route) => json(route, []));
   await page.route('**/api/projects', async (route) => json(route, []));
   await page.goto('/projects');
-  await page.getByLabel('Active organisation').selectOption('org-joined');
+  const workspaceSelector = page.getByRole('combobox', { name: 'Workspace selector' });
+  await workspaceSelector.selectOption('org-joined');
   await expect(page.getByRole('alert')).toContainText('do not have access');
-  await expect(page.getByLabel('Active organisation')).toHaveValue('org-home');
+  await expect(page).toHaveURL(/\/projects$/);
+  await expect(workspaceSelector).toHaveValue('org-home');
 });
 
 for (const viewport of [

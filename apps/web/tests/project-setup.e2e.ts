@@ -117,9 +117,13 @@ test('Projects renders organisation-scoped cards and opens New Project', async (
   await page.goto('/projects');
   await expect(page.getByTestId('project-list')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Checkout staging' })).toBeVisible();
-  await expect(page.getByText('staging.example.com')).toBeVisible();
-  await expect(page.getByText('github.com')).toBeVisible();
-  await page.getByRole('link', { name: 'New Project' }).click();
+  await expect(page.getByText('Application · staging.example.com')).toBeVisible();
+  await expect(page.getByText('Restrictions').first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open project' }).first()).toHaveAttribute(
+    'href',
+    '/projects/project-1',
+  );
+  await page.getByRole('link', { name: 'New Project', exact: true }).click();
   await expect(page).toHaveURL(/\/projects\/new$/);
 });
 
@@ -162,18 +166,115 @@ test('failed project session refresh clears auth state and redirects to login', 
 
 test('New Project validates required fields and rejects unsafe URL schemes', async ({ page }) => {
   await page.goto('/projects/new');
-  await page.getByRole('button', { name: 'Create project' }).click();
+  await expect(page.getByRole('heading', { name: 'Templates' })).toBeVisible();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByText('Enter a project name.')).toBeVisible();
   await expect(page.getByText('Enter the application URL.')).toBeVisible();
-  await expect(page.getByText('Confirm that these targets are authorised')).toBeVisible();
 
   await page.getByLabel('Project name').fill('Checkout staging');
   await page.getByLabel('Application URL').fill('file:///tmp/customer-data');
-  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByText('Enter a valid HTTP or HTTPS URL.')).toBeVisible();
   await page.getByLabel('Application URL').fill('javascript:alert(1)');
-  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByText('Enter a valid HTTP or HTTPS URL.')).toBeVisible();
+});
+
+test('New Project preserves fields across steps and returns to Projects', async ({ page }) => {
+  await mockList(page);
+  await page.goto('/projects/new');
+  await page.getByLabel('Project name').fill('Checkout staging');
+  await page.getByLabel('Application URL').fill('https://staging.example.com');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Access & Environment' })).toBeVisible();
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByLabel('Project name')).toHaveValue('Checkout staging');
+  await expect(page.getByLabel('Application URL')).toHaveValue('https://staging.example.com');
+  await page.getByLabel('Back to Projects').click();
+  await expect(page).toHaveURL(/\/projects$/);
+});
+
+test('Project custom templates persist and support apply, reset, rename, duplicate, delete, import, and export', async ({
+  page,
+}) => {
+  await page.goto('/projects/new');
+  await page.getByLabel('Project name').fill('Reusable checkout');
+  await page.getByLabel('Application URL').fill('https://templates.example.test');
+  await page.getByLabel('Custom template name').fill('Checkout template');
+  await page.getByRole('button', { name: 'Save current' }).click();
+  await expect(page.getByText('Saved in this browser', { exact: true })).toBeVisible();
+
+  await page.getByLabel('Custom template name').fill('checkout TEMPLATE');
+  await page.getByRole('button', { name: 'Save current' }).click();
+  await expect(page.getByText('Template names must be unique.', { exact: true })).toBeVisible();
+
+  await page.getByLabel('Project name').fill('Customised checkout');
+  await expect(page.getByText('Customised', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Reset to applied template' }).click();
+  await expect(page.getByLabel('Project name')).toHaveValue('Reusable checkout');
+
+  await page.getByRole('button', { name: 'Duplicate' }).click();
+  await expect(page.getByRole('heading', { name: 'Checkout template copy' })).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept('Checkout template'));
+  await page.getByRole('button', { name: 'Rename' }).click();
+  await expect(page.getByText('Template names must be unique.', { exact: true })).toBeVisible();
+  page.once('dialog', (dialog) => dialog.accept('Renamed checkout'));
+  await page.getByRole('button', { name: 'Rename' }).click();
+  await expect(page.getByRole('heading', { name: 'Renamed checkout' })).toBeVisible();
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export JSON' }).click();
+  await expect(download).resolves.toBeTruthy();
+
+  await page.getByLabel('Import template JSON file').setInputFiles({
+    name: 'invalid.rift-template.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from('{invalid'),
+  });
+  await expect(page.getByRole('alert').filter({ hasText: /./ })).toBeVisible();
+
+  await page.getByLabel('Import template JSON file').setInputFiles({
+    name: 'future.rift-template.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        category: 'PROJECT',
+        name: 'Future project',
+        schemaVersion: 2,
+        payload: {},
+      }),
+    ),
+  });
+  await expect(page.getByRole('alert').filter({ hasText: /./ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Future project' })).toHaveCount(0);
+
+  await page.getByLabel('Import template JSON file').setInputFiles({
+    name: 'imported.rift-template.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(
+      JSON.stringify({
+        category: 'PROJECT',
+        name: 'Imported project',
+        schemaVersion: 1,
+        payload: {
+          name: 'Imported checkout',
+          description: null,
+          applicationUrl: 'https://imported.example.test',
+          repositoryUrl: null,
+          credentialReferences: [],
+          apiEndpoints: [],
+          webhookEndpoints: [],
+        },
+      }),
+    ),
+  });
+  await expect(page.getByRole('heading', { name: 'Imported project' })).toBeVisible();
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Delete' }).click();
+  await expect(page.getByRole('heading', { name: 'Imported project' })).toHaveCount(0);
+  const scopedKeys = await page.evaluate(() => Object.keys(localStorage));
+  expect(scopedKeys).toContain('rift.templates.v1:org-1:user_owner');
 });
 
 test('New Project submits once to the real API contract and redirects with the project id', async ({
@@ -199,7 +300,7 @@ test('New Project submits once to the real API contract and redirects with the p
       button.click();
       button.click();
     });
-  await expect(page.getByRole('button', { name: 'Saving project…' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Creating project…' })).toBeDisabled();
   await expect(page).toHaveURL(/\/projects\/project-1\/settings$/);
   expect(requests).toBe(1);
   expect(payload).toMatchObject({
@@ -228,6 +329,8 @@ test('New Project keeps entered values after an API error', async ({ page }) => 
   await page.getByLabel(/I confirm that these targets/).check();
   await page.getByRole('button', { name: 'Create project' }).click();
   await expect(page.getByRole('alert').last()).toContainText('already exists');
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByLabel('Project name')).toHaveValue('Checkout staging');
   await expect(page.getByText('Unsaved changes')).toBeVisible();
 });
@@ -327,7 +430,7 @@ test('direct project routes and browser Back/Forward retain the app shell', asyn
   await page.route('**/api/projects/project-1', async (route) => json(route, details));
   await page.route('**/api/projects/project-1/safety', async (route) => json(route, safety));
   await page.goto('/projects/project-1/settings');
-  await expect(page.getByText('TaskOS', { exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation').getByRole('link', { name: 'Projects' })).toBeVisible();
   await page.goto('/projects/project-1/safety');
   await page.goBack();
   await expect(page).toHaveURL(/\/projects\/project-1\/settings$/);
@@ -367,6 +470,8 @@ for (const viewport of [
 async function fillRequiredProject(page: Page) {
   await page.getByLabel('Project name').fill('Checkout staging');
   await page.getByLabel('Application URL').fill('https://staging.example.com');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
 }
 
 async function mockList(page: Page) {

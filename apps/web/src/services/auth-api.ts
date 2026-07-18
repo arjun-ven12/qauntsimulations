@@ -103,7 +103,7 @@ export class HttpAuthApi implements AuthApi {
       });
     } catch {
       throw new AuthApiError(
-        'WorldLab could not be reached. Check your connection and try again.',
+        'Rift could not be reached. Check your connection and try again.',
         'NETWORK_ERROR',
         0,
       );

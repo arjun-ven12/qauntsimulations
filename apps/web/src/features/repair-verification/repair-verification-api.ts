@@ -67,7 +67,7 @@ class HttpRepairVerificationApi {
     let response: Response;
     try {
       response = await fetch(`${this.baseUrl}${path}`, { ...init, credentials: 'include', headers: { 'Content-Type': 'application/json', ...init?.headers } });
-    } catch { throw new RepairVerificationApiError('TaskOS could not reach Repair Verification.', 0, 'NETWORK_ERROR'); }
+    } catch { throw new RepairVerificationApiError('Rift could not reach Repair Verification.', 0, 'NETWORK_ERROR'); }
     const payload = await response.json() as { error?: { code?: string; message?: string; details?: unknown } };
     if (response.status === 401 && retry) {
       try { await authApi.refresh(); return this.request(path, init, false); } catch { await useAuthStore.getState().signOut(); }

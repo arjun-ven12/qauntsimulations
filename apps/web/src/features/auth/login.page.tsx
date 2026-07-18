@@ -45,6 +45,10 @@ export function AuthPage() {
   const requestedPath = readRequestedPath(location.state);
 
   useEffect(() => {
+    document.title = isLogin ? 'Sign in · Rift' : 'Create account · Rift';
+  }, [isLogin]);
+
+  useEffect(() => {
     const content = formContent.current;
     if (!content) return;
 
@@ -100,7 +104,7 @@ export function AuthPage() {
   return (
     <main className={`auth-page auth-page--${mode} ${complete ? 'auth-page--complete' : ''}`}>
       <AuthAtmosphere />
-      <section className="auth-visual" aria-label="TaskOS WorldLab preview">
+      <section className="auth-visual" aria-label="Rift preview">
         <Brand />
         <Mosaic mode={mode} />
         <div className="auth-hero-copy">
@@ -118,10 +122,20 @@ export function AuthPage() {
 
       <section
         className="auth-panel"
-        aria-label={isLogin ? 'Log in to TaskOS' : 'Create TaskOS account'}
+        aria-label={isLogin ? 'Log in to Rift' : 'Create Rift account'}
       >
         <div className="auth-form-wrap">
           <Brand compact />
+          {!isLogin ? (
+            <Link
+              aria-label="Back to sign in"
+              className="mb-3 inline-flex min-h-11 items-center rounded-lg px-2 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              state={location.state}
+              to="/login"
+            >
+              ← Back to sign in
+            </Link>
+          ) : null}
           <nav className="auth-tabs" aria-label="Authentication" role="tablist">
             <Link
               aria-selected={isLogin}
@@ -250,20 +264,20 @@ export function AuthPage() {
                 >
                   <span>
                     {complete
-                      ? 'Opening WorldLab…'
+                      ? 'Opening Rift…'
                       : pending
                         ? isLogin
                           ? 'Signing in…'
                           : 'Creating account…'
                         : isLogin
-                          ? 'Continue to WorldLab'
+                          ? 'Continue to Rift'
                           : 'Create account'}
                   </span>
                   <ArrowUpRight aria-hidden="true" size={19} />
                 </button>
 
                 <p className="auth-secondary">
-                  {isLogin ? 'New to TaskOS?' : 'Already have an account?'}{' '}
+                  {isLogin ? 'New to Rift?' : 'Already have an account?'}{' '}
                   <Link state={location.state} to={isLogin ? '/register' : '/login'}>
                     {isLogin ? 'Create an account' : 'Log in'}
                   </Link>
@@ -285,8 +299,8 @@ function Brand({ compact = false }: { compact?: boolean }) {
         <i />
       </span>
       <span>
-        <strong>TaskOS</strong>
-        <small>WorldLab</small>
+        <strong>Rift</strong>
+        <small>Reliability workspace</small>
       </span>
     </Link>
   );

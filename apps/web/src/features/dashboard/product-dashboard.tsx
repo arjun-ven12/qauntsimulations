@@ -1,35 +1,21 @@
-import {
-  AlertTriangle,
-  ArrowRight,
-  BadgeCheck,
-  Building2,
-  CircleCheck,
-  Clock3,
-  FlaskConical,
-  FolderKanban,
-  Rocket,
-  Route,
-  Search,
-  Server,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowRight, Clock3, Play } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { OnboardingProgressCard } from '../onboarding/onboarding-progress.js';
+import {
+  compactFindingTitle,
+  compactInvestigationTitle,
+  displayProjectName,
+} from './dashboard-display.js';
 import { createDashboardViewModel, type DashboardProjectView } from './dashboard.model.js';
+import { dashboardRoutes } from './dashboard.routes.js';
 import type {
   DashboardActivityAvailability,
   DashboardData,
   DashboardFindingSummary,
   DashboardInvestigationSummary,
 } from './dashboard.types.js';
-import { dashboardRoutes } from './dashboard.routes.js';
 
-const primaryAction =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-cyan px-4 py-2 font-bold text-ink transition hover:bg-cyan/90';
-const secondaryAction =
-  'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-700 px-4 py-2 font-bold text-slate-200 transition hover:border-slate-500 hover:bg-slate-900';
+type Tone = 'strong' | 'medium' | 'quiet';
 
 export interface ProductDashboardProps {
   data: DashboardData;
@@ -47,453 +33,367 @@ export function ProductDashboard({
 }: ProductDashboardProps) {
   const dashboard = createDashboardViewModel(data);
   const primary = dashboard.primaryProject;
+  const current = dashboard.recentInvestigations.find((item) => isActive(item.status))
+    ?? dashboard.recentInvestigations[0];
+  const attention = dashboard.recentFindings.find((item) => isAttention(item.severity))
+    ?? dashboard.projects.find((item) => !item.ready);
+  const primaryAction = primary
+    ? primary.ready
+      ? { href: primary.startInvestigationHref, label: 'Start investigation' }
+      : { href: primary.continueSetupHref, label: 'Continue setup' }
+    : canCreateProject
+      ? { href: dashboardRoutes.createProject, label: 'Create project' }
+      : undefined;
+
   return (
-    <section aria-labelledby="product-dashboard-title" className="mx-auto max-w-[1200px] min-w-0 space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
+    <section aria-labelledby="product-dashboard-title" className="mx-auto min-w-0 max-w-[1280px] space-y-6">
+      <header className="flex flex-col gap-5 border-b border-[var(--rift-border)] pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="eyebrow">Product workspace</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight lg:text-4xl" id="product-dashboard-title">
+          <h1
+            className="text-3xl font-semibold tracking-[-0.045em] text-[var(--rift-text)] lg:text-[2.5rem]"
+            id="product-dashboard-title"
+          >
             Dashboard
           </h1>
-          <p className="mt-2 max-w-2xl text-slate-400">
-            See what is ready, finish Product setup, and start the next safe investigation.
+          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">
+            Operational view for investigations, findings, and release readiness.
           </p>
         </div>
-        {primary ? (
-          <div className="flex w-full flex-wrap gap-3 sm:w-auto">
-            {primary.ready ? (
-              <Link className={primaryAction} to={primary.startInvestigationHref}>
-                <Rocket aria-hidden="true" size={17} /> Start Investigation
-              </Link>
-            ) : (
-              <Link className={primaryAction} to={primary.continueSetupHref}>
-                Continue Setup
-              </Link>
-            )}
-          </div>
-        ) : canCreateProject ? (
-          <Link className={primaryAction} to={dashboardRoutes.createProject}>
-            Create Project
+        {primaryAction ? (
+          <Link className="rift-button-primary shrink-0 gap-2" to={primaryAction.href}>
+            <Play aria-hidden="true" size={14} />
+            {primaryAction.label}
           </Link>
         ) : null}
       </header>
 
-      <OrganisationSummary activityAvailability={activityAvailability} dashboard={dashboard} />
+      <MetricsRail dashboard={dashboard} />
 
-      {primary ? (
-        <>
-          <FeaturedProject project={primary} />
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
-            <OnboardingProgressCard progress={primary.onboarding} />
-            <ConfigurationReadiness project={primary} />
-          </div>
-        </>
-      ) : (
-        <DashboardEmptyState
-          action={
-            canCreateProject
-              ? { href: dashboardRoutes.createProject, label: 'Create your first Project' }
-              : undefined
-          }
-          description={
-            canCreateProject
-              ? 'Projects organise safety boundaries, Environments, Journeys, and Invariants. Create one to begin Product onboarding.'
-              : 'There are no Projects in this organisation. Your current permissions allow you to view Projects but not create them.'
-          }
-          icon={<FolderKanban aria-hidden="true" size={26} />}
-          title="No Projects yet"
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]">
+        <CurrentInvestigation
+          availability={activityAvailability?.investigations ?? 'available'}
+          item={current}
         />
-      )}
+        <NeedsAttention item={attention} />
+      </div>
 
-      {dashboard.projects.length ? (
-        <ProjectOverview activityAvailability={activityAvailability} projects={dashboard.projects} />
-      ) : null}
-
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]">
         <RecentInvestigations
           availability={activityAvailability?.investigations ?? 'available'}
           items={dashboard.recentInvestigations}
         />
-        <RecentFindings
-          availability={activityAvailability?.findings ?? 'available'}
-          items={dashboard.recentFindings}
-        />
+        <ProjectReadiness projects={dashboard.projects} />
       </div>
+
+      <RecentFindings
+        availability={activityAvailability?.findings ?? 'available'}
+        items={dashboard.recentFindings}
+      />
     </section>
   );
 }
 
-function OrganisationSummary({
-  activityAvailability,
-  dashboard,
+function MetricsRail({ dashboard }: { dashboard: ReturnType<typeof createDashboardViewModel> }) {
+  const activeCount = dashboard.recentInvestigations.filter((item) => isActive(item.status)).length;
+  const entries = [
+    { label: 'Active investigations', value: String(activeCount), detail: 'Currently running', tone: activeCount ? 'strong' : 'quiet' },
+    { label: 'Recent investigations', value: String(dashboard.totals.recentInvestigationCount), detail: 'Across all Projects', tone: 'medium' },
+    { label: 'Open findings', value: String(dashboard.totals.openFindingCount), detail: 'Awaiting review', tone: dashboard.totals.openFindingCount ? 'strong' : 'quiet' },
+    { label: 'Ready projects', value: `${dashboard.totals.readyProjectCount}/${dashboard.totals.projectCount}`, detail: 'Configured to run', tone: 'medium' },
+  ] satisfies Array<{ label: string; value: string; detail: string; tone: Tone }>;
+
+  return (
+    <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {entries.map((entry) => (
+        <div className="rift-surface rounded-lg px-4 py-3.5" key={entry.label}>
+          <dt className="text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--rift-text-muted)]">
+            {entry.label}
+          </dt>
+          <dd className="mt-2 flex items-baseline justify-between gap-3">
+            <span className="text-2xl font-semibold tracking-[-0.04em] text-[var(--rift-text)]">{entry.value}</span>
+            <StatusDot tone={entry.tone} />
+          </dd>
+          <p className="mt-1 text-xs text-[var(--rift-text-muted)]">{entry.detail}</p>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function CurrentInvestigation({
+  item,
+  availability,
 }: {
-  activityAvailability: ProductDashboardProps['activityAvailability'];
-  dashboard: ReturnType<typeof createDashboardViewModel>;
+  item: DashboardInvestigationSummary | undefined;
+  availability: DashboardActivityAvailability;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 sm:p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="rounded-xl border border-cyan-900 bg-cyan-950/30 p-3 text-cyan">
-            <Building2 aria-hidden="true" size={22} />
-          </span>
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Active organisation</p>
-            <h2 className="mt-1 truncate text-xl font-black">{dashboard.organisation.name}</h2>
-          </div>
-        </div>
-        <span className="rounded-full border border-slate-700 px-3 py-1 text-xs font-black text-slate-300">
-          {dashboard.organisation.role}
-        </span>
-      </div>
-      <dl className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metric label="Projects" value={dashboard.totals.projectCount} />
-        <Metric label="Ready Projects" value={dashboard.totals.readyProjectCount} />
-        <Metric
-          label="Recent Investigations"
-          value={
-            activityAvailability?.investigations === 'unavailable'
-              ? 'Unavailable'
-              : dashboard.totals.recentInvestigationCount
-          }
-        />
-        <Metric
-          label="Open Findings"
-          value={
-            activityAvailability?.findings === 'unavailable'
-              ? 'Unavailable'
-              : dashboard.totals.openFindingCount
-          }
-        />
-      </dl>
-    </section>
-  );
-}
-
-function FeaturedProject({ project }: { project: DashboardProjectView }) {
-  const primaryDemo = Boolean(project.project.isPrimaryDemo);
-  return (
-    <article
-      className={`relative overflow-hidden rounded-2xl border p-5 sm:p-7 ${
-        primaryDemo
-          ? 'border-cyan-900/80 bg-cyan-950/20'
-          : 'border-slate-800 bg-slate-950/40'
-      }`}
-      data-testid={primaryDemo ? 'primary-demo-project' : 'featured-project'}
+    <DashboardPanel
+      action={item ? { href: dashboardRoutes.investigation(item.id), label: 'Open investigation' } : undefined}
+      eyebrow="Current investigation"
+      title={item ? compactInvestigationTitle(item.name, item.projectName) : 'No investigation running'}
     >
-      {primaryDemo ? (
-        <Sparkles aria-hidden="true" className="absolute -right-7 -top-7 text-cyan/10" size={150} />
-      ) : null}
-      <div className="relative flex flex-wrap items-start justify-between gap-5">
-        <div className="min-w-0 max-w-2xl">
-          <div className="flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full border px-3 py-1 text-xs font-black uppercase tracking-wide ${
-                primaryDemo
-                  ? 'border-cyan-800 bg-cyan-950/60 text-cyan-200'
-                  : 'border-slate-700 bg-slate-900 text-slate-300'
-              }`}
-            >
-              {primaryDemo ? 'Primary demo' : 'Featured Project'}
-            </span>
-            <ReadinessBadge ready={project.ready} />
+      {availability === 'unavailable' ? <AvailabilityNote /> : item ? (
+        <div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[var(--rift-text-secondary)]">
+            <span className="inline-flex items-center gap-2"><StatusDot tone={statusTone(item.status)} />{humanize(item.status)}</span>
+            <span>{displayProjectName(item.projectName)}</span>
+            {item.findingCount !== undefined ? <span>{pluralize(item.findingCount, 'finding')}</span> : null}
+            {item.createdAt ? <span className="inline-flex items-center gap-1.5"><Clock3 aria-hidden="true" size={14} />{formatDate(item.createdAt)}</span> : null}
           </div>
-          <h2 className="mt-4 text-2xl font-black sm:text-3xl">{project.project.name}</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">
-            {project.project.description || 'No project description.'}
-          </p>
+          <InvestigationTimeline status={item.status} />
         </div>
-        <div className="flex w-full flex-wrap gap-3 sm:w-auto">
-          <Link className={secondaryAction} to={project.projectHref}>
-            Open Project <ArrowRight aria-hidden="true" size={16} />
-          </Link>
-          {project.ready ? (
-            <Link className={primaryAction} to={project.startInvestigationHref}>
-              Start Investigation
-            </Link>
-          ) : (
-            <Link className={primaryAction} to={project.continueSetupHref}>
-              Continue Setup
-            </Link>
-          )}
-        </div>
-      </div>
-    </article>
+      ) : (
+        <EmptyCopy>Start an investigation from a ready Project when you need fresh evidence.</EmptyCopy>
+      )}
+    </DashboardPanel>
   );
 }
 
-function ConfigurationReadiness({ project }: { project: DashboardProjectView }) {
-  const unavailable = new Set(project.project.unavailableConfiguration ?? []);
-  const facts = [
-    { label: 'Safety', value: project.project.safetyConfigured ? 'Configured' : 'Required', icon: ShieldCheck },
-    { label: 'Environments', value: unavailable.has('environments') ? 'Unavailable' : readyCount(project.project.readyEnvironmentCount, project.project.totalEnvironmentCount), icon: Server },
-    { label: 'Journeys', value: unavailable.has('journeys') ? 'Unavailable' : readyCount(project.project.readyJourneyCount, project.project.totalJourneyCount), icon: Route },
-    { label: 'Invariants', value: unavailable.has('invariants') ? 'Unavailable' : readyCount(project.project.readyInvariantCount, project.project.totalInvariantCount), icon: BadgeCheck },
-  ];
+function InvestigationTimeline({ status }: { status: string }) {
+  const steps = ['Plan', 'Provision', 'Observe', 'Adapt', 'Complete'];
+  const activeIndex = timelineIndex(status);
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5 sm:p-6" data-testid="configuration-readiness">
-      <p className="eyebrow">Configuration readiness</p>
-      <div className="mt-2 flex items-center justify-between gap-3">
-        <h2 className="text-xl font-black">Launch foundation</h2>
-        <ReadinessBadge ready={project.ready} />
-      </div>
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        {facts.map(({ label, value, icon: Icon }) => (
-          <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4" key={label}>
-            <Icon aria-hidden="true" className="text-cyan" size={18} />
-            <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-500">{label}</p>
-            <p className="mt-1 font-black text-slate-200">{value}</p>
-          </div>
-        ))}
-      </div>
-      <Link
-        className={`${secondaryAction} mt-5 w-full`}
-        to={project.ready ? project.projectHref : project.continueSetupHref}
-      >
-        {project.ready ? 'Open Project' : 'Continue Setup'}
-      </Link>
-    </section>
+    <div className="mt-6 border-t border-[var(--rift-border)] pt-4">
+      <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--rift-text-muted)]">
+        Investigation timeline
+      </p>
+      <ol className="grid grid-cols-5" aria-label="Investigation timeline">
+        {steps.map((step, index) => {
+          const reached = index <= activeIndex;
+          return (
+            <li className="relative min-w-0 pr-2 last:pr-0" key={step}>
+              {index < steps.length - 1 ? (
+                <span aria-hidden="true" className={`absolute left-2 top-[3px] h-px w-[calc(100%-4px)] ${index < activeIndex ? 'bg-[var(--rift-text-secondary)]' : 'bg-[var(--rift-border-strong)]'}`} />
+              ) : null}
+              <span aria-hidden="true" className={`relative block size-[7px] rounded-full border ${reached ? 'border-[var(--rift-text)] bg-[var(--rift-text)]' : 'border-[var(--rift-border-strong)] bg-[var(--rift-surface)]'}`} />
+              <span className={`mt-2 block truncate text-[10px] uppercase tracking-[0.08em] ${reached ? 'text-[var(--rift-text-secondary)]' : 'text-[var(--rift-text-muted)]'}`}>{step}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
-function ProjectOverview({
-  activityAvailability,
-  projects,
-}: {
-  activityAvailability: ProductDashboardProps['activityAvailability'];
-  projects: DashboardProjectView[];
-}) {
+function NeedsAttention({ item }: { item: DashboardFindingSummary | DashboardProjectView | undefined }) {
+  const finding = item && 'severity' in item ? item : undefined;
+  const project = item && 'project' in item ? item : undefined;
   return (
-    <section>
-      <SectionHeading description="Product targets and their current launch readiness." title="Project overview" />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {projects.map((project) => (
-          <article className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5" key={project.project.id}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-black uppercase tracking-wide text-slate-500">
-                  {project.project.isPrimaryDemo ? 'Primary demo' : 'Project'}
-                </p>
-                <h3 className="mt-2 break-words text-lg font-black">{project.project.name}</h3>
-              </div>
-              <span className="text-sm font-black text-cyan">{project.readinessScore}%</span>
-            </div>
-            <p className="mt-2 line-clamp-2 text-sm text-slate-400">
-              {project.project.description || 'No project description.'}
-            </p>
-            <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-800">
-              <div className="h-full rounded-full bg-cyan" style={{ width: `${project.readinessScore}%` }} />
-            </div>
-            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-400">
-              <span>
-                {activityAvailability?.investigations === 'unavailable'
-                  ? 'Investigations unavailable'
-                  : `${project.project.recentInvestigationCount} investigations`}
-              </span>
-              <span>
-                {activityAvailability?.findings === 'unavailable'
-                  ? 'Findings unavailable'
-                  : `${project.project.openFindingCount} open findings`}
-              </span>
-            </div>
-            <Link className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-cyan" to={project.projectHref}>
-              View Project <ArrowRight aria-hidden="true" size={14} />
-            </Link>
-          </article>
-        ))}
-      </div>
-    </section>
+    <DashboardPanel
+      action={finding?.investigationId
+        ? { href: dashboardRoutes.finding(finding.investigationId, finding.id), label: 'Review finding' }
+        : project
+          ? { href: project.continueSetupHref, label: 'Continue setup' }
+          : undefined}
+      eyebrow="Needs attention"
+      title={finding ? compactFindingTitle(finding.title) : project ? displayProjectName(project.project.name) : 'Nothing needs attention'}
+    >
+      {finding ? (
+        <div className="space-y-2 text-sm text-[var(--rift-text-secondary)]">
+          <p className="flex items-center gap-2"><StatusDot tone="strong" />{humanize(finding.severity)} · {humanize(finding.status)}</p>
+          <p className="text-xs text-[var(--rift-text-muted)]">{displayProjectName(finding.projectName)}</p>
+        </div>
+      ) : project ? (
+        <div className="space-y-2 text-sm text-[var(--rift-text-secondary)]">
+          <p className="flex items-center gap-2"><StatusDot tone="medium" />Project setup is incomplete</p>
+          <p className="text-xs leading-5 text-[var(--rift-text-muted)]">Finish configuration before launching an investigation.</p>
+        </div>
+      ) : (
+        <EmptyCopy>All Projects are configured and no recent critical Finding requires review.</EmptyCopy>
+      )}
+    </DashboardPanel>
   );
 }
 
 function RecentInvestigations({
-  availability,
   items,
+  availability,
 }: {
-  availability: DashboardActivityAvailability;
   items: DashboardInvestigationSummary[];
+  availability: DashboardActivityAvailability;
 }) {
   return (
-    <ActivitySection description="Latest investigation activity across Product projects." title="Recent Investigations">
-      {availability === 'unavailable' ? (
-        <ActivityEmpty
-          description="The current public API does not provide an organisation-wide Investigation list. Existing Investigations remain available from their direct links."
-          icon={<FlaskConical aria-hidden="true" size={22} />}
-          title="Recent Investigations unavailable"
-        />
-      ) : items.length ? (
-        <ul className="divide-y divide-slate-800">
-          {items.map((item) => (
-            <li className="py-4 first:pt-0 last:pb-0" key={item.id}>
-              <ActivityLink href={item.href ?? dashboardRoutes.investigation(item.id)}>
-                <div className="flex min-w-0 items-start gap-3">
-                  <FlaskConical aria-hidden="true" className="mt-0.5 shrink-0 text-cyan" size={18} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="truncate font-bold">{item.projectName}</p>
-                      <StatusPill label={item.status} />
-                    </div>
-                    <p className="mt-1 truncate text-sm text-slate-300">{item.name}</p>
-                    <p className="mt-2 text-xs text-slate-500">
-                      {optionalCount(item.worldCount, 'world')} · {optionalCount(item.findingCount, 'finding')}
-                    </p>
-                    <ActivityTime value={item.createdAt} />
-                  </div>
-                </div>
-              </ActivityLink>
+    <DashboardPanel eyebrow="Activity" title="Recent investigations">
+      {availability === 'unavailable' ? <AvailabilityNote /> : items.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[580px] text-left text-sm">
+            <thead className="border-b border-[var(--rift-border)] text-[10px] uppercase tracking-[0.13em] text-[var(--rift-text-muted)]">
+              <tr>
+                <th className="pb-2.5 font-medium">Investigation</th>
+                <th className="pb-2.5 font-medium">Project</th>
+                <th className="pb-2.5 font-medium">Status</th>
+                <th className="pb-2.5 text-right font-medium">Updated</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--rift-border)]">
+              {items.map((item) => (
+                <tr key={item.id}>
+                  <td className="max-w-64 py-3 pr-4 font-medium text-[var(--rift-text)]">
+                    <Link className="block truncate hover:text-white" to={dashboardRoutes.investigation(item.id)}>{compactInvestigationTitle(item.name, item.projectName)}</Link>
+                  </td>
+                  <td className="py-3 pr-4 text-[var(--rift-text-secondary)]">{displayProjectName(item.projectName)}</td>
+                  <td className="py-3 pr-4"><span className="flex items-center gap-2 text-[var(--rift-text-secondary)]"><StatusDot tone={statusTone(item.status)} />{humanize(item.status)}</span></td>
+                  <td className="py-3 text-right text-[var(--rift-text-muted)]">{item.createdAt ? formatDate(item.createdAt) : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <EmptyCopy>No completed or active investigations have been recorded for this organisation.</EmptyCopy>
+      )}
+    </DashboardPanel>
+  );
+}
+
+function ProjectReadiness({ projects }: { projects: DashboardProjectView[] }) {
+  return (
+    <DashboardPanel eyebrow="Configuration" title="Project readiness">
+      {projects.length ? (
+        <ul className="divide-y divide-[var(--rift-border)]">
+          {projects.map((item) => (
+            <li className="py-3 first:pt-0 last:pb-0" key={item.project.id}>
+              <div className="flex items-center justify-between gap-3">
+                <Link className="min-w-0 truncate text-sm font-medium text-[var(--rift-text)] hover:text-white" to={item.projectHref}>{displayProjectName(item.project.name)}</Link>
+                <span className="flex shrink-0 items-center gap-2 text-xs text-[var(--rift-text-secondary)]"><StatusDot tone={item.ready ? 'strong' : 'medium'} />{item.ready ? 'Ready' : 'Setup'}</span>
+              </div>
+              <p className="mt-1.5 text-xs leading-5 text-[var(--rift-text-muted)]">
+                {item.project.readyEnvironmentCount}/{item.project.totalEnvironmentCount} environments · {item.project.readyJourneyCount}/{item.project.totalJourneyCount} journeys · {item.project.readyInvariantCount}/{item.project.totalInvariantCount} invariants
+              </p>
             </li>
           ))}
         </ul>
       ) : (
-        <ActivityEmpty
-          description="Start an investigation from a READY Project to see its progress here."
-          icon={<FlaskConical aria-hidden="true" size={22} />}
-          title="No Investigations yet"
-        />
+        <EmptyCopy>No Project configuration is available yet.</EmptyCopy>
       )}
-    </ActivitySection>
+    </DashboardPanel>
   );
 }
 
 function RecentFindings({
-  availability,
   items,
+  availability,
 }: {
-  availability: DashboardActivityAvailability;
   items: DashboardFindingSummary[];
+  availability: DashboardActivityAvailability;
 }) {
   return (
-    <ActivitySection description="Product risks surfaced by recent investigation evidence." title="Recent Findings">
-      {availability === 'unavailable' ? (
-        <ActivityEmpty
-          description="The current public API exposes Findings within a known Investigation, not as an organisation-wide feed. No Finding records have been inferred."
-          icon={<Search aria-hidden="true" size={22} />}
-          title="Recent Findings unavailable"
-        />
-      ) : items.length ? (
-        <ul className="divide-y divide-slate-800">
-          {items.map((item) => (
-            <li className="py-4 first:pt-0 last:pb-0" key={item.id}>
-              <ActivityLink href={item.href ?? (item.investigationId ? dashboardRoutes.finding(item.investigationId, item.id) : `/projects/${item.projectId}`)}>
-                <div className="flex min-w-0 items-start gap-3">
-                  <AlertTriangle aria-hidden="true" className="mt-0.5 shrink-0 text-amber-300" size={18} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="break-words font-bold">{item.title}</p>
-                      <SeverityPill severity={item.severity} />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-400">{item.projectName} · {item.status}</p>
-                    <ActivityTime value={item.createdAt} />
-                  </div>
-                </div>
-              </ActivityLink>
-            </li>
-          ))}
-        </ul>
+    <DashboardPanel eyebrow="Risk" title="Recent findings">
+      {availability === 'unavailable' ? <AvailabilityNote /> : items.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[660px] text-left text-sm">
+            <thead className="border-b border-[var(--rift-border)] text-[10px] uppercase tracking-[0.13em] text-[var(--rift-text-muted)]">
+              <tr><th className="pb-2.5 font-medium">Finding</th><th className="pb-2.5 font-medium">Project</th><th className="pb-2.5 font-medium">Severity</th><th className="pb-2.5 font-medium">Status</th><th className="pb-2.5 text-right font-medium">Reported</th></tr>
+            </thead>
+            <tbody className="divide-y divide-[var(--rift-border)]">
+              {items.map((item) => {
+                const href = item.investigationId ? dashboardRoutes.finding(item.investigationId, item.id) : dashboardRoutes.project(item.projectId);
+                return (
+                  <tr key={item.id}>
+                    <td className="max-w-72 py-3 pr-4 font-medium text-[var(--rift-text)]"><Link className="block truncate hover:text-white" to={href}>{compactFindingTitle(item.title)}</Link></td>
+                    <td className="py-3 pr-4 text-[var(--rift-text-secondary)]">{displayProjectName(item.projectName)}</td>
+                    <td className="py-3 pr-4"><span className="flex items-center gap-2 text-[var(--rift-text-secondary)]"><StatusDot tone={severityTone(item.severity)} />{humanize(item.severity)}</span></td>
+                    <td className="py-3 pr-4 text-[var(--rift-text-secondary)]">{humanize(item.status)}</td>
+                    <td className="py-3 text-right text-[var(--rift-text-muted)]">{item.createdAt ? formatDate(item.createdAt) : '—'}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <ActivityEmpty
-          description="Confirmed Product risks will appear here when investigations produce Findings."
-          icon={<Search aria-hidden="true" size={22} />}
-          title="No Findings yet"
-        />
+        <EmptyCopy>No recent Findings. New evidence-backed risks will appear here.</EmptyCopy>
       )}
-    </ActivitySection>
+    </DashboardPanel>
   );
 }
 
-function ActivitySection({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+function DashboardPanel({
+  eyebrow,
+  title,
+  action,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  action?: { href: string; label: string } | undefined;
+  children: ReactNode;
+}) {
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5 sm:p-6">
-      <SectionHeading description={description} title={title} />
+    <section className="rift-surface h-full rounded-xl p-5 sm:p-6">
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="eyebrow">{eyebrow}</p>
+          <h2 className="mt-1.5 truncate text-lg font-semibold tracking-[-0.025em] text-[var(--rift-text)]">{title}</h2>
+        </div>
+        {action ? (
+          <Link className="rift-button-secondary min-h-9 shrink-0 px-3 py-1.5 text-xs" to={action.href}>
+            {action.label}<ArrowRight aria-hidden="true" className="ml-1.5" size={13} />
+          </Link>
+        ) : null}
+      </div>
       {children}
     </section>
   );
 }
 
-function SectionHeading({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="mb-5">
-      <h2 className="text-xl font-black">{title}</h2>
-      <p className="mt-1 text-sm text-slate-400">{description}</p>
-    </div>
-  );
+function AvailabilityNote() {
+  return <p className="text-sm text-[var(--rift-text-muted)]">Activity is temporarily unavailable. Configuration remains available.</p>;
 }
 
-function DashboardEmptyState({ title, description, icon, action }: { title: string; description: string; icon: ReactNode; action?: { href: string; label: string } | undefined }) {
-  return (
-    <section className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/30 px-6 py-10 text-center">
-      <span className="mx-auto inline-flex rounded-xl border border-slate-800 p-3 text-cyan">{icon}</span>
-      <h2 className="mt-4 text-xl font-black">{title}</h2>
-      <p className="mx-auto mt-2 max-w-xl text-sm text-slate-400">{description}</p>
-      {action ? <Link className={`${primaryAction} mt-5`} to={action.href}>{action.label}</Link> : null}
-    </section>
-  );
+function EmptyCopy({ children }: { children: ReactNode }) {
+  return <p className="text-sm leading-6 text-[var(--rift-text-secondary)]">{children}</p>;
 }
 
-function ActivityEmpty({ title, description, icon }: { title: string; description: string; icon: ReactNode }) {
-  return (
-    <div className="rounded-xl border border-dashed border-slate-800 px-5 py-8 text-center">
-      <span className="mx-auto inline-flex text-slate-500">{icon}</span>
-      <h3 className="mt-3 font-black text-slate-200">{title}</h3>
-      <p className="mx-auto mt-1 max-w-sm text-sm text-slate-500">{description}</p>
-    </div>
-  );
+function StatusDot({ tone }: { tone: Tone }) {
+  const color = tone === 'strong'
+    ? 'border-white bg-white'
+    : tone === 'medium'
+      ? 'border-zinc-400 bg-zinc-400'
+      : 'border-zinc-600 bg-zinc-600';
+  return <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full border ${color}`} />;
 }
 
-function Metric({ label, value }: { label: string; value: number | string }) {
-  return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-      <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-2 text-2xl font-black text-slate-100">{value}</dd>
-    </div>
-  );
+function isActive(status: string) {
+  return ['RUNNING', 'QUEUED', 'PLANNING', 'PROVISIONING', 'OBSERVING', 'ADAPTING', 'REPRODUCING', 'MINIMISING'].includes(status);
 }
 
-function ReadinessBadge({ ready }: { ready: boolean }) {
-  return ready ? (
-    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-800 bg-emerald-950/40 px-3 py-1 text-xs font-black text-emerald-300">
-      <CircleCheck aria-hidden="true" size={13} /> READY
-    </span>
-  ) : (
-    <span className="rounded-full border border-amber-800 bg-amber-950/40 px-3 py-1 text-xs font-black text-amber-300">
-      SETUP REQUIRED
-    </span>
-  );
+function isAttention(severity: string) {
+  return ['CRITICAL', 'HIGH'].includes(severity);
 }
 
-function StatusPill({ label }: { label: string }) {
-  return <span className="rounded-full border border-slate-700 px-2.5 py-1 text-[11px] font-black text-slate-300">{label}</span>;
+function statusTone(status: string): Tone {
+  if (status === 'COMPLETED') return 'strong';
+  if (status === 'FAILED' || status === 'CANCELLED') return 'quiet';
+  if (isActive(status)) return 'medium';
+  return 'quiet';
 }
 
-function SeverityPill({ severity }: { severity: string }) {
-  const tone = severity === 'CRITICAL' || severity === 'HIGH' ? 'border-red-800 bg-red-950/30 text-red-300' : severity === 'MEDIUM' ? 'border-amber-800 bg-amber-950/30 text-amber-300' : 'border-slate-700 text-slate-300';
-  return <span className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${tone}`}>{severity}</span>;
+function severityTone(severity: string): Tone {
+  if (isAttention(severity)) return 'strong';
+  if (severity === 'MEDIUM') return 'medium';
+  return 'quiet';
 }
 
-function ActivityLink({ href, children }: { href: string; children: ReactNode }) {
-  return <Link className="group block rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan" to={href}>{children}</Link>;
+function timelineIndex(status: string) {
+  if (status === 'PLANNING' || status === 'QUEUED') return 0;
+  if (status === 'PROVISIONING') return 1;
+  if (status === 'OBSERVING' || status === 'RUNNING') return 2;
+  if (['ADAPTING', 'REPRODUCING', 'MINIMISING'].includes(status)) return 3;
+  if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(status)) return 4;
+  return 0;
 }
 
-function ActivityTime({ value }: { value: string | undefined }) {
-  if (!value) return null;
-  return (
-    <p className="mt-2 flex items-center gap-1 text-xs text-slate-600">
-      <Clock3 aria-hidden="true" size={12} /> {formatDate(value)}
-    </p>
-  );
+function humanize(value: string) {
+  return value.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function readyCount(ready: number, total: number) {
-  return `${ready}/${total} READY`;
-}
-
-function optionalCount(value: number | undefined, singular: string) {
-  if (value === undefined) return `${singular} count unavailable`;
-  return `${value} ${singular}${value === 1 ? '' : 's'}`;
+function pluralize(value: number, label: string) {
+  return `${value} ${label}${value === 1 ? '' : 's'}`;
 }
 
 function formatDate(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return 'Date unavailable';
-  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(parsed);
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '—' : new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' }).format(date);
 }
