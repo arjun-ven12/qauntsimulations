@@ -231,8 +231,8 @@ describe('experiment planning contract', () => {
     estimatedComputeUnits: 0,
   } as const;
 
-  it('accepts deterministic, OpenAI, and fallback planner provenance/status metadata', () => {
-    for (const aiProvider of ['DETERMINISTIC', 'OPENAI', 'FALLBACK'] as const) {
+  it('accepts deterministic, OpenAI, ai&, Kimi, and fallback planner provenance/status metadata', () => {
+    for (const aiProvider of ['DETERMINISTIC', 'OPENAI', 'AIAND', 'KIMI', 'FALLBACK'] as const) {
       expect(
         experimentPlanSchema.parse({
           ...basePlan,

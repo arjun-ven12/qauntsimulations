@@ -2,7 +2,7 @@ import { isAbsolute, resolve } from 'node:path';
 import { loadEnvFile } from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { createDatabaseClient } from '@taskos/database';
-import { KimiClient, KimiExperimentPlanner, OpenAIClient, OpenAIExperimentPlanner, type ExperimentPlanner } from '@taskos/ai-providers';
+import { AiAndClient, AiAndExperimentPlanner, KimiClient, KimiExperimentPlanner, OpenAIClient, OpenAIExperimentPlanner, type ExperimentPlanner } from '@taskos/ai-providers';
 import { createApplication } from './app.js';
 import { loadEnvironment } from './config/env.js';
 import { logger } from './core/logging/logger.js';
@@ -93,10 +93,10 @@ const repairVerificationRepository = new PrismaRepairVerificationReadRepository(
 const evidenceIntelligenceRepository = new EvidenceIntelligenceRepository(database);
 const openAIPlannerModel = env.OPENAI_PLANNER_MODEL ?? env.OPENAI_MODEL_PLANNER;
 let selectedPlanner: ExperimentPlanner | undefined;
-const plannerModel: string | undefined = env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_MODEL : env.PLANNER_PROVIDER === 'openai' ? openAIPlannerModel : undefined;
-const plannerTimeoutMs = env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_TIMEOUT_MS : env.OPENAI_PLANNER_TIMEOUT_MS;
-const plannerMaximumAttempts = env.PLANNER_PROVIDER === 'kimi' ? 1 : env.OPENAI_PLANNER_MAX_RETRIES + 1;
-const plannerMaximumOutputTokens = env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_MAX_OUTPUT_TOKENS : env.OPENAI_PLANNER_MAX_OUTPUT_TOKENS;
+const plannerModel: string | undefined = env.PLANNER_PROVIDER === 'AIAND' ? env.AIAND_MODEL : env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_MODEL : env.PLANNER_PROVIDER === 'openai' ? openAIPlannerModel : undefined;
+const plannerTimeoutMs = env.PLANNER_PROVIDER === 'AIAND' ? env.AIAND_REQUEST_TIMEOUT_MS : env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_TIMEOUT_MS : env.OPENAI_PLANNER_TIMEOUT_MS;
+const plannerMaximumAttempts = env.PLANNER_PROVIDER === 'openai' ? env.OPENAI_PLANNER_MAX_RETRIES + 1 : 1;
+const plannerMaximumOutputTokens = env.PLANNER_PROVIDER === 'AIAND' ? env.AIAND_MAX_COMPLETION_TOKENS : env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_MAX_OUTPUT_TOKENS : env.OPENAI_PLANNER_MAX_OUTPUT_TOKENS;
 if (env.PLANNER_PROVIDER === 'openai' && env.OPENAI_API_KEY) {
   selectedPlanner = new OpenAIExperimentPlanner(
       new OpenAIClient({
@@ -119,6 +119,18 @@ if (env.PLANNER_PROVIDER === 'kimi' && env.MOONSHOT_API_KEY) {
     env.KIMI_MODEL,
   );
 }
+if (env.PLANNER_PROVIDER === 'AIAND' && env.AIAND_PLANNER_ENABLED && env.AIAND_API_KEY) {
+  selectedPlanner = new AiAndExperimentPlanner(
+    new AiAndClient({
+      apiKey: env.AIAND_API_KEY,
+      baseUrl: env.AIAND_BASE_URL,
+      timeoutMs: env.AIAND_REQUEST_TIMEOUT_MS,
+      maxRetries: 0,
+    }),
+    env.AIAND_MODEL,
+    env.AIAND_API_SURFACE,
+  );
+}
 const investigationPlanningService = new InvestigationPlanningService(
   {
     requestedProvider: env.PLANNER_PROVIDER,
@@ -131,6 +143,12 @@ const investigationPlanningService = new InvestigationPlanningService(
     maxProviderAttempts: plannerMaximumAttempts,
     maxOutputTokens: plannerMaximumOutputTokens,
     ...(plannerModel ? { model: plannerModel } : {}),
+    ...(env.PLANNER_PROVIDER === 'AIAND' ? {
+      reasoningEffort: env.AIAND_REASONING_EFFORT,
+      apiSurface: env.AIAND_API_SURFACE,
+      streamingEnabled: env.AIAND_STREAMING_ENABLED,
+      idleTimeoutMs: env.AIAND_IDLE_TIMEOUT_MS,
+    } : {}),
   },
   new DeterministicExperimentPlanner(new DeterministicExperimentPlanService(2)),
   selectedPlanner,

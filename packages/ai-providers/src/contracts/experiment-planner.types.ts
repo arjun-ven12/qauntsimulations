@@ -1,7 +1,7 @@
 import type { z } from 'zod';
 import type { generatedExperimentPlanSchema } from '../schemas/generated-experiment-plan.schema.js';
 
-export type PlannerProvider = 'DETERMINISTIC' | 'OPENAI' | 'KIMI' | 'FALLBACK';
+export type PlannerProvider = 'DETERMINISTIC' | 'OPENAI' | 'KIMI' | 'AIAND' | 'FALLBACK';
 export type PlannerStatus =
   | 'PENDING'
   | 'GENERATING'
@@ -50,6 +50,10 @@ export interface PlannerContext {
   timeoutMs: number;
   maxOutputTokens: number;
   maxAttempts: number;
+  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high';
+  apiSurface?: 'CHAT_COMPLETIONS';
+  streamingEnabled?: boolean;
+  idleTimeoutMs?: number;
   signal?: AbortSignal;
 }
 
@@ -67,6 +71,7 @@ export interface PlannerGenerationResult {
   output?: GeneratedExperimentPlan;
   durationMs: number;
   usage?: PlannerUsage;
+  providerDiagnostics?: unknown;
   error?: {
     code: string;
     message: string;

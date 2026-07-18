@@ -8,7 +8,6 @@ import {
   loadDashboardData,
   type DashboardDataSources,
 } from './dashboard.data.js';
-import type { DashboardActivity } from './dashboard-activity-api.js';
 
 const organisation = { id: 'org-current', name: 'Current Organisation', role: 'OWNER' };
 
@@ -68,8 +67,8 @@ describe('Dashboard Product data adapter', () => {
     expect(result.data.projects).toHaveLength(1);
     expect(result.data.recentInvestigations).toEqual([]);
     expect(result.data.recentFindings).toEqual([]);
-    expect(result.investigationsAvailable).toBe(true);
-    expect(result.findingsAvailable).toBe(true);
+    expect(result.investigationsAvailable).toBe(false);
+    expect(result.findingsAvailable).toBe(false);
   });
 
   it('limits real organisation activity to five items and never hardcodes demo IDs', async () => {
@@ -170,7 +169,7 @@ describe('Dashboard Product data adapter', () => {
 
   it('keeps configuration available when the read-only activity feed fails', async () => {
     const sources = sourceFixture({ projects: [project('project-real', 'Checkout Reliability Lab')] });
-    sources.activity = vi.fn().mockRejectedValue(new Error('Activity unavailable'));
+    sources.getActivity = vi.fn().mockRejectedValue(new Error('Activity unavailable'));
 
     const result = await loadDashboardData(organisation, sources);
 

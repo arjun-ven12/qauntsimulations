@@ -59,6 +59,8 @@ export interface ExperimentPlanWorldResponse {
 }
 
 export interface ExperimentPlanResponse {
+  investigationId?: string | undefined;
+  planId?: string | undefined;
   objective: string;
   journeyId: string;
   scenarioId: string;
@@ -76,10 +78,14 @@ export interface ExperimentPlanResponse {
   aiProvider?: string | undefined;
   estimatedComputeUnits?: number | undefined;
   plannerStatus?: string | undefined;
+  schemaPassed?: boolean | undefined;
+  safetyPassed?: boolean | undefined;
   plannerMetadata?: Record<string, unknown> | undefined;
 }
 
 export const experimentPlanResponseSchema: z.ZodType<ExperimentPlanResponse, z.ZodTypeDef, unknown> = z.object({
+  investigationId: z.string().optional(),
+  planId: z.string().optional(),
   objective: z.string(),
   journeyId: z.string(),
   scenarioId: z.string(),
@@ -97,6 +103,8 @@ export const experimentPlanResponseSchema: z.ZodType<ExperimentPlanResponse, z.Z
   aiProvider: z.string().optional(),
   estimatedComputeUnits: z.number().optional(),
   plannerStatus: z.string().optional(),
+  schemaPassed: z.boolean().optional(),
+  safetyPassed: z.boolean().optional(),
   plannerMetadata: jsonRecordSchema.optional(),
 });
 

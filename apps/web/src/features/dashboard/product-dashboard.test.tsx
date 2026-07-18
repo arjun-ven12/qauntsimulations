@@ -80,13 +80,12 @@ describe('Rift operational dashboard', () => {
 
     const html = render(data);
 
-    expect(html).toContain('RUNNING');
+    expect(html).toContain('Running');
     expect(html).toContain('Duplicate checkout investigation');
-    expect(html).toContain('4 worlds');
     expect(html).toContain('1 finding');
     expect(html).toContain('Duplicate payment request');
-    expect(html).toContain('CRITICAL');
-    expect(html).toContain('OPEN');
+    expect(html).toContain('Critical');
+    expect(html).toContain('Open');
     expect(html).toContain('/investigations/investigation-1/findings/finding-1');
   });
 

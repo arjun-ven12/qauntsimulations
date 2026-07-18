@@ -67,6 +67,17 @@ class FakeKimiPlanner implements ExperimentPlanner {
   }
 }
 
+class FakeAiAndPlanner implements ExperimentPlanner {
+  readonly provider = 'AIAND' as const;
+  request?: PlannerRequest;
+  constructor(private readonly output: unknown = generatedPlan, private readonly fail = false) {}
+  async generatePlan(request: PlannerRequest, _context: PlannerContext) {
+    this.request = request;
+    if (this.fail) return { provider: 'AIAND' as const, status: 'FAILED' as const, model: 'moonshotai/kimi-k2.7-code', durationMs: 11, usage: { providerRequestCount: 1 }, error: { code: 'TIMEOUT', message: 'ai& planner request timed out.' } };
+    return { provider: 'AIAND' as const, status: 'VALIDATING' as const, model: 'moonshotai/kimi-k2.7-code', output: generatedExperimentPlanSchema.parse(this.output), durationMs: 11, usage: { providerRequestCount: 1, inputTokens: 12, outputTokens: 34, totalTokens: 46 } };
+  }
+}
+
 describe('InvestigationPlanningService', () => {
   it('uses deterministic planning by default', async () => {
     const result = await new InvestigationPlanningService(options).plan(demoCreateInvestigationInput, scope);
@@ -91,6 +102,29 @@ describe('InvestigationPlanningService', () => {
     expect(result.effectiveProvider).toBe('KIMI');
     expect(result.plan.planner).toMatchObject({ requestedProvider: 'KIMI', effectiveProvider: 'KIMI', model: 'kimi-k2.6', plannerStatus: 'ACCEPTED' });
     expect(kimi.request?.controls.maximumWorlds).toBe(demoCreateInvestigationInput.scenario.controls.maximumWorlds);
+  });
+
+  it('selects ai& explicitly and preserves Kimi-through-ai& provenance', async () => {
+    const aiand = new FakeAiAndPlanner();
+    const result = await new InvestigationPlanningService({ ...options, requestedProvider: 'AIAND', model: 'moonshotai/kimi-k2.7-code' }, undefined, aiand).plan(demoCreateInvestigationInput, scope);
+    expect(result.effectiveProvider).toBe('AIAND');
+    expect(result.plan.planner).toMatchObject({
+      requestedProvider: 'AIAND',
+      effectiveProvider: 'AIAND',
+      model: 'moonshotai/kimi-k2.7-code',
+      plannerStatus: 'ACCEPTED',
+      usage: { totalTokens: 46 },
+    });
+    expect(aiand.request?.controls.maximumWorlds).toBe(demoCreateInvestigationInput.scenario.controls.maximumWorlds);
+  });
+
+  it('uses deterministic fallback when selected ai& configuration is missing or fails', async () => {
+    const missing = await new InvestigationPlanningService({ ...options, requestedProvider: 'AIAND' }).plan(demoCreateInvestigationInput, scope);
+    expect(missing).toMatchObject({ requestedProvider: 'AIAND', effectiveProvider: 'FALLBACK', plannerStatus: 'FALLBACK_USED' });
+    expect(missing.plan.planner?.fallbackReason).toBe('ai& planner is not configured.');
+    const failed = await new InvestigationPlanningService({ ...options, requestedProvider: 'AIAND' }, undefined, new FakeAiAndPlanner(generatedPlan, true)).plan(demoCreateInvestigationInput, scope);
+    expect(failed).toMatchObject({ requestedProvider: 'AIAND', effectiveProvider: 'FALLBACK', plannerStatus: 'FALLBACK_USED' });
+    expect(failed.fallbackReason).toContain('ai& planner request timed out');
   });
 
   it('uses deterministic fallback when selected Kimi configuration is missing', async () => {

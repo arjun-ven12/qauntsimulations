@@ -2,25 +2,63 @@
 
 ## Role and boundary
 
-Kimi is an optional provider for Rift's initial experiment plan only. Persisted Scenario, Environment, Journey, Invariant, control, and Project Safety context is converted to the existing provider-neutral `PlannerRequest`. Kimi does not evaluate invariants, confirm findings, control adaptive reproduction or minimisation, execute workers, automate browsers, or determine report truth. Runtime evidence remains authoritative.
+Kimi is used by Rift only for the initial experiment plan. Persisted Scenario, Environment, Journey, Invariant, controls, and Project Safety context are converted into the existing provider-neutral `PlannerRequest`. Kimi does not evaluate invariants, confirm findings, control adaptive reproduction or minimisation, execute workers, automate browsers, or determine report truth. Runtime evidence remains authoritative.
+
+## Current serving provider
+
+Rift’s current Kimi planner integration uses Kimi K2.7 Code through ai&:
+
+- Serving provider: `ai&`
+- Model developer: `Moonshot AI`
+- Model: `moonshotai/kimi-k2.7-code`
+- Fallback: Rift deterministic planner
+
+The direct Moonshot adapter remains available as an optional alternative provider for compatibility, but the demo Kimi path should use `PLANNER_PROVIDER=AIAND`.
 
 ## Configuration
 
-- `PLANNER_PROVIDER=kimi` explicitly selects Kimi. A Moonshot key alone never changes the provider.
-- `MOONSHOT_API_KEY` supplies the server-only bearer credential.
-- `KIMI_BASE_URL` defaults to `https://api.moonshot.ai/v1`, matching the current Kimi API Platform endpoint.
-- `KIMI_MODEL` defaults to `kimi-k2.6` and accepts sponsor-specific model identifiers.
-- `KIMI_TIMEOUT_MS` defaults to 60000 and is bounded from 1000 through 120000 milliseconds.
-- `KIMI_MAX_OUTPUT_TOKENS` defaults to 3000 and is bounded from 500 through 10000 tokens.
-- `PLANNER_FALLBACK_ENABLED` retains the established deterministic fallback policy.
+Use exactly this environment format for ai&:
 
-Secrets belong in the deployment secret store or an uncommitted local environment file. They are passed only to the OpenAI SDK constructor and are never included in planner messages, public configuration, events, logs, or error summaries.
+```env
+PLANNER_PROVIDER=AIAND
+AIAND_API_KEY=<secret>
+AIAND_BASE_URL=https://api.aiand.com/v1
+AIAND_MODEL=moonshotai/kimi-k2.7-code
+AIAND_API_SURFACE=CHAT_COMPLETIONS
+AIAND_STREAMING_ENABLED=true
+AIAND_REQUEST_TIMEOUT_MS=240000
+AIAND_IDLE_TIMEOUT_MS=45000
+AIAND_MAX_COMPLETION_TOKENS=6000
+AIAND_REASONING_EFFORT=none
+AIAND_PLANNER_ENABLED=true
+```
+
+`AIAND_API_KEY` belongs only in a deployment secret store or an uncommitted local `.env`. It is passed only to the OpenAI SDK constructor and is never included in planner messages, public configuration, events, logs, or error summaries.
+
+Existing direct Moonshot variables are still optional for the legacy provider:
+
+- `PLANNER_PROVIDER=kimi`
+- `MOONSHOT_API_KEY`
+- `KIMI_BASE_URL`
+- `KIMI_MODEL`
+- `KIMI_TIMEOUT_MS`
+- `KIMI_MAX_OUTPUT_TOKENS`
 
 ## Architecture and request flow
 
-`KimiExperimentPlanner` implements the same `ExperimentPlanner` contract as `OpenAIExperimentPlanner`. `KimiClient` uses the existing OpenAI Node SDK with a configurable `baseURL` and calls Chat Completions. The server constructs one selected planner adapter at startup; the investigation planning service remains the single planning pipeline.
+`AiAndExperimentPlanner` implements the same `ExperimentPlanner` contract as `OpenAIExperimentPlanner` and `KimiExperimentPlanner`. `AiAndClient` uses the existing OpenAI Node SDK with a configurable `baseURL` and calls streaming Chat Completions. The server constructs one selected planner adapter at startup; `InvestigationPlanningService` remains the single planning pipeline.
 
-The request uses the configured model, bounded `max_completion_tokens`, JSON-object response mode, one request, and the configured timeout. It disables K2.6 thinking with `thinking: { type: "disabled" }`, sent as a narrowly typed provider-specific POST-body field (the OpenAI Node SDK equivalent of `extra_body`). It intentionally omits `temperature`: Kimi K2.6 uses provider-fixed temperature values and rejects `temperature: 0`. The shared planning prompt is reused and receives sanitized persisted launch context: environment origin without URL credentials, capabilities, Journey steps without fill values, action types, selected Invariants, maximum worlds, supported dimensions and faults, and Project Safety constraints.
+The ai& request uses portable OpenAI-compatible fields:
+
+- `model`
+- `messages`
+- `max_completion_tokens`
+- `reasoning_effort: "none"`
+- `stream: true`
+- `stream_options: { include_usage: true }`
+- `response_format: { type: "json_schema", json_schema: { name: "rift_experiment_strategy", strict: true, ... } }`
+
+It intentionally does not send Moonshot-specific `thinking` or `extra_body` fields. The model only generates a minimal strategy object: summary, hypothesis, selected dimensions, and exactly four compact worlds. RIFT then deterministically maps that output into the existing full experiment-plan shape before Zod and Project Safety validation. If ai& rejects strict JSON Schema for a selected compatible model, the adapter performs one bounded compatibility retry using `response_format: { type: "json_object" }`; the same conservative parser, Zod schema, and Project Safety checks still apply. The compact prompt receives sanitized persisted launch context: objective, invariant, environment origin without URL credentials, allowed dimensions, world count, and brief Project Safety constraints.
 
 The response flow is:
 
@@ -34,22 +72,31 @@ Arbitrary prose and mixed prose/JSON are rejected. Model output cannot add Journ
 
 ## Failure handling and fallback
 
-The Kimi adapter emits safe categories: `AUTHENTICATION_ERROR`, `RATE_LIMITED`, `TIMEOUT`, `PROVIDER_UNAVAILABLE`, `MALFORMED_RESPONSE`, `PLAN_SCHEMA_INVALID`, and `UNKNOWN_PROVIDER_ERROR`. Policy rejection is recorded as `PLAN_SAFETY_INVALID`. Raw provider bodies, headers, prompts, and stacks are not persisted or exposed.
+The ai& adapter emits safe categories: `AUTHENTICATION_ERROR`, `RATE_LIMITED`, `TIMEOUT`, `MODEL_UNAVAILABLE`, `PROVIDER_UNAVAILABLE`, `RESPONSE_FORMAT_UNSUPPORTED`, `REFUSAL`, `MALFORMED_RESPONSE`, `PLAN_SCHEMA_INVALID`, and `UNKNOWN_PROVIDER_ERROR`. Empty visible completions include only safe diagnostics such as finish reason, content length, token counts, and reasoning-token counts. Policy rejection is recorded as `PLAN_SAFETY_INVALID`. Raw provider bodies, headers, prompts, hidden reasoning, and stacks are not persisted or exposed.
 
-Prompt 14 makes one Kimi request and configures SDK retries to zero. When fallback is enabled, missing configuration, provider errors, malformed output, schema failure, or safety failure selects the existing deterministic plan. It does not automatically try OpenAI. OpenAI selection and its existing retry settings remain unchanged.
+When fallback is enabled, missing configuration, provider errors, malformed output, schema failure, model unavailability, or safety failure selects the existing deterministic plan. Rift does not automatically switch from ai& to direct Moonshot or OpenAI.
 
 ## Provenance
 
-Persisted plan JSON records `requestedProvider`, `effectiveProvider`, `plannerStatus`, configured `model`, safe `fallbackReason` when relevant, `generatedAt`, durations, validation counts, and token usage when supplied. The relational `ExperimentPlan.provider` uses the existing `KIMI` enum value for accepted Kimi plans; no Prisma migration is required.
+Persisted plan JSON records:
 
-Experiment Plan and Live WorldLab display Kimi as “Kimi AI”, the model, validation status, whether fallback was used, and the deterministic fallback source. Final reports already consume the persisted planner object, so Kimi provenance follows the existing report path without report-generation changes.
+- `requestedProvider: "AIAND"`
+- `effectiveProvider: "AIAND"` on success
+- `modelProvider: "MOONSHOTAI"`
+- `model: "moonshotai/kimi-k2.7-code"`
+- `plannerStatus`
+- safe `fallbackReason` when relevant
+- `generatedAt`
+- generation duration
+- validation counts
+- token usage when supplied
+
+When fallback is used, persisted metadata records `requestedProvider: "AIAND"`, `effectiveProvider: "FALLBACK"`, and a safe fallback reason.
+
+The legacy relational `ExperimentPlan.provider` enum does not currently contain `AIAND`; no Prisma migration is required for this integration because the authoritative public provenance is stored in the existing JSON planner metadata and returned through the Experiment Plan DTO.
+
+Experiment Plan and Live WorldLab display successful ai& plans as “Kimi via ai&”, including model, validation status, fallback state, serving provider, and model developer.
 
 ## Local verification
 
-Run the mock tests first. A real planner-only check is permitted only when both `MOONSHOT_API_KEY` is available and `PLANNER_PROVIDER=kimi`. Use the configured SDK client, verify model access, submit sanitized local context, and stop after schema and safety validation. Do not launch an investigation or Daytona for this check.
-
-## Known limitations
-
-- The installed OpenAI Node SDK does not name provider extensions `extra_body`; it serializes additional POST parameters directly. Rift supplies only Kimi's `thinking` extension through a narrow local type and keeps temperature at its provider-defined value.
-- Kimi JSON Schema structured outputs are not assumed; Rift uses JSON-object mode followed by its own authoritative Zod validation.
-- Availability, sponsor model access, and rate limits remain provider-account concerns.
+Run mock tests first. A real planner-only check is permitted only when `AIAND_API_KEY` is available and `PLANNER_PROVIDER=AIAND`. Use the configured SDK client to list models, verify `moonshotai/kimi-k2.7-code`, submit sanitized local context, and stop after schema/safety validation and initial-world persistence. Do not run Daytona for this check.

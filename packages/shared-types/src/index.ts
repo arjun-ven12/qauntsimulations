@@ -148,7 +148,7 @@ export const experimentPlanSchema = z.object({
   invariants: z.array(invariantSchema),
   worlds: z.array(worldConfigSchema),
   planningExplanation: z.string(),
-  aiProvider: z.enum(['DETERMINISTIC', 'OPENAI', 'KIMI', 'MOCK', 'FALLBACK']),
+  aiProvider: z.enum(['DETERMINISTIC', 'OPENAI', 'KIMI', 'AIAND', 'MOCK', 'FALLBACK']),
   estimatedComputeUnits: z.number().nonnegative(),
   plannerStatus: z
     .enum([

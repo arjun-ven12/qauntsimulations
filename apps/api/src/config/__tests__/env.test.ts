@@ -141,6 +141,40 @@ describe('API environment security', () => {
     expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, PLANNER_PROVIDER: 'unknown' }).success).toBe(false);
   });
 
+  it('validates explicit ai& planner configuration with exact environment names', () => {
+    const configured = apiEnvironmentSchema.parse({
+      ...requiredEnvironment,
+      PLANNER_PROVIDER: 'AIAND',
+      AIAND_API_KEY: 'test-key',
+      AIAND_BASE_URL: 'https://api.aiand.com/v1',
+      AIAND_MODEL: 'moonshotai/kimi-k2.7-code',
+      AIAND_API_SURFACE: 'CHAT_COMPLETIONS',
+      AIAND_STREAMING_ENABLED: 'true',
+      AIAND_REQUEST_TIMEOUT_MS: '240000',
+      AIAND_IDLE_TIMEOUT_MS: '45000',
+      AIAND_MAX_COMPLETION_TOKENS: '6000',
+      AIAND_REASONING_EFFORT: 'none',
+      AIAND_PLANNER_ENABLED: 'true',
+    });
+    expect(configured.PLANNER_PROVIDER).toBe('AIAND');
+    expect(configured.AIAND_BASE_URL).toBe('https://api.aiand.com/v1');
+    expect(configured.AIAND_MODEL).toBe('moonshotai/kimi-k2.7-code');
+    expect(configured.AIAND_API_SURFACE).toBe('CHAT_COMPLETIONS');
+    expect(configured.AIAND_STREAMING_ENABLED).toBe(true);
+    expect(configured.AIAND_REQUEST_TIMEOUT_MS).toBe(240_000);
+    expect(configured.AIAND_IDLE_TIMEOUT_MS).toBe(45_000);
+    expect(configured.AIAND_MAX_COMPLETION_TOKENS).toBe(6_000);
+    expect(configured.AIAND_REASONING_EFFORT).toBe('none');
+    expect(configured.AIAND_PLANNER_ENABLED).toBe(true);
+    expect(Object.keys(configured)).not.toContain('PUBLIC_AIAND_API_KEY');
+    expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, PLANNER_PROVIDER: 'AIAND', AIAND_PLANNER_ENABLED: 'true' }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, PLANNER_PROVIDER: 'AIAND', AIAND_API_KEY: 'test-key', AIAND_PLANNER_ENABLED: 'false' }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, PLANNER_PROVIDER: 'AIAND', AIAND_API_KEY: 'test-key', AIAND_BASE_URL: 'http://api.aiand.com/v1', AIAND_PLANNER_ENABLED: 'true' }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, PLANNER_PROVIDER: 'AIAND', AIAND_API_KEY: 'test-key', AIAND_PLANNER_ENABLED: 'true', AIAND_REQUEST_TIMEOUT_MS: '301000' }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, PLANNER_PROVIDER: 'AIAND', AIAND_API_KEY: 'test-key', AIAND_PLANNER_ENABLED: 'true', AIAND_API_SURFACE: 'RESPONSES' }).success).toBe(false);
+    expect(apiEnvironmentSchema.safeParse({ ...requiredEnvironment, PLANNER_PROVIDER: 'AIAND', AIAND_API_KEY: 'test-key', AIAND_PLANNER_ENABLED: 'true', AIAND_REASONING_EFFORT: 'max' }).success).toBe(false);
+  });
+
   it('does not select Kimi merely because its key exists', () => {
     expect(apiEnvironmentSchema.parse({ ...requiredEnvironment, MOONSHOT_API_KEY: 'test-key' }).PLANNER_PROVIDER).toBe('deterministic');
   });
