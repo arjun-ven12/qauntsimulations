@@ -53,4 +53,20 @@ describe('Rift monochrome design foundation', () => {
     expect(layout).toContain('rift-surface-raised');
     expect(layout).toContain('<ContextualNavigation />');
   });
+
+  it('gives editable controls a visible resting boundary and keyboard focus treatment', () => {
+    const styles = source('apps/web/src/styles/index.css');
+    for (const affordance of [
+      "input:not([type='checkbox']):not([type='radio']):not([type='hidden'])",
+      'border: 1px solid #303030',
+      'border-radius: 8px',
+      'background: #0b0b0b',
+      ':focus-visible',
+      '.rift-choice-control',
+      '.rift-editable-row',
+      'input:-webkit-autofill',
+    ]) {
+      expect(styles).toContain(affordance);
+    }
+  });
 });

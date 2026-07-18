@@ -273,7 +273,10 @@ export function SafetySettingsPage() {
             <legend className="text-sm font-bold">Allowed HTTP methods</legend>
             <div className="mt-2 flex flex-wrap gap-3">
               {methods.map((method) => (
-                <label className="flex items-center gap-2 text-sm" key={method}>
+                <label
+                  className="rift-choice-control flex min-h-11 items-center gap-2 px-3 text-sm"
+                  key={method}
+                >
                   <input
                     checked={value.allowedHttpMethods.includes(method)}
                     onChange={(event) =>
@@ -346,7 +349,7 @@ export function SafetySettingsPage() {
           <ul className="mt-4 space-y-3" data-testid="prohibited-actions">
             {value.prohibitedActions.map((action, index) => (
               <li
-                className="grid min-w-0 gap-2 rounded-lg border border-slate-800 p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
+                className="rift-editable-row grid min-w-0 gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_auto]"
                 key={index}
               >
                 {canManage ? (
@@ -460,7 +463,7 @@ function SafetyToggle({
   onChange(value: boolean): void;
 }) {
   return (
-    <label className="flex items-center gap-3 text-sm">
+    <label className="rift-choice-control flex min-h-11 items-center gap-3 px-3 text-sm">
       <input
         checked={checked}
         disabled={disabled}

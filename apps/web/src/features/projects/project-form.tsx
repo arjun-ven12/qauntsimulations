@@ -664,7 +664,7 @@ function ReferenceSection<T extends CredentialReference | EndpointReference>({
       {items.length === 0 ? <p className="text-sm text-slate-500">{emptyLabel}</p> : null}
       {items.map((item, index) => (
         <div
-          className="grid gap-3 rounded-xl border border-slate-800 p-4 md:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)_auto]"
+          className="rift-editable-row grid gap-3 p-4 md:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)_auto]"
           key={index}
         >
           <Field label="Label">

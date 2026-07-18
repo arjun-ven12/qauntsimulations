@@ -7,6 +7,7 @@ import { useAuthStore } from '../../stores/auth.store.js';
 import type { Journey } from './journey-api.js';
 import { JourneyForm } from './journey-form.js';
 import { checkoutTemplate } from './journey-form.model.js';
+import { JourneyOverviewPage } from './journey-overview.page.js';
 import { JourneySettingsPage } from './journey-settings.page.js';
 import { JourneysPage } from './journeys.page.js';
 import { NewJourneyPage } from './new-journey.page.js';
@@ -37,7 +38,7 @@ describe('Journey frontend pages', () => {
     expect(html).toContain('New Journey');
     expect(html).toContain('Ordered steps');
     expect(html).toContain('Completion condition');
-    expect(html).toContain('Journey preview');
+    expect(html).toContain('Execution path');
     expect(html).toContain('Validation and review');
   });
 
@@ -54,6 +55,23 @@ describe('Journey frontend pages', () => {
     expect(html).toContain('Journey Settings');
     expect(html).toContain('Checkout Purchase Flow');
     expect(html).toContain('customer@example.test');
+  });
+
+  it('renders the Journey overview as one human-readable execution path', () => {
+    setRole('OWNER');
+    const client = queryClient();
+    client.setQueryData(['journey', 'project-1', 'journey-1'], journey());
+    client.setQueryData(['environments', 'project-1'], [environment()]);
+    const html = renderPage(
+      <JourneyOverviewPage />,
+      '/projects/project-1/journeys/journey-1',
+      client,
+    );
+    expect(html).toContain('Execution path');
+    expect(html).toContain('Open application');
+    expect(html).toContain('Verify completion');
+    expect(html).toContain('Journey execution path');
+    expect(html).not.toContain('Execution graph');
   });
 
   it.each(['MEMBER', 'VIEWER'] as const)('renders a clear read-only %s experience', (role) => {
@@ -85,7 +103,7 @@ describe('Journey frontend pages', () => {
     );
     expect(html).toContain('min-w-0');
     expect(html).toContain('md:grid-cols-2');
-    expect(html).toContain('lg:grid-cols-2');
+    expect(html).toContain('sm:grid-cols-3');
     expect(html).not.toMatch(/min-w-\[[0-9]/);
   });
 });
@@ -97,6 +115,7 @@ function renderPage(element: React.ReactNode, location: string, client = queryCl
         <Routes>
           <Route path="/projects/:projectId/journeys" element={element} />
           <Route path="/projects/:projectId/journeys/new" element={element} />
+          <Route path="/projects/:projectId/journeys/:journeyId" element={element} />
           <Route path="/projects/:projectId/journeys/:journeyId/settings" element={element} />
         </Routes>
       </MemoryRouter>

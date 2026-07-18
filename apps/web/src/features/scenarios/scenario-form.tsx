@@ -72,8 +72,7 @@ export function ScenarioForm({
     currentPayload,
   );
   const customised = Boolean(
-    appliedPreset &&
-      isScenarioPresetCustomised(appliedPreset.payload, currentPayload),
+    appliedPreset && isScenarioPresetCustomised(appliedPreset.payload, currentPayload),
   );
 
   const change = (next: ScenarioFormValue) => {
@@ -149,7 +148,7 @@ export function ScenarioForm({
             const ready = environment.validationStatus === 'READY';
             return (
               <label
-                className={`min-w-0 rounded-xl border p-4 ${ready ? 'border-slate-700' : 'border-amber-900 bg-amber-950/20'}`}
+                className={`rift-choice-control min-w-0 p-4 ${ready ? '' : 'border-amber-900 bg-amber-950/20'}`}
                 key={environment.id}
               >
                 <div className="flex min-w-0 items-start gap-3">
@@ -196,7 +195,7 @@ export function ScenarioForm({
                 : 'Different Environment';
             return (
               <label
-                className={`min-w-0 rounded-xl border p-4 ${selectable ? 'border-slate-700' : 'border-slate-800 opacity-70'}`}
+                className={`rift-choice-control min-w-0 p-4 ${selectable ? '' : 'opacity-70'}`}
                 key={journey.id}
               >
                 <div className="flex min-w-0 items-start gap-3">
@@ -210,9 +209,12 @@ export function ScenarioForm({
                   <div className="min-w-0">
                     <p className="break-words font-black">{journey.name}</p>
                     <p className="mt-1 break-words text-sm text-slate-400">
-                      {journey.validationStatus} · {journey.state} · {journey.steps.length} executable steps
+                      {journey.validationStatus} · {journey.state} · {journey.steps.length}{' '}
+                      executable steps
                     </p>
-                    <p className={`mt-2 text-sm ${selectable ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    <p
+                      className={`mt-2 text-sm ${selectable ? 'text-emerald-300' : 'text-amber-300'}`}
+                    >
                       {compatibility}
                     </p>
                   </div>
@@ -233,7 +235,7 @@ export function ScenarioForm({
             const selectable = isInvariantSelectable(invariant);
             return (
               <label
-                className={`min-w-0 rounded-xl border p-4 ${selectable ? 'border-slate-700' : 'border-slate-800 opacity-70'}`}
+                className={`rift-choice-control min-w-0 p-4 ${selectable ? '' : 'opacity-70'}`}
                 key={invariant.id}
               >
                 <div className="flex min-w-0 items-start gap-3">
@@ -318,7 +320,9 @@ export function ScenarioForm({
               : 'LAUNCH_FAILED'}
           </p>
           <p className="mt-2 break-words text-sm text-slate-300">{launchError.message}</p>
-          <p className="mt-2 text-sm text-slate-500">Your Scenario selections and prompt are preserved.</p>
+          <p className="mt-2 text-sm text-slate-500">
+            Your Scenario selections and prompt are preserved.
+          </p>
         </section>
       ) : null}
 
@@ -334,7 +338,9 @@ export function ScenarioForm({
           </button>
           <button
             className={primaryButton}
-            disabled={!readyForCurrentPayload || preflightPending || launchPending || localLaunchPending}
+            disabled={
+              !readyForCurrentPayload || preflightPending || launchPending || localLaunchPending
+            }
             onClick={() => void launch()}
             type="button"
           >
@@ -342,14 +348,24 @@ export function ScenarioForm({
           </button>
         </div>
         {!readyForCurrentPayload ? (
-          <p className="mt-3 text-sm text-slate-400">Launch requires a READY preflight for the current payload.</p>
+          <p className="mt-3 text-sm text-slate-400">
+            Launch requires a READY preflight for the current payload.
+          </p>
         ) : null}
       </section>
     </div>
   );
 }
 
-function FormSection({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function FormSection({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="card min-w-0 space-y-5">
       <div>
@@ -362,5 +378,9 @@ function FormSection({ title, description, children }: { title: string; descript
 }
 
 function InlineError({ message }: { message: string }) {
-  return <p className="text-sm text-red-300" role="alert">{message}</p>;
+  return (
+    <p className="text-sm text-red-300" role="alert">
+      {message}
+    </p>
+  );
 }

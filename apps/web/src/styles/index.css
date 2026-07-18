@@ -49,26 +49,89 @@
   button {
     font-family: inherit;
   }
-  input,
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
   textarea,
   select {
-    @apply rounded-lg px-3 py-2 outline-none;
-    border-color: var(--rift-border);
-    background: var(--rift-surface);
+    @apply min-h-11 px-3 py-2 outline-none;
+    border: 1px solid #303030;
+    border-radius: 8px;
+    background: #0b0b0b;
     color: var(--rift-text);
+    transition:
+      border-color 180ms ease,
+      box-shadow 180ms ease,
+      background-color 180ms ease;
+  }
+  input[type='checkbox'],
+  input[type='radio'] {
+    width: 1rem;
+    height: 1rem;
+    flex: 0 0 auto;
+    border: 1px solid #303030;
+    background: #0b0b0b;
+    accent-color: #f5f5f5;
   }
   input::placeholder,
   textarea::placeholder {
     color: var(--rift-text-muted);
   }
-  input:focus,
-  textarea:focus,
-  select:focus {
-    border-color: var(--rift-border-strong);
+  input:not([type='checkbox']):not([type='radio']):focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    border-color: #737373;
     box-shadow: 0 0 0 3px rgb(255 255 255 / 0.08);
+  }
+  input[type='checkbox']:focus-visible,
+  input[type='radio']:focus-visible {
+    outline: 2px solid #a1a1aa;
+    outline-offset: 3px;
+  }
+  input[aria-invalid='true'],
+  textarea[aria-invalid='true'],
+  select[aria-invalid='true'] {
+    border-color: var(--status-fail-border);
+  }
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    cursor: not-allowed;
+    background: #090909;
+    color: var(--rift-text-muted);
+    opacity: 0.72;
+  }
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  textarea:-webkit-autofill,
+  select:-webkit-autofill {
+    -webkit-text-fill-color: var(--rift-text);
+    box-shadow: 0 0 0 1000px #0b0b0b inset;
+    caret-color: var(--rift-text);
   }
 }
 @layer components {
+  .rift-choice-control {
+    border: 1px solid #303030;
+    border-radius: 8px;
+    background: #0b0b0b;
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      box-shadow 180ms ease;
+  }
+  .rift-choice-control:hover:not(:has(input:disabled)) {
+    border-color: var(--rift-border-strong);
+    background: var(--rift-surface-raised);
+  }
+  .rift-choice-control:focus-within {
+    border-color: #737373;
+    box-shadow: 0 0 0 3px rgb(255 255 255 / 0.08);
+  }
+  .rift-editable-row {
+    border: 1px solid #303030;
+    border-radius: 8px;
+    background: #090909;
+  }
   .card {
     @apply rounded-xl p-5;
     border-color: var(--rift-border);
@@ -117,17 +180,46 @@
     background: var(--rift-surface-raised);
     color: var(--rift-text-secondary);
   }
-  .rift-status--pass { border-color: color-mix(in srgb, var(--rift-pass) 45%, var(--rift-border)); color: var(--rift-pass); }
-  .rift-status--warning { border-color: color-mix(in srgb, var(--rift-warning) 45%, var(--rift-border)); color: var(--rift-warning); }
-  .rift-status--fail { border-color: color-mix(in srgb, var(--rift-fail) 45%, var(--rift-border)); color: var(--rift-fail); }
+  .rift-status--pass {
+    border-color: color-mix(in srgb, var(--rift-pass) 45%, var(--rift-border));
+    color: var(--rift-pass);
+  }
+  .rift-status--warning {
+    border-color: color-mix(in srgb, var(--rift-warning) 45%, var(--rift-border));
+    color: var(--rift-warning);
+  }
+  .rift-status--fail {
+    border-color: color-mix(in srgb, var(--rift-fail) 45%, var(--rift-border));
+    color: var(--rift-fail);
+  }
   .rift-semantic-status {
     @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
   }
-  .rift-semantic-status--pass { border-color: var(--status-pass-border); background: var(--status-pass-bg); color: var(--status-pass); }
-  .rift-semantic-status--running { border-color: var(--status-running-border); background: var(--status-running-bg); color: var(--status-running); }
-  .rift-semantic-status--pending { border-color: var(--status-pending-border); background: var(--status-pending-bg); color: var(--status-pending); }
-  .rift-semantic-status--fail { border-color: var(--status-fail-border); background: var(--status-fail-bg); color: var(--status-fail); }
-  .rift-semantic-status--neutral { border-color: var(--status-neutral-border); background: var(--status-neutral-bg); color: var(--status-neutral); }
+  .rift-semantic-status--pass {
+    border-color: var(--status-pass-border);
+    background: var(--status-pass-bg);
+    color: var(--status-pass);
+  }
+  .rift-semantic-status--running {
+    border-color: var(--status-running-border);
+    background: var(--status-running-bg);
+    color: var(--status-running);
+  }
+  .rift-semantic-status--pending {
+    border-color: var(--status-pending-border);
+    background: var(--status-pending-bg);
+    color: var(--status-pending);
+  }
+  .rift-semantic-status--fail {
+    border-color: var(--status-fail-border);
+    background: var(--status-fail-bg);
+    color: var(--status-fail);
+  }
+  .rift-semantic-status--neutral {
+    border-color: var(--status-neutral-border);
+    background: var(--status-neutral-bg);
+    color: var(--status-neutral);
+  }
   .badge {
     @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
     border-color: var(--rift-border);

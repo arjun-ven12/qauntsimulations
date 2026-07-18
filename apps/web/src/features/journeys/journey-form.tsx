@@ -3,10 +3,7 @@ import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { environmentApi } from '../../services/environment-api.js';
 import { Field, primaryButton, secondaryButton } from '../projects/project-ui.js';
-import type {
-  JourneyInput,
-  JourneyValidationResult,
-} from './journey-api.js';
+import type { JourneyInput, JourneyValidationResult } from './journey-api.js';
 import {
   addStep,
   changeAction,
@@ -103,7 +100,10 @@ export function JourneyForm({
         </div>
       ) : null}
       {error ? (
-        <div className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-sm text-red-300" role="alert">
+        <div
+          className="rounded-xl border border-red-900 bg-red-950/40 p-4 text-sm text-red-300"
+          role="alert"
+        >
           {error}
         </div>
       ) : null}
@@ -264,7 +264,11 @@ export function JourneyForm({
                     ...value,
                     completionCondition:
                       event.target.value === 'TEXT'
-                        ? { type: 'TEXT', selector: value.completionCondition.selector, expectedText: '' }
+                        ? {
+                            type: 'TEXT',
+                            selector: value.completionCondition.selector,
+                            expectedText: '',
+                          }
                         : { type: 'VISIBLE', selector: value.completionCondition.selector },
                   })
                 }
@@ -275,7 +279,7 @@ export function JourneyForm({
               </select>
             </Field>
             <Field
-              description="Prefer stable data-testid selectors. Example: [data-testid=&quot;add-to-cart&quot;]"
+              description='Prefer stable data-testid selectors. Example: [data-testid="add-to-cart"]'
               error={submitted ? errors.completionSelector : undefined}
               label="Completion selector"
             >
@@ -338,11 +342,11 @@ export function JourneyForm({
             label="Completion"
             value={`${value.completionCondition.type}: ${value.completionCondition.selector || 'Not set'}`}
           />
-          <ReviewItem label="Validation state" value={validation?.status ?? value.validationStatus} />
           <ReviewItem
-            label="Safety compatibility"
-            value={safetySummary(validation)}
+            label="Validation state"
+            value={validation?.status ?? value.validationStatus}
           />
+          <ReviewItem label="Safety compatibility" value={safetySummary(validation)} />
         </dl>
         {validation ? <ValidationChecks result={validation} /> : null}
         <div className="flex flex-wrap gap-3">
@@ -409,7 +413,7 @@ function StepCard({
   onRemove(): void;
 }) {
   return (
-    <article className="min-w-0 rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+    <article className="rift-editable-row min-w-0 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cyan/15 text-sm font-black text-cyan">
@@ -422,10 +426,18 @@ function StepCard({
         </div>
         {!readOnly ? (
           <div className="flex flex-wrap gap-2">
-            <IconButton disabled={index === 0} label={`Move step ${index + 1} up`} onClick={() => onMove(-1)}>
+            <IconButton
+              disabled={index === 0}
+              label={`Move step ${index + 1} up`}
+              onClick={() => onMove(-1)}
+            >
               <ArrowUp size={16} />
             </IconButton>
-            <IconButton disabled={index === total - 1} label={`Move step ${index + 1} down`} onClick={() => onMove(1)}>
+            <IconButton
+              disabled={index === total - 1}
+              label={`Move step ${index + 1} down`}
+              onClick={() => onMove(1)}
+            >
               <ArrowDown size={16} />
             </IconButton>
             <IconButton label={`Duplicate step ${index + 1}`} onClick={onDuplicate}>
@@ -482,7 +494,7 @@ function StepCard({
         <ActionFields errorFor={errorFor} onChange={onChange} readOnly={readOnly} step={step} />
       </div>
 
-      <div className="mt-5 rounded-lg border border-slate-800 bg-panel/60 p-4">
+      <div className="rift-choice-control mt-5 p-4">
         <label className="flex items-start gap-3">
           <input
             checked={Boolean(step.metadata.screenshotCheckpoint)}
@@ -495,7 +507,7 @@ function StepCard({
                   ...step.metadata,
                   screenshotCheckpoint: event.target.checked || undefined,
                   screenshotCheckpointName: event.target.checked
-                    ? step.metadata.screenshotCheckpointName ?? step.metadata.name ?? ''
+                    ? (step.metadata.screenshotCheckpointName ?? step.metadata.name ?? '')
                     : undefined,
                 },
               })
@@ -642,46 +654,108 @@ function IconButton({
 export function JourneyPreview({ value }: { value: JourneyFormValue }) {
   return (
     <FormSection
-      description="A readable sequence and a simple execution graph—without hidden branching."
-      title="Journey preview"
+      description="The exact linear route Rift will execute, from entry point to completion evidence."
+      title="Execution path"
     >
-      <div className="grid min-w-0 gap-6 lg:grid-cols-2">
-        <div>
-          <h3 className="font-bold">Human-readable sequence</h3>
-          <ol className="mt-3 space-y-2">
-            {value.steps.map((step, index) => (
-              <li className="flex min-w-0 gap-3 text-sm" key={step.clientId}>
-                <span className="text-slate-500">{index + 1}.</span>
-                <span className="min-w-0 break-words">{stepDescription(step)}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
-        <div>
-          <h3 className="font-bold">Execution graph</h3>
-          <div className="mt-3 flex flex-col items-center text-center text-sm">
-            <GraphNode label="Start" />
-            {value.steps.map((step, index) => (
-              <div className="flex w-full flex-col items-center" key={step.clientId}>
-                <span aria-hidden="true" className="py-1 text-cyan">↓</span>
-                <GraphNode label={`Step ${index + 1}: ${step.action}`} />
-              </div>
-            ))}
-            <span aria-hidden="true" className="py-1 text-cyan">↓</span>
-            <GraphNode label="Complete" />
-          </div>
-        </div>
+      <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--rift-border)] bg-[var(--rift-border)] sm:grid-cols-3">
+        <PathSummary label="Entry point" value={value.startPath || 'Not configured'} />
+        <PathSummary label="Executable steps" value={String(value.steps.length)} />
+        <PathSummary label="Completion" value={completionLabel(value)} />
       </div>
+      <ol className="relative mt-6 space-y-0" aria-label="Journey execution path">
+        <ExecutionPathItem
+          detail={value.startPath || 'No entry point configured'}
+          index="00"
+          label="Open application"
+          tone="start"
+        />
+        {value.steps.map((step, index) => (
+          <ExecutionPathItem
+            detail={stepDescription(step)}
+            index={String(index + 1).padStart(2, '0')}
+            key={step.clientId}
+            label={actionLabel(step.action)}
+          />
+        ))}
+        <ExecutionPathItem
+          detail={completionDetail(value)}
+          index={String(value.steps.length + 1).padStart(2, '0')}
+          label="Verify completion"
+          last
+          tone="complete"
+        />
+      </ol>
     </FormSection>
   );
 }
 
-function GraphNode({ label }: { label: string }) {
+function PathSummary({ label, value }: { label: string; value: string }) {
   return (
-    <div className="w-full max-w-sm break-words rounded-lg border border-cyan/30 bg-cyan/5 px-4 py-2 font-bold">
-      {label}
+    <div className="min-w-0 bg-[var(--rift-surface-raised)] px-4 py-3">
+      <dt className="text-[10px] font-semibold uppercase tracking-[0.13em] text-[var(--rift-text-muted)]">
+        {label}
+      </dt>
+      <dd className="mt-1 truncate text-sm font-semibold text-[var(--rift-text)]" title={value}>
+        {value}
+      </dd>
     </div>
   );
+}
+
+function ExecutionPathItem({
+  index,
+  label,
+  detail,
+  last = false,
+  tone = 'step',
+}: {
+  index: string;
+  label: string;
+  detail: string;
+  last?: boolean;
+  tone?: 'start' | 'step' | 'complete';
+}) {
+  return (
+    <li className="relative grid min-w-0 grid-cols-[36px_minmax(0,1fr)] gap-3 pb-3 last:pb-0">
+      {!last ? (
+        <span
+          aria-hidden="true"
+          className="absolute left-[17px] top-8 h-[calc(100%-20px)] w-px bg-[var(--rift-border-strong)]"
+        />
+      ) : null}
+      <span
+        className={`relative z-[1] flex size-9 items-center justify-center rounded-full border text-[10px] font-semibold ${tone === 'complete' ? 'border-[var(--status-pass-border)] bg-[var(--status-pass-bg)] text-[var(--status-pass)]' : tone === 'start' ? 'border-[var(--status-running-border)] bg-[var(--status-running-bg)] text-[var(--status-running)]' : 'border-[var(--rift-border-strong)] bg-[var(--rift-surface-raised)] text-[var(--rift-text-secondary)]'}`}
+      >
+        {index}
+      </span>
+      <div className="min-w-0 rounded-lg border border-[var(--rift-border)] bg-[var(--rift-surface-raised)] px-4 py-3">
+        <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <h3 className="text-sm font-semibold text-[var(--rift-text)]">{label}</h3>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--rift-text-muted)]">
+            {tone === 'step' ? `Step ${Number(index)}` : tone}
+          </span>
+        </div>
+        <p className="mt-1 break-words text-sm leading-5 text-[var(--rift-text-secondary)]">
+          {detail}
+        </p>
+      </div>
+    </li>
+  );
+}
+
+function actionLabel(action: BuilderStep['action']) {
+  return actions.find((candidate) => candidate.value === action)?.label ?? action;
+}
+
+function completionLabel(value: JourneyFormValue) {
+  return value.completionCondition.type === 'TEXT' ? 'Expected text' : 'Visible element';
+}
+
+function completionDetail(value: JourneyFormValue) {
+  const condition = value.completionCondition;
+  if (condition.type === 'TEXT')
+    return `${condition.selector || 'No selector'} contains “${condition.expectedText || 'No expected text'}”`;
+  return `${condition.selector || 'No selector'} is visible`;
 }
 
 function ReviewItem({ label, value }: { label: string; value: string }) {
