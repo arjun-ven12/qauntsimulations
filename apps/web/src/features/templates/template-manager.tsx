@@ -3,7 +3,7 @@ import { useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'rea
 import type { z } from 'zod';
 import { primaryButton, secondaryButton } from '../projects/project-ui.js';
 import type { RiftTemplate, TemplateCategory } from './template-model.js';
-import { parseImportedTemplate, parseTemplatePayload } from './template-storage.js';
+import { parseImportedTemplate, parseTemplatePayload } from './template-json.js';
 import { useTemplateLibrary } from './use-template-library.js';
 
 export function TemplateManager<TPayload>({
@@ -62,7 +62,7 @@ export function TemplateManager<TPayload>({
     showMessage(`${template.name} applied.`);
   }
 
-  function saveCurrent() {
+  async function saveCurrent() {
     if (!name.trim()) {
       showMessage('Enter a name for the custom template.', true);
       return;
@@ -73,11 +73,11 @@ export function TemplateManager<TPayload>({
     }
     try {
       const payload = parseTemplatePayload<TPayload>(value, payloadSchema);
-      const template = library.create({ name, payload });
+      const template = await library.create({ name, payload });
       setName('');
       setSelectedId(template.id);
       setApplied(template);
-      showMessage('Custom template saved in this browser.');
+      showMessage('Custom template saved to Rift.');
     } catch (error) {
       showMessage(error instanceof Error ? error.message : 'Template could not be saved.', true);
     }
@@ -90,13 +90,13 @@ export function TemplateManager<TPayload>({
     try {
       const parsed = parseImportedTemplate<TPayload>(await file.text(), category, payloadSchema);
       if (nameExists(parsed.name)) throw new Error('Template names must be unique.');
-      const template = library.create({
+      const template = await library.create({
         name: parsed.name,
         ...(parsed.description ? { description: parsed.description } : {}),
         payload: parsed.payload,
       });
       setSelectedId(template.id);
-      showMessage('Template imported and saved in this browser.');
+      showMessage('Template imported and saved to Rift.');
     } catch (error) {
       showMessage(error instanceof Error ? error.message : 'Template import failed.', true);
     }
@@ -121,7 +121,7 @@ export function TemplateManager<TPayload>({
             Templates
           </h2>
           <p className="mt-1 text-sm text-[var(--rift-text-secondary)]">
-            Preview and apply built-in or browser-saved configurations.
+            Preview and apply built-in or account-saved configurations.
           </p>
         </div>
         {applied ? (
@@ -182,7 +182,7 @@ export function TemplateManager<TPayload>({
               ) : null}
               {template.source === 'CUSTOM' ? (
                 <span className="mt-2 block text-[10px] text-[var(--rift-text-muted)]">
-                  Saved in this browser
+                  Saved to Rift
                 </span>
               ) : null}
             </button>
@@ -191,6 +191,9 @@ export function TemplateManager<TPayload>({
             <p className="rounded-lg border border-dashed border-[var(--rift-border)] p-4 text-sm text-[var(--rift-text-muted)]">
               No templates match this search.
             </p>
+          ) : null}
+          {library.loading ? (
+            <p className="text-sm text-[var(--rift-text-muted)]">Loading saved templates…</p>
           ) : null}
         </div>
 
@@ -222,15 +225,23 @@ export function TemplateManager<TPayload>({
                 <>
                   <button
                     className={secondaryButton}
-                    onClick={() => {
+                    disabled={library.mutating}
+                    onClick={async () => {
                       const next = window.prompt('Rename template', selected.name)?.trim();
                       if (!next) return;
                       if (nameExists(next, selected.id)) {
                         showMessage('Template names must be unique.', true);
                         return;
                       }
-                      library.update(selected.id, { name: next });
-                      showMessage('Template renamed.');
+                      try {
+                        await library.update(selected.id, { name: next });
+                        showMessage('Template renamed.');
+                      } catch (error) {
+                        showMessage(
+                          error instanceof Error ? error.message : 'Template rename failed.',
+                          true,
+                        );
+                      }
                     }}
                     type="button"
                   >
@@ -238,14 +249,22 @@ export function TemplateManager<TPayload>({
                   </button>
                   <button
                     className={secondaryButton}
-                    onClick={() => {
-                      const copy = library.create({
-                        name: availableCopyName(selected.name, templates),
-                        ...(selected.description ? { description: selected.description } : {}),
-                        payload: selected.payload,
-                      });
-                      setSelectedId(copy.id);
-                      showMessage('Template duplicated.');
+                    disabled={library.mutating}
+                    onClick={async () => {
+                      try {
+                        const copy = await library.create({
+                          name: availableCopyName(selected.name, templates),
+                          ...(selected.description ? { description: selected.description } : {}),
+                          payload: selected.payload,
+                        });
+                        setSelectedId(copy.id);
+                        showMessage('Template duplicated.');
+                      } catch (error) {
+                        showMessage(
+                          error instanceof Error ? error.message : 'Template duplication failed.',
+                          true,
+                        );
+                      }
                     }}
                     type="button"
                   >
@@ -253,11 +272,20 @@ export function TemplateManager<TPayload>({
                   </button>
                   <button
                     className={secondaryButton}
-                    onClick={() => {
+                    disabled={library.mutating}
+                    onClick={async () => {
                       if (window.confirm(`Delete “${selected.name}”?`)) {
-                        library.remove(selected.id);
-                        setSelectedId(builtIns[0]?.id ?? '');
-                        if (applied?.id === selected.id) setApplied(null);
+                        try {
+                          await library.remove(selected.id);
+                          setSelectedId(builtIns[0]?.id ?? '');
+                          if (applied?.id === selected.id) setApplied(null);
+                          showMessage('Template deleted.');
+                        } catch (error) {
+                          showMessage(
+                            error instanceof Error ? error.message : 'Template deletion failed.',
+                            true,
+                          );
+                        }
                       }
                     }}
                     type="button"
@@ -278,7 +306,12 @@ export function TemplateManager<TPayload>({
           placeholder="Custom template name"
           value={name}
         />
-        <button className={secondaryButton} onClick={saveCurrent} type="button">
+        <button
+          className={secondaryButton}
+          disabled={library.mutating}
+          onClick={() => void saveCurrent()}
+          type="button"
+        >
           <Save aria-hidden="true" className="mr-2" size={15} /> Save current
         </button>
         <button
@@ -308,6 +341,13 @@ export function TemplateManager<TPayload>({
           role={messageIsError ? 'alert' : 'status'}
         >
           {message}
+        </p>
+      ) : null}
+      {library.error && !message ? (
+        <p className="text-sm text-[var(--status-fail)]" role="alert">
+          {library.error instanceof Error
+            ? library.error.message
+            : 'Saved templates could not be loaded.'}
         </p>
       ) : null}
     </section>

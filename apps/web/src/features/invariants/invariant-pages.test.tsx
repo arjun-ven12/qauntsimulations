@@ -117,11 +117,13 @@ describe('Invariant frontend pages', () => {
 
   it('uses responsive wrapping and stacked template structures without fixed-width controls', () => {
     const html = renderToStaticMarkup(
-      <InvariantForm
-        initial={templateValue(invariantTemplates[1]!)}
-        onSubmit={() => undefined}
-        pending={false}
-      />,
+      <QueryClientProvider client={queryClient()}>
+        <InvariantForm
+          initial={templateValue(invariantTemplates[1]!)}
+          onSubmit={() => undefined}
+          pending={false}
+        />
+      </QueryClientProvider>,
     );
     expect(html).toContain('min-w-0');
     expect(html).toContain('md:grid-cols-2');

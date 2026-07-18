@@ -79,14 +79,16 @@ describe('Scenario frontend', () => {
 
   it('has no fixture Journey or Invariant fallback when persisted lists are empty', () => {
     const html = renderToStaticMarkup(
-      <ScenarioForm
-        environments={[environment()]}
-        initial={{ ...validScenario(), journeyId: '', invariantIds: [] }}
-        invariants={[]}
-        journeys={[]}
-        onLaunch={async () => undefined}
-        onPreflight={async () => readyResult()}
-      />,
+      <QueryClientProvider client={queryClient()}>
+        <ScenarioForm
+          environments={[environment()]}
+          initial={{ ...validScenario(), journeyId: '', invariantIds: [] }}
+          invariants={[]}
+          journeys={[]}
+          onLaunch={async () => undefined}
+          onPreflight={async () => readyResult()}
+        />
+      </QueryClientProvider>,
     );
     expect(html).not.toContain('Complete checkout');
     expect(html).not.toContain('Single checkout submission');
@@ -158,14 +160,16 @@ function renderForm(
   ],
 ) {
   return renderToStaticMarkup(
-    <ScenarioForm
-      environments={[environment()]}
-      initial={validScenario()}
-      invariants={extraInvariants}
-      journeys={[journey()]}
-      onLaunch={async () => undefined}
-      onPreflight={async () => readyResult()}
-    />,
+    <QueryClientProvider client={queryClient()}>
+      <ScenarioForm
+        environments={[environment()]}
+        initial={validScenario()}
+        invariants={extraInvariants}
+        journeys={[journey()]}
+        onLaunch={async () => undefined}
+        onPreflight={async () => readyResult()}
+      />
+    </QueryClientProvider>,
   );
 }
 

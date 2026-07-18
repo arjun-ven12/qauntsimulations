@@ -7,18 +7,20 @@ import { TemplateManager } from './template-manager.js';
 describe('TemplateManager', () => {
   it('renders searchable immutable built-ins and complete custom-template actions', () => {
     const html = renderToStaticMarkup(
-      <TemplateManager
-        builtIns={[
-          builtInTemplate('PROJECT', 'project-blank', 'Blank project', 'Start clean.', {
-            name: '',
-          }),
-        ]}
-        category="PROJECT"
-        onApply={() => undefined}
-        payloadSchema={z.object({ name: z.string() })}
-        preview={(payload) => <span>{payload.name || 'Untitled'}</span>}
-        value={{ name: 'Current project' }}
-      />,
+      <QueryClientProvider client={new QueryClient()}>
+        <TemplateManager
+          builtIns={[
+            builtInTemplate('PROJECT', 'project-blank', 'Blank project', 'Start clean.', {
+              name: '',
+            }),
+          ]}
+          category="PROJECT"
+          onApply={() => undefined}
+          payloadSchema={z.object({ name: z.string() })}
+          preview={(payload) => <span>{payload.name || 'Untitled'}</span>}
+          value={{ name: 'Current project' }}
+        />
+      </QueryClientProvider>,
     );
     expect(html).toContain('Search templates');
     expect(html).toContain('Filter templates');
@@ -31,3 +33,4 @@ describe('TemplateManager', () => {
     expect(html).not.toContain('Delete');
   });
 });
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
