@@ -57,6 +57,8 @@ export function ProductDashboard({ data, activityAvailability, canCreateProject 
         <ProjectReadiness projects={dashboard.projects} />
       </div>
 
+      <ExecutionOverview overview={dashboard.executionOverview} />
+
       <RecentFindings items={dashboard.recentFindings} availability={activityAvailability?.findings ?? 'available'} />
     </section>
   );
@@ -96,6 +98,70 @@ function ProjectReadiness({ projects }: { projects: DashboardProjectView[] }) {
   return <DashboardSection eyebrow="Configuration" title="Project readiness" action={projects[0] ? { href: projects[0].projectHref, label: 'Open project' } : undefined}>
     {projects.length ? <ul className="divide-y divide-[var(--rift-border)]">{projects.map((item) => <li className="flex items-center justify-between gap-3 py-3 first:pt-0 last:pb-0" key={item.project.id}><div className="min-w-0"><p className="truncate text-sm font-medium text-[var(--rift-text)]">{item.project.name}</p><p className="mt-1 text-xs text-[var(--rift-text-muted)]">{item.project.readyEnvironmentCount}/{item.project.totalEnvironmentCount} environments · {item.project.readyJourneyCount}/{item.project.totalJourneyCount} journeys · {item.project.readyInvariantCount}/{item.project.totalInvariantCount} invariants</p></div><span className="flex shrink-0 items-center gap-2 text-xs font-medium text-[var(--rift-text-secondary)]"><StatusDot tone={item.ready ? 'pass' : 'warning'} />{item.ready ? 'Ready' : 'Setup'}</span></li>)}</ul> : <EmptyCopy>Create a Project to establish a safe investigation boundary.</EmptyCopy>}
   </DashboardSection>;
+}
+
+function ExecutionOverview({
+  overview,
+}: {
+  overview: ReturnType<typeof createDashboardViewModel>['executionOverview'];
+}) {
+  const metrics = [
+    {
+      label: 'Completion rate',
+      value: overview.completionRate === null ? '—' : `${overview.completionRate}%`,
+      detail: overview.completionRate === null ? 'No concluded investigations' : 'Concluded recent investigations',
+    },
+    {
+      label: 'Open findings',
+      value: String(overview.openFindingCount),
+      detail: 'Across recent investigations',
+      tone: overview.openFindingCount ? 'fail' : 'pass',
+    },
+    {
+      label: 'Repairs verified',
+      value: '—',
+      detail: 'Not available in this view',
+    },
+  ] satisfies Array<{ label: string; value: string; detail: string; tone?: Tone }>;
+
+  return (
+    <section aria-labelledby="execution-overview-title" className="rift-surface overflow-hidden rounded-xl">
+      <div className="grid xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.42fr)]">
+        <div className="flex min-h-64 flex-col justify-between p-6 sm:p-7">
+          <div>
+            <p className="eyebrow">Execution overview</p>
+            <h2 className="sr-only" id="execution-overview-title">Execution overview</h2>
+          </div>
+          <div>
+            <p className="text-6xl font-semibold tracking-[-0.07em] text-[var(--rift-text)] sm:text-7xl">
+              {overview.worldsExecuted ?? '—'}
+            </p>
+            <p className="mt-4 text-sm text-[var(--rift-text-secondary)]">
+              {overview.worldsExecuted === null
+                ? 'World execution volume is not available for recent investigations.'
+                : 'Worlds executed across recent investigations'}
+            </p>
+          </div>
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-[var(--rift-text-muted)]">
+            Recent execution volume
+          </p>
+        </div>
+
+        <dl className="divide-y divide-[var(--rift-border)] border-t border-[var(--rift-border)] xl:border-l xl:border-t-0">
+          {metrics.map((metric) => (
+            <div className="flex min-h-[calc(16rem/3)] flex-col justify-center px-6 py-5 sm:px-7" key={metric.label}>
+              <dt className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.12em] text-[var(--rift-text-muted)]">
+                {metric.tone ? <StatusDot tone={metric.tone} /> : null}
+                {metric.label}
+              </dt>
+              <dd className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[var(--rift-text)]">{metric.value}</dd>
+              <p className="mt-1 text-xs text-[var(--rift-text-muted)]">{metric.detail}</p>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </section>
+  );
 }
 
 function RecentFindings({ items, availability }: { items: DashboardFindingSummary[]; availability: DashboardActivityAvailability }) {

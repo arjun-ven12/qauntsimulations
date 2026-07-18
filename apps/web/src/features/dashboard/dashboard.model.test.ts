@@ -63,6 +63,40 @@ describe('Product Dashboard view model', () => {
     expect(dashboard.recentInvestigations.map((item) => item.id)).toEqual(['newer', 'older']);
     expect(dashboard.recentFindings.map((item) => item.id)).toEqual(['newer', 'older']);
   });
+
+  it('derives execution overview metrics only from available recent activity', () => {
+    const dashboard = createDashboardViewModel({
+      organisation: { id: 'org-1', name: 'Organisation', role: 'ADMIN' },
+      projects: [project('project-1', 'Project', false, '2026-07-19T00:00:00.000Z')],
+      recentInvestigations: [
+        { ...investigation('completed', '2026-07-19T00:00:00.000Z'), status: 'COMPLETED', worldCount: 8 },
+        { ...investigation('failed', '2026-07-18T00:00:00.000Z'), status: 'FAILED', worldCount: 5 },
+        { ...investigation('running', '2026-07-17T00:00:00.000Z'), status: 'RUNNING' },
+      ],
+      recentFindings: [
+        { ...finding('open', '2026-07-19T00:00:00.000Z'), status: 'OPEN' },
+        { ...finding('closed', '2026-07-18T00:00:00.000Z'), status: 'CLOSED' },
+      ],
+    });
+
+    expect(dashboard.executionOverview).toEqual({
+      worldsExecuted: 13,
+      completionRate: 50,
+      openFindingCount: 1,
+      repairsVerified: null,
+    });
+  });
+
+  it('leaves unavailable execution metrics blank instead of inventing values', () => {
+    const dashboard = createDashboardViewModel(seededDemoDashboardData);
+
+    expect(dashboard.executionOverview).toEqual({
+      worldsExecuted: null,
+      completionRate: null,
+      openFindingCount: 0,
+      repairsVerified: null,
+    });
+  });
 });
 
 function project(id: string, name: string, isPrimaryDemo: boolean, updatedAt: string) {

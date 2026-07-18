@@ -48,6 +48,37 @@ describe('Rift operational dashboard', () => {
     expect(html).not.toContain('Start investigation');
   });
 
+  it('places a truthful execution overview between project readiness and recent findings', () => {
+    const html = render({
+      ...seededDemoDashboardData,
+      recentInvestigations: [
+        { id: 'completed', projectId: 'project_demo_checkout', projectName: 'Checkout Reliability Lab', status: 'COMPLETED', worldCount: 8, createdAt: '2026-07-18T00:00:00.000Z' },
+        { id: 'failed', projectId: 'project_demo_checkout', projectName: 'Checkout Reliability Lab', status: 'FAILED', worldCount: 5, createdAt: '2026-07-17T00:00:00.000Z' },
+      ],
+      recentFindings: [
+        { id: 'finding-open', projectId: 'project_demo_checkout', projectName: 'Checkout Reliability Lab', title: 'Open risk', severity: 'HIGH', status: 'OPEN', createdAt: '2026-07-18T00:00:00.000Z' },
+      ],
+    });
+
+    const overviewPosition = html.indexOf('Execution overview');
+    expect(overviewPosition).toBeGreaterThan(html.indexOf('Project readiness'));
+    expect(overviewPosition).toBeLessThan(html.lastIndexOf('Recent findings'));
+    expect(html).toContain('Worlds executed across recent investigations');
+    expect(html).toContain('Completion rate');
+    expect(html).toContain('50%');
+    expect(html).toContain('Open findings');
+    expect(html).toContain('Repairs verified');
+    expect(html).toContain('Not available in this view');
+  });
+
+  it('uses an em dash for execution metrics that the routed dashboard cannot know', () => {
+    const html = render(seededDemoDashboardData);
+
+    expect(html).toContain('World execution volume is not available for recent investigations.');
+    expect(html).toContain('No concluded investigations');
+    expect(html).toContain('Repairs verified');
+  });
+
   it('keeps activity failures subtle and does not fabricate records', () => {
     const html = render(seededDemoDashboardData, { activityAvailability: { investigations: 'unavailable', findings: 'unavailable' } });
 
