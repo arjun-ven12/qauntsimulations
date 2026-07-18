@@ -1,6 +1,7 @@
 import type { InvestigationEvent } from '@taskos/shared-types';
-import { Link, useParams } from 'react-router-dom';
-import { PageHeading } from '../../components/page-heading.js';
+import { ArrowUpRight } from 'lucide-react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { useAuthStore } from '../../stores/auth.store.js';
 import {
   CompletedRunSummary,
   EventTimeline,
@@ -24,6 +25,7 @@ import {
   useInvestigationWorkers,
   useInvestigationWorlds,
 } from '../runtime/use-runtime-queries.js';
+import { InvestigationReport } from './investigation-report.js';
 
 function metadataString(event: InvestigationEvent, key: string) {
   const value = event.metadata?.[key];
@@ -72,6 +74,7 @@ export function plannerLabels(event: InvestigationEvent) {
 
 export function LiveWorldLabPage() {
   const { investigationId } = useParams();
+  const { pathname } = useLocation();
   if (!investigationId) return <PanelState title="Investigation not found">The URL does not include an investigation ID.</PanelState>;
 
   const progress = useInvestigationProgress(investigationId);
@@ -82,6 +85,7 @@ export function LiveWorldLabPage() {
   const workers = useInvestigationWorkers(investigationId, status);
   const evidence = useInvestigationEvidence(investigationId, status);
   const findings = useInvestigationFindings(investigationId, status);
+  const canVerifyRepair = useAuthStore((state) => state.permissions.includes('EDIT_PROJECTS'));
 
   if (progress.isLoading) return <PanelState title="Loading investigation">Loading investigation header, progress, and runtime status…</PanelState>;
   if (progress.error || !progress.data) {
@@ -89,36 +93,70 @@ export function LiveWorldLabPage() {
   }
 
   const workerProvider = workers.data?.[0]?.provider;
+  const worldsView = pathname.endsWith('/worlds');
+  const liveView = pathname.endsWith('/live');
 
   return (
-    <>
-      <PageHeading
-        eyebrow={progress.data.status}
-        title="Investigation overview"
-        description={`${phaseLabel(progress.data.status)}. Runtime data is loaded from the investigation API.`}
-        action={<Link className="rounded-lg bg-cyan px-4 py-2 font-bold text-ink" to={`/investigations/${investigationId}/plan`}>View plan</Link>}
-      />
+    <section className="mx-auto min-w-0 max-w-[1280px]">
+      <header className="mb-6 flex flex-col gap-5 border-b border-[var(--rift-border)] pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="eyebrow">{progress.data.status} · Investigation</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-[-0.045em] text-[var(--rift-text)] lg:text-[2.5rem]">
+            {worldsView ? 'Tested worlds' : liveView ? 'Live investigation' : 'Investigation report'}
+          </h1>
+          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">
+            {worldsView ? 'World outcomes, tested variables, and failure-region exploration.' : liveView ? `${phaseLabel(progress.data.status)}. Operational execution details update from the investigation API.` : 'Conclusion, evidence, and the smallest failure trigger established by Rift.'}
+          </p>
+        </div>
+        <Link className="rift-button-secondary shrink-0 gap-2" to={`/investigations/${investigationId}/plan`}>
+          Experiment plan <ArrowUpRight aria-hidden="true" size={14} />
+        </Link>
+      </header>
       <RuntimeNav investigationId={investigationId} />
-      <InvestigationOverviewHeader progress={progress.data} plan={plan.data} workerProvider={workerProvider} />
-      <div className="grid gap-5">
-        <ProgressSummary progress={progress.data} />
-        {worlds.error || experiments.error || evidence.error ? (
-          <PanelState title="World data partially unavailable" retry={() => { void worlds.refetch(); void experiments.refetch(); void evidence.refetch(); }}>
-            One or more world panels could not load. Loaded panels remain visible.
-          </PanelState>
-        ) : null}
-        <CompletedRunSummary progress={progress.data} findings={findings.data ?? []} />
-        <WorldTable worlds={worlds.data ?? []} experiments={experiments.data ?? []} workers={workers.data ?? []} evidence={evidence.data ?? []} />
-        <WorldMatrix worlds={worlds.data ?? []} experiments={experiments.data ?? []} workers={workers.data ?? []} evidence={evidence.data ?? []} />
-        {workers.error ? <PanelState title="Workers unavailable" retry={() => void workers.refetch()}>{workers.error instanceof Error ? workers.error.message : 'Worker data could not load.'}</PanelState> : <WorkerPanel workers={workers.data ?? []} experiments={experiments.data ?? []} />}
-        <EventTimeline events={progress.data.recentEvents} />
-        {findings.error ? (
-          <PanelState title="Findings unavailable" retry={() => void findings.refetch()}>{findings.error instanceof Error ? findings.error.message : 'Findings could not load.'}</PanelState>
-        ) : (
-          <LiveFindingSummary findings={findings.data ?? []} investigationId={investigationId} investigationStatus={progress.data.status} />
-        )}
-        {evidence.error ? <PanelState title="Evidence unavailable" retry={() => void evidence.refetch()}>{evidence.error instanceof Error ? evidence.error.message : 'Evidence could not load.'}</PanelState> : <EvidenceSummary evidence={evidence.data ?? []} />}
-      </div>
-    </>
+
+      {worldsView ? (
+        <div className="grid gap-5">
+          {worlds.error || experiments.error || evidence.error ? (
+            <PanelState title="World data partially unavailable" retry={() => { void worlds.refetch(); void experiments.refetch(); void evidence.refetch(); }}>
+              One or more world panels could not load. Loaded panels remain visible.
+            </PanelState>
+          ) : null}
+          <WorldTable worlds={worlds.data ?? []} experiments={experiments.data ?? []} workers={workers.data ?? []} evidence={evidence.data ?? []} />
+          <WorldMatrix worlds={worlds.data ?? []} experiments={experiments.data ?? []} workers={workers.data ?? []} evidence={evidence.data ?? []} />
+        </div>
+      ) : liveView ? (
+        <div className="grid gap-5">
+          <InvestigationOverviewHeader progress={progress.data} plan={plan.data} workerProvider={workerProvider} />
+          <ProgressSummary progress={progress.data} />
+          <CompletedRunSummary progress={progress.data} findings={findings.data ?? []} />
+          {workers.error ? <PanelState title="Workers unavailable" retry={() => void workers.refetch()}>{workers.error instanceof Error ? workers.error.message : 'Worker data could not load.'}</PanelState> : <WorkerPanel workers={workers.data ?? []} experiments={experiments.data ?? []} />}
+          <EventTimeline events={progress.data.recentEvents} />
+        </div>
+      ) : (
+        <div className="grid gap-5">
+          {findings.error || evidence.error || worlds.error || experiments.error ? (
+            <PanelState title="Report data partially unavailable" retry={() => { void findings.refetch(); void evidence.refetch(); void worlds.refetch(); void experiments.refetch(); }}>
+              One or more report sources could not load. Available conclusions and links remain visible.
+            </PanelState>
+          ) : null}
+          <InvestigationReport
+            canVerifyRepair={canVerifyRepair}
+            evidence={evidence.data ?? []}
+            experiments={experiments.data ?? []}
+            findings={findings.data ?? []}
+            investigationId={investigationId}
+            progress={progress.data}
+            worlds={worlds.data ?? []}
+          />
+          <details className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface)]">
+            <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-[var(--rift-text)] marker:hidden">Supporting runtime record</summary>
+            <div className="grid gap-5 border-t border-[var(--rift-border)] p-5">
+              <LiveFindingSummary findings={findings.data ?? []} investigationId={investigationId} investigationStatus={progress.data.status} />
+              <EvidenceSummary evidence={evidence.data ?? []} />
+            </div>
+          </details>
+        </div>
+      )}
+    </section>
   );
 }
