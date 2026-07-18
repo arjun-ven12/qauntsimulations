@@ -58,7 +58,7 @@ describe('Journey frontend pages', () => {
     expect(html).toContain('customer@example.test');
   });
 
-  it('renders the Journey overview as one human-readable execution path', () => {
+  it('renders the Journey overview as a compact business-first execution path', () => {
     setRole('OWNER');
     const client = queryClient();
     client.setQueryData(['journey', 'project-1', 'journey-1'], journey());
@@ -68,11 +68,54 @@ describe('Journey frontend pages', () => {
       '/projects/project-1/journeys/journey-1',
       client,
     );
-    expect(html).toContain('Execution path');
-    expect(html).toContain('Open application');
-    expect(html).toContain('Verify completion');
-    expect(html).toContain('Journey execution path');
-    expect(html).not.toContain('Execution graph');
+    expect(html).toContain('Journey map');
+    expect(html).toContain('Product');
+    expect(html).toContain('Cart');
+    expect(html).toContain('Checkout');
+    expect(html).toContain('Payment');
+    expect(html).toContain('Confirmation');
+    expect(html).toContain('Detailed execution path');
+    expect(html).toContain('Expand all');
+    expect(html).toContain('Collapse all');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('Edit Journey');
+    expect(html).toContain('Start Investigation');
+    expect(html).not.toContain('Edit Settings');
+    expect(html).not.toMatch(/STEP \d/i);
+  });
+
+  it('keeps unavailable investigation launch visible with its prerequisite', () => {
+    setRole('OWNER');
+    const client = queryClient();
+    client.setQueryData(['journey', 'project-1', 'journey-1'], {
+      ...journey(),
+      state: 'DRAFT',
+      validationStatus: 'DRAFT',
+    });
+    client.setQueryData(['environments', 'project-1'], [environment()]);
+    const html = renderPage(
+      <JourneyOverviewPage />,
+      '/projects/project-1/journeys/journey-1',
+      client,
+    );
+    expect(html).toContain('Start Investigation');
+    expect(html).toContain('Enable this Journey');
+    expect(html).toContain('disabled=""');
+  });
+
+  it('uses a horizontally scrollable map and touch-sized phase controls on mobile', () => {
+    setRole('OWNER');
+    const client = queryClient();
+    client.setQueryData(['journey', 'project-1', 'journey-1'], journey());
+    client.setQueryData(['environments', 'project-1'], [environment()]);
+    const html = renderPage(
+      <JourneyOverviewPage />,
+      '/projects/project-1/journeys/journey-1',
+      client,
+    );
+    expect(html).toContain('overflow-x-auto');
+    expect(html).toContain('min-w-max');
+    expect(html).toContain('min-h-14');
   });
 
   it.each(['MEMBER', 'VIEWER'] as const)('renders a clear read-only %s experience', (role) => {
