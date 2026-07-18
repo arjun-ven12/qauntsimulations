@@ -10,6 +10,7 @@ import { requireAuth, requireOrganisation } from '../../auth/auth.middleware.js'
 import { errorHandler } from '../../../core/middleware/error-handler.js';
 import { EvidenceContentService } from '../evidence-content.service.js';
 import { InvestigationPlanningService } from '../../experiments/services/investigation-planning.service.js';
+import type { DeterministicWorldDefinition } from '../../experiments/services/deterministic-experiment-plan.service.js';
 import { InvestigationController } from '../investigations.controller.js';
 import { createInvestigationRouter, createProjectInvestigationRouter } from '../investigations.routes.js';
 import { InvestigationService } from '../investigations.service.js';
@@ -17,6 +18,23 @@ import { InvestigationService } from '../investigations.service.js';
 function application(evidenceRoot?: string) {
   const progressRecord = { id: 'investigation_api_test', status: 'PLANNING', worlds: [], experiments: [], events: [], findingsCount: 0 };
   const createdAt = new Date('2026-07-17T00:00:00.000Z');
+  const plannedWorld: DeterministicWorldDefinition = {
+    key: 'baseline',
+    name: 'Baseline checkout',
+    browser: 'chromium',
+    viewport: 'desktop-1440x900',
+    networkProfile: 'normal',
+    userProfile: 'normal',
+    paymentDelayMs: 0,
+    duplicateSubmissionBug: false,
+    doubleSubmit: false,
+    doubleSubmitIntervalMs: 100,
+    expectedOutcome: 'PASS',
+    reason: 'Establish expected checkout behaviour.',
+    randomSeed: 41000,
+    creationOrder: 0,
+    origin: 'INITIAL',
+  };
   const finalReportArtifact = { id: 'evidence_final_report', experimentId: 'experiment_api_test', executionAttemptId: null, storageProvider: 'local', type: 'FINAL_REPORT' as const, storageKey: 'reports/investigation_api_test/final-report.json', mimeType: 'application/json', sizeBytes: 13n, checksum: 'sha256:test', redacted: true, createdAt, metadata: { path: '/Users/example/private/final-report.json', reportVersion: 1, filename: 'final-report.json' } };
   const markdownReportArtifact = { ...finalReportArtifact, id: 'evidence_markdown_report', storageKey: 'reports/investigation_api_test/final-report.md', mimeType: 'text/markdown', sizeBytes: 14n, metadata: { filename: 'final-report.md' } };
   const screenshotArtifact = { ...finalReportArtifact, id: 'evidence_screenshot', type: 'SCREENSHOT' as const, storageKey: 'screenshots/001.png', mimeType: 'image/png' };
@@ -98,11 +116,11 @@ function application(evidenceRoot?: string) {
         invariantIds: demoCreateInvestigationInput.invariantIds,
         executionProvider: 'LOCAL_PLAYWRIGHT' as const,
         maximumConcurrentWorkers: 2,
-        worlds: [],
+        worlds: [plannedWorld],
         planningExplanation: 'Validated initial plan.',
         planner: {
-          version: 'v1', requestedProvider: 'KIMI' as const, effectiveProvider: 'KIMI' as const, plannerStatus: 'ACCEPTED', model: 'kimi-k2.6',
-          assumptions: [], warnings: [], rejectedPlanItems: [], normalizedFields: [], acceptedWorldCount: 0, rejectedWorldCount: 0, generatedAt: createdAt.toISOString(),
+          version: 'v1', requestedProvider: 'AIAND' as const, effectiveProvider: 'AIAND' as const, plannerStatus: 'ACCEPTED', model: 'moonshotai/kimi-k2.7-code', modelProvider: 'MOONSHOTAI',
+          assumptions: [], warnings: [], rejectedPlanItems: [], normalizedFields: [], acceptedWorldCount: 1, rejectedWorldCount: 0, generationDurationMs: 22350, generatedAt: createdAt.toISOString(),
         },
       },
     } : null,
@@ -158,15 +176,24 @@ describe('investigation API', () => {
       validation: { status: 'READY', warnings: [] },
     });
   });
-  it('returns public Kimi planner provenance without credentials', async () => {
+  it('returns public ai& Kimi planner provenance without credentials', async () => {
     const response = await request(application()).get('/api/investigations/investigation_api_test/plan').set('authorization', 'Bearer valid');
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({
-      aiProvider: 'KIMI',
+      aiProvider: 'AIAND',
       plannerStatus: 'ACCEPTED',
-      plannerMetadata: { requestedProvider: 'KIMI', effectiveProvider: 'KIMI', model: 'kimi-k2.6' },
+      investigationId: 'investigation_api_test',
+      planId: 'plan_api_test',
+      schemaPassed: true,
+      safetyPassed: true,
+      plannerMetadata: { requestedProvider: 'AIAND', effectiveProvider: 'AIAND', modelProvider: 'MOONSHOTAI', model: 'moonshotai/kimi-k2.7-code' },
     });
-    expect(JSON.stringify(response.body)).not.toContain('API_KEY');
+    const serialized = JSON.stringify(response.body);
+    expect(serialized).not.toContain('API_KEY');
+    expect(serialized).not.toContain('AIAND_API_KEY');
+    expect(serialized).not.toContain('Bearer');
+    expect(serialized).not.toContain('Authorization');
+    expect(serialized).not.toContain('hidden prompt');
   });
   it('rejects invalid scope and missing invariants', async () => {
     const invalidProject = await request(application()).post('/api/investigations').set('authorization', 'Bearer valid').send({ ...demoCreateInvestigationInput, projectId: 'missing' });

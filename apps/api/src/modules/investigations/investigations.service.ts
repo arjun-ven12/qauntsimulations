@@ -86,26 +86,35 @@ export class InvestigationService {
   async cancel(organisationId: string, id: string) { if (!(await this.repository.cancel(organisationId, id))) throw new ApplicationError('INVESTIGATION_NOT_CANCELLABLE', 'Investigation was not found or is already terminal', 409); return this.get(organisationId, id); }
   async plan(organisationId: string, id: string) {
     await this.requireProgress(organisationId, id);
-    const plan = (await this.repository.orchestrationContext(id))?.plan;
-    if (!plan) return null;
+    const context = await this.repository.orchestrationContext(id);
+    if (!context?.plan) return null;
+    const persistedPlan = context.plan;
+    const planner = persistedPlan.planner;
+    const plannerStatus = planner?.plannerStatus ?? 'ACCEPTED';
+    const schemaPassed = ['ACCEPTED', 'PARTIALLY_ACCEPTED', 'FALLBACK_USED'].includes(plannerStatus) && persistedPlan.worlds.length > 0;
+    const safetyPassed = schemaPassed && (planner?.effectiveProvider === 'FALLBACK' || plannerStatus === 'FALLBACK_USED' || (planner?.rejectedWorldCount ?? 0) === 0);
     return {
-      objective: plan.objective,
-      journeyId: plan.journeyId,
-      scenarioId: plan.scenarioId,
+      investigationId: id,
+      planId: context.planId,
+      objective: persistedPlan.objective,
+      journeyId: persistedPlan.journeyId,
+      scenarioId: persistedPlan.scenarioId,
       worldPack: 'persisted-launch-v1',
-      selectedVariables: plan.selectedVariables,
-      initialWorldCount: plan.worlds.length,
-      maximumWorldCount: plan.selectedControls.maximumWorlds,
-      maximumConcurrentWorkers: plan.maximumConcurrentWorkers,
+      selectedVariables: persistedPlan.selectedVariables,
+      initialWorldCount: persistedPlan.worlds.length,
+      maximumWorldCount: persistedPlan.selectedControls.maximumWorlds,
+      maximumConcurrentWorkers: persistedPlan.maximumConcurrentWorkers,
       timeoutSeconds: 0,
       retryCount: 0,
-      safetyConstraints: plan.launch ? [plan.launch.safety] : [],
-      invariants: plan.launch?.invariants ?? [],
-      worlds: plan.worlds,
-      planningExplanation: plan.planningExplanation,
-      aiProvider: plan.planner?.effectiveProvider ?? 'DETERMINISTIC',
-      plannerStatus: plan.planner?.plannerStatus ?? 'ACCEPTED',
-      plannerMetadata: plan.planner,
+      safetyConstraints: persistedPlan.launch ? [persistedPlan.launch.safety] : [],
+      invariants: persistedPlan.launch?.invariants ?? [],
+      worlds: persistedPlan.worlds,
+      planningExplanation: persistedPlan.planningExplanation,
+      aiProvider: planner?.effectiveProvider ?? 'DETERMINISTIC',
+      plannerStatus,
+      schemaPassed,
+      safetyPassed,
+      plannerMetadata: planner,
     };
   }
 

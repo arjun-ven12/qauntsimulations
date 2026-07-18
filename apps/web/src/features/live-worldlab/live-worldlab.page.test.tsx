@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { MockInvestigationApi, MOCK_INVESTIGATION_ID } from '../../services/api/mock-investigation-api.js';
-import { CompletedRunSummary, EventTimeline, EvidenceSummary, ExperimentPlanPanel, InvestigationOverviewHeader, LiveFindingSummary, ProgressSummary, WorkerPanel, WorldMatrix, WorldTable } from '../runtime/runtime-components.js';
+import { CompletedRunSummary, EventTimeline, EvidenceSummary, ExperimentPlanPanel, InvestigationOverviewHeader, LiveFindingSummary, PlannerProvenanceBadge, ProgressSummary, WorkerPanel, WorldMatrix, WorldTable } from '../runtime/runtime-components.js';
 import { polling } from '../runtime/use-runtime-queries.js';
 import { cleanupWarning, plannerLabels, providerLabel, timingLabels } from './live-worldlab.page.js';
 import { InvestigationReport } from './investigation-report.js';
@@ -68,16 +68,49 @@ describe('LiveWorldLabPage runtime metadata helpers', () => {
   it('renders Kimi planner and deterministic fallback provenance explicitly', () => {
     const base = {
       objective: 'Safe plan', journeyId: 'journey', scenarioId: 'scenario', worldPack: 'v1', selectedVariables: [], initialWorldCount: 0,
-      maximumWorldCount: 4, maximumConcurrentWorkers: 2, timeoutSeconds: 0, retryCount: 0, safetyConstraints: [], invariants: [], worlds: [],
+      maximumWorldCount: 4, maximumConcurrentWorkers: 2, timeoutSeconds: 0, retryCount: 0, safetyConstraints: [], invariants: [], worlds: [
+        { name: 'Baseline checkout', browser: 'chromium', viewport: 'desktop-1440x900', networkProfile: 'normal', userProfile: 'normal', paymentDelayMs: 0, doubleSubmit: false, doubleSubmitIntervalMs: 100, duplicateSubmissionBug: false, expectedOutcome: 'PASS', reason: 'Establish expected checkout behaviour.' },
+        { name: 'Mobile delayed retry', browser: 'chromium', viewport: 'mobile-390x844', networkProfile: 'delayed-payment', userProfile: 'impatient', paymentDelayMs: 5000, doubleSubmit: true, doubleSubmitIntervalMs: 50, duplicateSubmissionBug: false, expectedOutcome: 'OBSERVE', reason: 'Compare mobile delayed repeated submission.' },
+      ], schemaPassed: true, safetyPassed: true,
     };
-    const kimi = renderToStaticMarkup(<ExperimentPlanPanel plan={{ ...base, plannerMetadata: { requestedProvider: 'KIMI', effectiveProvider: 'KIMI', plannerStatus: 'ACCEPTED', model: 'kimi-k2.6' } }} />);
+    const kimi = renderToStaticMarkup(<ExperimentPlanPanel plan={{ ...base, investigationId: 'investigation-1', planId: 'plan-1', plannerMetadata: { requestedProvider: 'KIMI', effectiveProvider: 'KIMI', plannerStatus: 'ACCEPTED', model: 'kimi-k2.6', generationDurationMs: 22350, generatedAt: '2026-07-18T00:00:00.000Z' } }} />);
+    expect(kimi).toContain('Planned by Kimi');
+    expect(kimi).toContain('Kimi Verified');
     expect(kimi).toContain('Kimi AI');
     expect(kimi).toContain('kimi-k2.6');
-    expect(kimi).toContain('Fallback used');
+    expect(kimi).toContain('Fallback');
     expect(kimi).toContain('No');
+    expect(kimi).toContain('Schema');
+    expect(kimi).toContain('Passed');
+    expect(kimi).toContain('Safety');
+    expect(kimi).toContain('22.35s');
+    expect(kimi).toContain('Objective');
+    expect(kimi).toContain('Kimi’s experiment strategy');
+    expect(kimi).toContain('Initial worlds');
+    expect(kimi).toContain('Mobile delayed retry');
+    expect(kimi).toContain('Changed');
+    expect(kimi).toContain('Planning provenance');
+    expect(kimi).not.toContain('API_KEY');
+    const aiand = renderToStaticMarkup(<ExperimentPlanPanel plan={{ ...base, investigationId: 'investigation-aiand', planId: 'plan-aiand', plannerMetadata: { requestedProvider: 'AIAND', effectiveProvider: 'AIAND', plannerStatus: 'ACCEPTED', model: 'moonshotai/kimi-k2.7-code', generationDurationMs: 18000, generatedAt: '2026-07-18T00:00:00.000Z' } }} />);
+    expect(aiand).toContain('Planned by Kimi via ai&amp;');
+    expect(aiand).toContain('Kimi Verified');
+    expect(aiand).toContain('moonshotai/kimi-k2.7-code');
+    expect(aiand).toContain('Serving provider');
+    expect(aiand).toContain('ai&amp;');
+    expect(aiand).toContain('Model developer');
+    expect(aiand).toContain('Moonshot AI');
+    expect(aiand).toContain('Fallback');
+    expect(aiand).toContain('No');
+    expect(aiand).not.toContain('API_KEY');
     const fallback = renderToStaticMarkup(<ExperimentPlanPanel plan={{ ...base, plannerMetadata: { requestedProvider: 'KIMI', effectiveProvider: 'FALLBACK', plannerStatus: 'FALLBACK_USED', fallbackReason: 'Kimi planner request timed out.' } }} />);
+    expect(fallback).toContain('Fallback plan');
     expect(fallback).toContain('Deterministic fallback');
+    expect(fallback).toContain('Fallback');
+    expect(fallback).toContain('Yes');
     expect(fallback).toContain('Kimi planner request timed out.');
+    expect(fallback).not.toContain('Kimi Verified');
+    const unknown = renderToStaticMarkup(<PlannerProvenanceBadge plan={{ ...base, plannerMetadata: { plannerStatus: 'ACCEPTED' } }} />);
+    expect(unknown).not.toContain('Kimi');
   });
 
   it('renders the completed 13-world runtime experience without report-body content', async () => {
@@ -110,6 +143,7 @@ describe('LiveWorldLabPage runtime metadata helpers', () => {
     expect(evidence).toHaveLength(93);
     expect(findings).toHaveLength(1);
     expect(html).toContain('Investigation complete');
+    expect(html).toContain('View experiment plan');
     expect(html).toContain('World exploration');
     expect(html).toContain('Inspect world');
     expect(html).not.toContain('>Browser</th>');

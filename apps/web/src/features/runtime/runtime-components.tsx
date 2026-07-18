@@ -25,7 +25,6 @@ import {
   evidenceFilename,
   evidenceStageGroups,
   experimentHistoryRows,
-  fallbackReason,
   finalReportIds,
   filterWorldRows,
   findingList,
@@ -119,6 +118,10 @@ export function InvestigationOverviewHeader({ progress, plan, workerProvider }: 
           <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">
             Planner: {plannerProviderLabel(provider.effective)} · Worker: {workerProvider ?? 'Not recorded'} · Findings: {progress.findingsCount.toLocaleString()} · Worlds: {progress.progress.totalWorlds.toLocaleString()}
           </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <PlannerProvenanceBadge plan={plan} />
+            <Link className="rift-button-secondary min-h-8 px-3 py-1.5 text-xs" to={`/investigations/${progress.id}/plan`}>View experiment plan</Link>
+          </div>
           <p className="mt-1 text-xs text-[var(--rift-text-muted)]">Raw status: {progress.status}</p>
         </div>
         <div className="min-w-48 text-right">
@@ -132,6 +135,12 @@ export function InvestigationOverviewHeader({ progress, plan, workerProvider }: 
       <PhaseTracker steps={steps} />
     </section>
   );
+}
+
+export function PlannerProvenanceBadge({ plan }: { plan: ExperimentPlanResponse | null | undefined }) {
+  const provider = providerFromPlan(plan);
+  const tone = provider.kimiVerified ? 'pass' : provider.fallbackUsed ? 'pending' : provider.status === 'FAILED' ? 'fail' : 'neutral';
+  return <StatusBadge tone={tone}>{provider.badgeLabel}</StatusBadge>;
 }
 
 export function PhaseTracker({ steps }: { steps: ReturnType<typeof phaseTracker> }) {
@@ -189,48 +198,211 @@ export function CompletedRunSummary({ progress, findings }: { progress: Investig
   );
 }
 
-export function ExperimentPlanPanel({ plan }: { plan: ExperimentPlanResponse | null }) {
+export function ExperimentPlanPanel({
+  demoPreview,
+  plan,
+}: {
+  demoPreview?: { onExit: () => void } | undefined;
+  plan: ExperimentPlanResponse | null;
+}) {
   if (!plan) return <PanelState title="Experiment plan">No experiment plan has been recorded yet.</PanelState>;
   const provider = providerFromPlan(plan);
   const assumptions = plannerList(plan, 'assumptions');
   const warnings = plannerList(plan, 'warnings');
   const rejected = plannerList(plan, 'rejectedPlanItems');
-  const fallback = fallbackReason(plan);
+  const fallback = provider.fallbackReason;
+  const generationLabel = provider.fallbackUsed ? 'Fallback plan' : provider.effective === 'AIAND' ? 'Planned by Kimi via ai&' : provider.effective === 'KIMI' ? 'Planned by Kimi' : `Planned by ${plannerProviderLabel(provider.effective)}`;
+  const validationTone = provider.kimiVerified ? 'pass' : provider.fallbackUsed ? 'pending' : provider.status === 'FAILED' || provider.status === 'REJECTED' ? 'fail' : 'neutral';
+  const baseline = plan.worlds[0];
   return (
-    <section className="card">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-bold">Experiment plan</h2>
-        <div className="flex flex-wrap gap-2">
-          <StatusBadge tone={plannerStatusTone(provider.status, provider.fallbackUsed)}>{plannerProviderLabel(provider.effective)}</StatusBadge>
-          <StatusBadge tone={plannerStatusTone(provider.status, provider.fallbackUsed)}>{humanize(provider.status)}</StatusBadge>
+    <div className="space-y-5">
+      <section className="card">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            {demoPreview ? (
+              <div className="mb-4 rounded-2xl border-2 border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] p-4" role="alert">
+                <div className="text-xs font-black uppercase tracking-[0.18em] text-[var(--status-pending)]">DEMO PREVIEW</div>
+                <p className="mt-2 text-sm font-bold text-white">Simulated successful ai&amp; plan — Not a persisted provider result</p>
+                <p className="mt-1 text-sm text-[var(--status-pending)]">This screen uses simulated presentation data. No successful full ai&amp; plan was persisted for this preview.</p>
+                <button className="rift-button-secondary mt-3 min-h-9 px-3 py-1.5 text-xs" onClick={demoPreview.onExit} type="button">
+                  Exit demo preview
+                </button>
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <StatusBadge tone={validationTone}>{generationLabel}</StatusBadge>
+              {provider.kimiVerified && !demoPreview ? <StatusBadge tone="pass">Kimi Verified</StatusBadge> : null}
+              <StatusBadge tone={plannerStatusTone(provider.status, provider.fallbackUsed)}>{humanize(provider.status)}</StatusBadge>
+            </div>
+            <h2 className="mt-4 text-2xl font-black">Experiment Plan</h2>
+            <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">
+              {demoPreview ? 'This preview demonstrates the intended successful Experiment Plan UI without changing production provenance.' : provider.kimiVerified ? 'Kimi created these worlds. RIFT validated them. They are ready to run.' : provider.fallbackUsed ? 'Kimi was unavailable, so RIFT generated a deterministic fallback plan.' : 'RIFT is showing the persisted planner output and validation state.'}
+            </p>
+          </div>
+          <div className="grid min-w-44 gap-1 text-sm text-[var(--rift-text-secondary)]">
+            <span><strong className="text-white">{plan.worlds.length.toLocaleString()}</strong> initial worlds</span>
+            <span>Plan {humanize(provider.status)}</span>
+          </div>
         </div>
-      </div>
-      <p className="mt-4 text-[var(--rift-text-secondary)]">{plan.objective}</p>
-      <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">{plan.planningExplanation}</p>
-      <dl className="mt-4 grid gap-3 md:grid-cols-4">
-        <div><dt className="text-xs text-[var(--rift-text-muted)]">Planner requested</dt><dd className="font-bold">{plannerProviderLabel(provider.requested)}</dd></div>
-        <div><dt className="text-xs text-[var(--rift-text-muted)]">Executed plan source</dt><dd className="font-bold">{plannerProviderLabel(provider.effective)}</dd></div>
-        <div><dt className="text-xs text-[var(--rift-text-muted)]">Model</dt><dd className="font-bold">{provider.model ?? 'Not applicable'}</dd></div>
-        <div><dt className="text-xs text-[var(--rift-text-muted)]">Fallback used</dt><dd className="font-bold">{provider.fallbackUsed ? 'Yes' : 'No'}</dd></div>
-      </dl>
-      {fallback ? <p className="mt-4 rounded-xl border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] p-3 text-sm text-[var(--status-pending)]">{fallback}</p> : null}
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <Metric label="Proposed worlds" value={plan.maximumWorldCount} />
-        <Metric label="Accepted worlds" value={plan.worlds.length} />
-        <Metric label="Rejected worlds" value={rejected.length} />
-      </div>
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
-        <ListBlock title="Variables" items={plan.selectedVariables} empty="No variables recorded." />
-        <ListBlock title="Warnings" items={warnings} empty="No validation warnings." tone={warnings.length ? 'pending' : 'neutral'} />
-        <ListBlock title="Assumptions" items={assumptions} empty="No assumptions recorded." />
-        <ListBlock title="World reasons" items={plan.worlds.map((world) => world.reason).filter((reason): reason is string => Boolean(reason))} empty="No world reasons recorded." />
-      </div>
-    </section>
+        <dl className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <ProvenanceMetric label="Provider" value={plannerProviderLabel(provider.effective)} />
+          <ProvenanceMetric label="Model" value={provider.model ?? 'Not applicable'} />
+          <ProvenanceMetric label="Fallback" value={provider.fallbackUsed ? 'Yes' : 'No'} />
+          <ProvenanceMetric label="Schema" value={provider.schemaPassed ? 'Passed' : 'Not passed'} />
+          <ProvenanceMetric label="Safety" value={provider.safetyPassed ? 'Passed' : 'Not passed'} />
+          <ProvenanceMetric label="Planning time" value={demoPreview ? `Simulated ${formatPlannerDuration(provider.durationMs)}` : formatPlannerDuration(provider.durationMs)} />
+        </dl>
+        {fallback ? <p className="mt-4 rounded-xl border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] p-3 text-sm text-[var(--status-pending)]">{fallback}</p> : null}
+      </section>
+
+      <section className="card">
+        <h2 className="font-bold">Objective</h2>
+        <p className="mt-3 text-[var(--rift-text-secondary)]">{plan.objective}</p>
+        <h3 className="mt-6 font-bold">{(provider.effective === 'KIMI' || provider.effective === 'AIAND') && !provider.fallbackUsed ? 'Kimi’s experiment strategy' : 'Experiment strategy'}</h3>
+        <p className="mt-3 text-sm leading-6 text-[var(--rift-text-secondary)]">{plan.planningExplanation ?? 'No concise planner strategy was recorded.'}</p>
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          <ListBlock title="Variables" items={plan.selectedVariables} empty="No variables recorded." />
+          <ListBlock title="Assumptions" items={assumptions} empty="No assumptions recorded." />
+          <ListBlock title="Warnings" items={warnings} empty="No validation warnings." tone={warnings.length ? 'pending' : 'neutral'} />
+        </div>
+      </section>
+
+      <section className="card">
+        <h2 className="font-bold">Plan progression</h2>
+        <ol className="mt-5 grid gap-4 md:grid-cols-6" aria-label="Experiment plan progression">
+          {planProgression(plan, provider).map((step) => (
+            <li className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface-raised)] p-3" key={step.label}>
+              <div className="text-xs uppercase tracking-[0.12em] text-[var(--rift-text-muted)]">{step.label}</div>
+              <div className="mt-2"><StatusBadge tone={step.tone}>{step.value}</StatusBadge></div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-bold">Initial worlds</h2>
+            <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{provider.sourceLabel}. Changed dimensions are highlighted against the first baseline world.</p>
+          </div>
+          <StatusBadge tone={provider.kimiVerified ? 'pass' : provider.fallbackUsed ? 'pending' : 'neutral'}>{provider.sourceLabel}</StatusBadge>
+        </div>
+        {plan.worlds.length ? (
+          <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {plan.worlds.map((world, index) => (
+              <PlannedWorldCard baseline={baseline} index={index} key={plannedWorldKey(world, index)} world={world} />
+            ))}
+          </div>
+        ) : <p className="mt-4 text-sm text-[var(--rift-text-muted)]">No initial worlds were persisted for this plan.</p>}
+      </section>
+
+      <details className="card">
+        <summary className="cursor-pointer text-sm font-bold text-white">Planning provenance</summary>
+        <dl className="mt-4 grid gap-3 md:grid-cols-3">
+          <ProvenanceMetric label="Actual provider" value={plannerProviderLabel(provider.effective)} />
+          <ProvenanceMetric label="Requested provider" value={plannerProviderLabel(provider.requested)} />
+          {provider.effective === 'AIAND' ? <ProvenanceMetric label="Serving provider" value="ai&" /> : null}
+          {provider.effective === 'AIAND' ? <ProvenanceMetric label="Model developer" value="Moonshot AI" /> : null}
+          <ProvenanceMetric label="Model" value={provider.model ?? 'Not applicable'} />
+          <ProvenanceMetric label="Fallback used" value={provider.fallbackUsed ? 'Yes' : 'No'} />
+          <ProvenanceMetric label="Planning status" value={humanize(provider.status)} />
+          <ProvenanceMetric label="Schema validation" value={provider.schemaPassed ? 'Passed' : 'Not passed'} />
+          <ProvenanceMetric label="Safety validation" value={provider.safetyPassed ? 'Passed' : 'Not passed'} />
+          <ProvenanceMetric label="Duration" value={formatPlannerDuration(provider.durationMs)} />
+          <ProvenanceMetric label="Generated timestamp" value={formatDate(provider.generatedAt)} />
+          <ProvenanceMetric label="Plan ID" value={plan.planId ?? 'Not recorded'} />
+          <ProvenanceMetric label="Investigation ID" value={plan.investigationId ?? 'Not recorded'} />
+          <ProvenanceMetric label="Initial-world count" value={plan.worlds.length} />
+        </dl>
+        {rejected.length ? <ListBlock title="Rejected plan items" items={rejected.map((item) => typeof item === 'string' ? item : formatValue(item))} empty="No rejected plan items." tone="pending" /> : null}
+      </details>
+    </div>
   );
 }
 
 function Metric({ label, value }: { label: string; value: string | number }) {
   return <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3"><div className="text-xs text-[var(--rift-text-muted)]">{label}</div><div className="mt-1 text-xl font-bold text-white">{value}</div></div>;
+}
+
+function ProvenanceMetric({ label, value }: { label: string; value: string | number }) {
+  return <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3"><dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt><dd className="mt-1 break-words font-bold text-white">{value}</dd></div>;
+}
+
+function formatPlannerDuration(durationMs: number | null): string {
+  if (durationMs === null) return 'Not recorded';
+  if (durationMs >= 1000) return `${(durationMs / 1000).toFixed(2)}s`;
+  return `${durationMs.toLocaleString()} ms`;
+}
+
+function planProgression(plan: ExperimentPlanResponse, provider: ReturnType<typeof providerFromPlan>): Array<{ label: string; value: string; tone: SemanticStatusTone }> {
+  const failed = provider.status === 'FAILED' || provider.status === 'REJECTED';
+  return [
+    { label: 'Objective received', value: plan.objective ? 'Complete' : 'Pending', tone: plan.objective ? 'pass' : 'pending' },
+    { label: provider.requested === 'KIMI' ? 'Kimi planning' : 'Planner', value: failed ? 'Failed' : provider.fallbackUsed ? 'Fallback' : provider.status === 'ACCEPTED' ? 'Complete' : humanize(provider.status), tone: failed ? 'fail' : provider.fallbackUsed ? 'pending' : provider.status === 'ACCEPTED' ? 'pass' : 'neutral' },
+    { label: 'Schema validation', value: provider.schemaPassed ? 'Passed' : 'Pending', tone: provider.schemaPassed ? 'pass' : 'pending' },
+    { label: 'Safety validation', value: provider.safetyPassed ? 'Passed' : 'Pending', tone: provider.safetyPassed ? 'pass' : 'pending' },
+    { label: 'Initial worlds', value: `${plan.worlds.length.toLocaleString()} created`, tone: plan.worlds.length ? 'pass' : 'pending' },
+    { label: 'Simulation', value: plan.worlds.length && !failed ? 'Ready' : failed ? 'Blocked' : 'Pending', tone: plan.worlds.length && !failed ? 'pass' : failed ? 'fail' : 'pending' },
+  ];
+}
+
+function PlannedWorldCard({ world, baseline, index }: { world: ExperimentPlanResponse['worlds'][number]; baseline: ExperimentPlanResponse['worlds'][number] | undefined; index: number }) {
+  const rows = plannedWorldRows(world, baseline);
+  return (
+    <article className="rounded-2xl border border-[var(--rift-border)] bg-[var(--rift-surface-raised)] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <div className="text-xs uppercase tracking-[0.12em] text-[var(--rift-text-muted)]">World {String(index + 1).padStart(2, '0')}</div>
+          <h3 className="mt-1 font-bold text-white">{plannedWorldName(world, index)}</h3>
+        </div>
+        <StatusBadge tone={index === 0 ? 'neutral' : 'running'}>{index === 0 ? 'Baseline' : 'Variant'}</StatusBadge>
+      </div>
+      <p className="mt-3 text-sm leading-6 text-[var(--rift-text-secondary)]">{typeof world.reason === 'string' && world.reason ? world.reason : 'No purpose was recorded for this world.'}</p>
+      <dl className="mt-4 grid gap-2 text-sm">
+        {rows.map((row) => (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--rift-border)] pt-2" key={row.label}>
+            <dt className="text-[var(--rift-text-muted)]">{row.label}</dt>
+            <dd className="text-right font-medium text-white">
+              {row.value}
+              {row.changed ? <span className="ml-2 rounded-full bg-[var(--status-running-bg)] px-2 py-0.5 text-[10px] text-[var(--status-running)]">Changed</span> : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </article>
+  );
+}
+
+function plannedWorldRows(world: ExperimentPlanResponse['worlds'][number], baseline: ExperimentPlanResponse['worlds'][number] | undefined) {
+  const keys = [
+    ['Browser', 'browser'],
+    ['Viewport', 'viewport'],
+    ['Network', 'networkProfile'],
+    ['User behaviour', 'userProfile'],
+    ['Payment delay', 'paymentDelayMs'],
+    ['Repeated submission', 'doubleSubmit'],
+    ['Submit interval', 'doubleSubmitIntervalMs'],
+    ['Defect mode', 'duplicateSubmissionBug'],
+    ['Expected observation', 'expectedOutcome'],
+  ] as const;
+  return keys.map(([label, key]) => {
+    const value = world[key];
+    const baselineValue = baseline?.[key];
+    return { label, value: formatConditionValue(key, value), changed: baseline !== undefined && value !== baselineValue };
+  });
+}
+
+function plannedWorldName(world: ExperimentPlanResponse['worlds'][number], index: number): string {
+  const name = world.name;
+  return typeof name === 'string' && name.trim() ? name : `Initial world ${index + 1}`;
+}
+
+function plannedWorldKey(world: ExperimentPlanResponse['worlds'][number], index: number): string {
+  const id = world.id;
+  const key = world.key;
+  if (typeof id === 'string') return id;
+  if (typeof key === 'string') return key;
+  return `planned-world-${index}`;
 }
 
 function ListBlock({ title, items, empty, tone = 'neutral' }: { title: string; items: string[]; empty: string; tone?: SemanticStatusTone }) {

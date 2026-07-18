@@ -389,8 +389,8 @@ export class InvestigationRepository {
         { investigationId, type: 'planner_started', data: messageData('Experiment planner started.', { plannerStatus: 'PENDING', requestedProvider: planner?.requestedProvider ?? 'DETERMINISTIC' }) },
         { investigationId, type: 'planner_request_created', data: messageData('Planner request created from validated investigation input.', { plannerVersion: planner?.version, maximumWorlds: input.scenario.controls.maximumWorlds }) },
       ] });
-      if (planner?.requestedProvider === 'OPENAI' || planner?.requestedProvider === 'KIMI') {
-        const providerLabel = planner.requestedProvider === 'KIMI' ? 'Kimi' : 'OpenAI';
+      if (planner?.requestedProvider === 'OPENAI' || planner?.requestedProvider === 'KIMI' || planner?.requestedProvider === 'AIAND') {
+        const providerLabel = planner.requestedProvider === 'AIAND' ? 'ai&' : planner.requestedProvider === 'KIMI' ? 'Kimi' : 'OpenAI';
         await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_provider_request_started', data: messageData(`${providerLabel} planner request started.`, { requestedProvider: planner.requestedProvider, model: planner.model }) } });
         await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_provider_request_completed', data: messageData(`${providerLabel} planner request completed.`, { requestedProvider: planner.requestedProvider, model: planner.model, generationDurationMs: planner.generationDurationMs, usage: planner.usage }) } });
         await transaction.investigationEvent.create({ data: { investigationId, type: 'planner_output_received', data: messageData('Planner structured output received.', { requestedProvider: planner.requestedProvider, model: planner.model }) } });
@@ -406,7 +406,7 @@ export class InvestigationRepository {
         investigationId,
         journeyId: input.journeyId,
         scenarioId: scope.scenarioId,
-        provider: planner?.effectiveProvider === 'OPENAI' ? 'OPENAI' : planner?.effectiveProvider === 'KIMI' ? 'KIMI' : 'MOCK',
+        provider: planner?.effectiveProvider === 'OPENAI' ? 'OPENAI' : planner?.effectiveProvider === 'KIMI' || planner?.effectiveProvider === 'AIAND' ? 'KIMI' : 'MOCK',
         plan: json(plan),
         planningExplanation: plan.planningExplanation,
         estimatedComputeUnits: planner?.usage && typeof planner.usage === 'object' && 'totalTokens' in planner.usage && typeof planner.usage.totalTokens === 'number' ? planner.usage.totalTokens : 0,

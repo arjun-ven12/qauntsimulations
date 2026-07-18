@@ -62,10 +62,11 @@ export interface DeterministicExperimentPlan {
   launch?: PersistedLaunchSnapshot;
   planner?: {
     version: string;
-    requestedProvider: 'DETERMINISTIC' | 'OPENAI' | 'KIMI';
-    effectiveProvider: 'DETERMINISTIC' | 'OPENAI' | 'KIMI' | 'FALLBACK';
+    requestedProvider: 'DETERMINISTIC' | 'OPENAI' | 'KIMI' | 'AIAND';
+    effectiveProvider: 'DETERMINISTIC' | 'OPENAI' | 'KIMI' | 'AIAND' | 'FALLBACK';
     plannerStatus: string;
     model?: string;
+    modelProvider?: string;
     assumptions: string[];
     warnings: string[];
     rejectedPlanItems: unknown[];

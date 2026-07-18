@@ -38,7 +38,7 @@ export interface PlannerValidationResult {
 }
 
 export interface InvestigationPlanningOptions {
-  requestedProvider: 'deterministic' | 'openai' | 'kimi';
+  requestedProvider: 'deterministic' | 'openai' | 'kimi' | 'AIAND';
   fallbackEnabled: boolean;
   maximumWorlds: number;
   maximumVariables: number;
@@ -48,6 +48,10 @@ export interface InvestigationPlanningOptions {
   maxProviderAttempts: number;
   maxOutputTokens: number;
   model?: string;
+  reasoningEffort?: 'none' | 'minimal' | 'low' | 'medium' | 'high';
+  apiSurface?: 'CHAT_COMPLETIONS';
+  streamingEnabled?: boolean;
+  idleTimeoutMs?: number;
 }
 
 export interface InvestigationPlanningResult {
@@ -165,6 +169,10 @@ export class InvestigationPlanningService {
         timeoutMs: this.options.timeoutMs,
         maxAttempts: this.options.maxProviderAttempts,
         maxOutputTokens: this.options.maxOutputTokens,
+        ...(this.options.reasoningEffort ? { reasoningEffort: this.options.reasoningEffort } : {}),
+        ...(this.options.apiSurface ? { apiSurface: this.options.apiSurface } : {}),
+        ...(this.options.streamingEnabled !== undefined ? { streamingEnabled: this.options.streamingEnabled } : {}),
+        ...(this.options.idleTimeoutMs ? { idleTimeoutMs: this.options.idleTimeoutMs } : {}),
         ...(signal ? { signal } : {}),
       });
     } catch (error) {
@@ -208,6 +216,7 @@ export class InvestigationPlanningService {
       ...(generation?.model ? { model: generation.model } : this.options.model ? { model: this.options.model } : {}),
       ...(generation ? { generationDurationMs: generation.durationMs } : {}),
       ...(generation?.usage ? { usage: generation.usage } : {}),
+      ...(requestedProvider === 'AIAND' ? { modelProvider: 'MOONSHOTAI' } : {}),
       generatedAt: new Date().toISOString(),
       warnings: validation.warnings,
       acceptedWorldCount: validation.acceptedWorlds.length,
@@ -370,10 +379,11 @@ export class InvestigationPlanningService {
       ...(scope.launch ? { launch: scope.launch } : {}),
       planner: {
         version: experimentPlannerPromptVersion,
-        requestedProvider: generation.provider === 'KIMI' ? 'KIMI' : 'OPENAI',
+        requestedProvider: generation.provider === 'AIAND' ? 'AIAND' : generation.provider === 'KIMI' ? 'KIMI' : 'OPENAI',
         effectiveProvider,
         plannerStatus,
         ...(generation.model ? { model: generation.model } : {}),
+        ...(effectiveProvider === 'AIAND' ? { modelProvider: 'MOONSHOTAI' } : {}),
         assumptions: output.assumptions.slice(0, this.options.maximumAssumptions),
         warnings: validation.warnings,
         rejectedPlanItems: validation.rejectedWorlds,
@@ -462,13 +472,14 @@ function slug(value: string): string {
 }
 
 function plannerProvider(provider: InvestigationPlanningOptions['requestedProvider']): Exclude<PlannerProvider, 'FALLBACK'> {
+  if (provider === 'AIAND') return 'AIAND';
   if (provider === 'openai') return 'OPENAI';
   if (provider === 'kimi') return 'KIMI';
   return 'DETERMINISTIC';
 }
 
 function providerName(provider: Exclude<PlannerProvider, 'FALLBACK'>): string {
-  return provider === 'KIMI' ? 'Kimi' : provider === 'OPENAI' ? 'OpenAI' : 'Deterministic';
+  return provider === 'AIAND' ? 'ai&' : provider === 'KIMI' ? 'Kimi' : provider === 'OPENAI' ? 'OpenAI' : 'Deterministic';
 }
 
 function safeOrigin(value: string): string {

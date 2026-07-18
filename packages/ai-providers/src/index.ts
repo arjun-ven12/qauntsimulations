@@ -13,6 +13,8 @@ export * from './providers/openai/openai.provider.js';
 export * from './providers/kimi/kimi.provider.js';
 export * from './providers/kimi/kimi.client.js';
 export * from './providers/kimi/kimi-experiment-planner.js';
+export * from './providers/aiand/aiand.client.js';
+export * from './providers/aiand/aiand-experiment-planner.js';
 export * from './services/experiment-planner.service.js';
 export * from './services/finding-explainer.service.js';
 export * from './services/invariant-compiler.service.js';

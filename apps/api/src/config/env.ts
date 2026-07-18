@@ -18,7 +18,7 @@ export const apiEnvironmentSchema = z
     COOKIE_SECURE: booleanString.default('false'),
     BCRYPT_ROUNDS: z.coerce.number().int().min(10).max(15).default(12),
     AI_PROVIDER: z.enum(['openai', 'kimi', 'mock']).default('openai'),
-    PLANNER_PROVIDER: z.enum(['deterministic', 'openai', 'kimi']).default('deterministic'),
+    PLANNER_PROVIDER: z.enum(['deterministic', 'openai', 'kimi', 'AIAND']).default('deterministic'),
     PLANNER_FALLBACK_ENABLED: booleanString.default('true'),
     PLANNER_MAX_WORLDS: z.coerce.number().int().min(1).max(20).default(8),
     PLANNER_MAX_VARIABLES: z.coerce.number().int().min(1).max(12).default(6),
@@ -39,6 +39,16 @@ export const apiEnvironmentSchema = z
     KIMI_MODEL: z.string().default('kimi-k2.6'),
     KIMI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(60_000),
     KIMI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(500).max(10_000).default(3_000),
+    AIAND_API_KEY: z.string().optional(),
+    AIAND_BASE_URL: z.string().url().refine((value) => new URL(value).protocol === 'https:', 'AIAND_BASE_URL must use HTTPS').default('https://api.aiand.com/v1'),
+    AIAND_MODEL: z.string().min(1).default('moonshotai/kimi-k2.7-code'),
+    AIAND_API_SURFACE: z.enum(['CHAT_COMPLETIONS']).default('CHAT_COMPLETIONS'),
+    AIAND_STREAMING_ENABLED: booleanString.default('true'),
+    AIAND_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(240_000),
+    AIAND_IDLE_TIMEOUT_MS: z.coerce.number().int().min(5_000).max(120_000).default(45_000),
+    AIAND_MAX_COMPLETION_TOKENS: z.coerce.number().int().min(500).max(12_000).default(8_000),
+    AIAND_REASONING_EFFORT: z.enum(['none', 'minimal', 'low', 'medium', 'high']).default('none'),
+    AIAND_PLANNER_ENABLED: booleanString.default('false'),
     NOSANA_EVIDENCE_INTELLIGENCE_ENABLED: booleanString.default('false'),
     NOSANA_DEPLOYMENT_ID: optionalString,
     NOSANA_DEPLOYMENT_ENDPOINT: optionalUrl,
@@ -128,6 +138,36 @@ export const apiEnvironmentSchema = z
         path: ['MOONSHOT_API_KEY'],
         message: 'MOONSHOT_API_KEY is required when PLANNER_PROVIDER=kimi and PLANNER_FALLBACK_ENABLED=false',
       });
+    }
+    if (environment.PLANNER_PROVIDER === 'AIAND') {
+      if (!environment.AIAND_PLANNER_ENABLED) {
+        context.addIssue({
+          code: 'custom',
+          path: ['AIAND_PLANNER_ENABLED'],
+          message: 'AIAND_PLANNER_ENABLED must be true when PLANNER_PROVIDER=AIAND',
+        });
+      }
+      if (!environment.AIAND_API_KEY) {
+        context.addIssue({
+          code: 'custom',
+          path: ['AIAND_API_KEY'],
+          message: 'AIAND_API_KEY is required when PLANNER_PROVIDER=AIAND',
+        });
+      }
+      if (!environment.AIAND_BASE_URL) {
+        context.addIssue({
+          code: 'custom',
+          path: ['AIAND_BASE_URL'],
+          message: 'AIAND_BASE_URL is required when PLANNER_PROVIDER=AIAND',
+        });
+      }
+      if (!environment.AIAND_MODEL) {
+        context.addIssue({
+          code: 'custom',
+          path: ['AIAND_MODEL'],
+          message: 'AIAND_MODEL is required when PLANNER_PROVIDER=AIAND',
+        });
+      }
     }
     if (environment.NOSANA_EVIDENCE_INTELLIGENCE_ENABLED) {
       if (!environment.NOSANA_DEPLOYMENT_ID) {
