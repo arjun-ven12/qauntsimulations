@@ -19,6 +19,7 @@ import { createSandboxProvider } from './integrations/daytona/daytona-sandbox.se
 import { EnvironmentController } from './modules/environments/environments.controller.js';
 import { EnvironmentRepository } from './modules/environments/environments.repository.js';
 import { EnvironmentService } from './modules/environments/environments.service.js';
+import { OxylabsEnvironmentIntelligenceProvider } from './modules/environments/oxylabs-environment-intelligence.provider.js';
 import { DeterministicExperimentPlanService } from './modules/experiments/services/deterministic-experiment-plan.service.js';
 import { FinalEvidenceReportService } from './modules/experiments/services/final-evidence-report.service.js';
 import {
@@ -89,6 +90,7 @@ const evidenceRoot = isAbsolute(env.EVIDENCE_LOCAL_PATH)
   ? env.EVIDENCE_LOCAL_PATH
   : resolve(repositoryRoot, env.EVIDENCE_LOCAL_PATH);
 const investigationRepository = new InvestigationRepository(database);
+const environmentRepository = new EnvironmentRepository(database);
 const repairVerificationRepository = new PrismaRepairVerificationReadRepository(database);
 const evidenceIntelligenceRepository = new EvidenceIntelligenceRepository(database);
 const openAIPlannerModel = env.OPENAI_PLANNER_MODEL ?? env.OPENAI_MODEL_PLANNER;
@@ -263,6 +265,16 @@ const repairVerificationController = new RepairVerificationController(
   ),
 );
 await new ExecutionCleanupService(investigationRepository).run();
+const environmentIntelligenceProvider = new OxylabsEnvironmentIntelligenceProvider({
+  enabled: env.OXYLABS_ENABLED,
+  required: env.OXYLABS_REQUIRED,
+  ...(env.OXYLABS_USERNAME ? { username: env.OXYLABS_USERNAME } : {}),
+  ...(env.OXYLABS_PASSWORD ? { password: env.OXYLABS_PASSWORD } : {}),
+  baseUrl: env.OXYLABS_BASE_URL,
+  source: env.OXYLABS_SOURCE,
+  timeoutMs: env.OXYLABS_REQUEST_TIMEOUT_MS,
+  renderMode: env.OXYLABS_RENDER_MODE,
+});
 
 const app = createApplication({
   webUrl: env.WEB_URL,
@@ -275,7 +287,10 @@ const app = createApplication({
   controllers: {
     projects: new ProjectController(new ProjectService(new PrismaProjectRepository(database))),
     environments: new EnvironmentController(
-      new EnvironmentService(new EnvironmentRepository(database)),
+      new EnvironmentService(environmentRepository, environmentIntelligenceProvider, {
+        enabled: env.OXYLABS_ENABLED,
+        required: env.OXYLABS_REQUIRED,
+      }),
     ),
     organisations: new OrganisationController(
       new OrganisationService(new PrismaOrganisationRepository(database)),

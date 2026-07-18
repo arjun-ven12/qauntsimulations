@@ -56,6 +56,14 @@ export const apiEnvironmentSchema = z
     NOSANA_MAX_SCREENSHOTS: z.coerce.number().int().min(1).max(3).default(3),
     NOSANA_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).max(5 * 1024 * 1024).default(5 * 1024 * 1024),
     NOSANA_REQUIRED: booleanString.default('false'),
+    OXYLABS_ENABLED: booleanString.default('false'),
+    OXYLABS_USERNAME: optionalString,
+    OXYLABS_PASSWORD: optionalString,
+    OXYLABS_BASE_URL: z.string().url().refine((value) => new URL(value).protocol === 'https:', 'OXYLABS_BASE_URL must use HTTPS').default('https://realtime.oxylabs.io/v1/queries'),
+    OXYLABS_SOURCE: z.string().trim().min(1).default('universal'),
+    OXYLABS_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(120_000),
+    OXYLABS_RENDER_MODE: z.enum(['html']).default('html'),
+    OXYLABS_REQUIRED: booleanString.default('false'),
     EVIDENCE_STORAGE_PROVIDER: z.enum(['local', 'object']).default('local'),
     EVIDENCE_LOCAL_PATH: z.string().default('./storage/evidence'),
     WORKER_EXECUTION_PROVIDER: z.enum(['local', 'daytona']).default('local'),
@@ -175,6 +183,14 @@ export const apiEnvironmentSchema = z
       }
       if (!environment.NOSANA_DEPLOYMENT_ENDPOINT) {
         context.addIssue({ code: 'custom', path: ['NOSANA_DEPLOYMENT_ENDPOINT'], message: 'NOSANA_DEPLOYMENT_ENDPOINT is required when NOSANA_EVIDENCE_INTELLIGENCE_ENABLED=true' });
+      }
+    }
+    if (environment.OXYLABS_ENABLED) {
+      if (!environment.OXYLABS_USERNAME) {
+        context.addIssue({ code: 'custom', path: ['OXYLABS_USERNAME'], message: 'OXYLABS_USERNAME is required when OXYLABS_ENABLED=true' });
+      }
+      if (!environment.OXYLABS_PASSWORD) {
+        context.addIssue({ code: 'custom', path: ['OXYLABS_PASSWORD'], message: 'OXYLABS_PASSWORD is required when OXYLABS_ENABLED=true' });
       }
     }
     if (environment.DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION > environment.DAYTONA_MAX_CONCURRENT_SANDBOXES) {

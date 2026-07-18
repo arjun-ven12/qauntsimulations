@@ -80,8 +80,43 @@ export interface ExperimentPlanResponse {
   plannerStatus?: string | undefined;
   schemaPassed?: boolean | undefined;
   safetyPassed?: boolean | undefined;
+  environmentIntelligence?: EnvironmentIntelligenceSummaryResponse | null | undefined;
   plannerMetadata?: Record<string, unknown> | undefined;
 }
+
+export interface EnvironmentIntelligenceSummaryResponse {
+  provider: 'OXYLABS';
+  status: 'COMPLETED' | 'FAILED' | 'UNAVAILABLE';
+  sourceDomain: string;
+  rendered: boolean;
+  title: string | null;
+  headingCount: number;
+  formCount: number;
+  inputCount: number;
+  buttonCount: number;
+  linkCount: number;
+  detectedJourneys: string[];
+  durationMs: number;
+  usedByPlanner: boolean;
+  retrievedAt: string;
+}
+
+const environmentIntelligenceSummaryResponseSchema = z.object({
+  provider: z.literal('OXYLABS'),
+  status: z.enum(['COMPLETED', 'FAILED', 'UNAVAILABLE']),
+  sourceDomain: z.string(),
+  rendered: z.boolean(),
+  title: z.string().nullable(),
+  headingCount: z.number().int().nonnegative(),
+  formCount: z.number().int().nonnegative(),
+  inputCount: z.number().int().nonnegative(),
+  buttonCount: z.number().int().nonnegative(),
+  linkCount: z.number().int().nonnegative(),
+  detectedJourneys: z.array(z.string()),
+  durationMs: z.number().int().nonnegative(),
+  usedByPlanner: z.boolean(),
+  retrievedAt: z.string(),
+});
 
 export const experimentPlanResponseSchema: z.ZodType<ExperimentPlanResponse, z.ZodTypeDef, unknown> = z.object({
   investigationId: z.string().optional(),
@@ -105,6 +140,7 @@ export const experimentPlanResponseSchema: z.ZodType<ExperimentPlanResponse, z.Z
   plannerStatus: z.string().optional(),
   schemaPassed: z.boolean().optional(),
   safetyPassed: z.boolean().optional(),
+  environmentIntelligence: environmentIntelligenceSummaryResponseSchema.nullable().optional(),
   plannerMetadata: jsonRecordSchema.optional(),
 });
 

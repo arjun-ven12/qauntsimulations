@@ -14,6 +14,7 @@ import type {
 } from './deterministic-experiment-plan.service.js';
 import { DeterministicExperimentPlanService } from './deterministic-experiment-plan.service.js';
 import type { PersistedLaunchSnapshot } from '../../investigations/investigations.types.js';
+import { environmentIntelligenceContextSchema, summarizeEnvironmentIntelligence } from '../../environments/environment-intelligence.schema.js';
 
 export interface PlanningScope {
   projectId: string;
@@ -217,6 +218,7 @@ export class InvestigationPlanningService {
       ...(generation ? { generationDurationMs: generation.durationMs } : {}),
       ...(generation?.usage ? { usage: generation.usage } : {}),
       ...(requestedProvider === 'AIAND' ? { modelProvider: 'MOONSHOTAI' } : {}),
+      ...(environmentIntelligenceSummary(scope.launch?.environment.environmentIntelligence, Boolean(generation)) ? { environmentIntelligence: environmentIntelligenceSummary(scope.launch?.environment.environmentIntelligence, Boolean(generation))! } : {}),
       generatedAt: new Date().toISOString(),
       warnings: validation.warnings,
       acceptedWorldCount: validation.acceptedWorlds.length,
@@ -256,6 +258,7 @@ export class InvestigationPlanningService {
             ...(scope.launch.environment.payment ? { payment: scope.launch.environment.payment } : {}),
             ...(scope.launch.environment.reset ? { reset: scope.launch.environment.reset } : {}),
           },
+          ...(plannerEnvironmentIntelligence(scope.launch.environment.environmentIntelligence) ? { intelligence: plannerEnvironmentIntelligence(scope.launch.environment.environmentIntelligence)! } : {}),
         } : {}),
       },
       journey: {
@@ -393,6 +396,7 @@ export class InvestigationPlanningService {
         generationDurationMs: generation.durationMs,
         generatedAt: new Date().toISOString(),
         ...(generation.usage ? { usage: generation.usage } : {}),
+        ...(environmentIntelligenceSummary(scope.launch?.environment.environmentIntelligence, true) ? { environmentIntelligence: environmentIntelligenceSummary(scope.launch?.environment.environmentIntelligence, true)! } : {}),
       },
     };
   }
@@ -489,6 +493,30 @@ function safeOrigin(value: string): string {
   } catch {
     return 'Configured environment';
   }
+}
+
+function plannerEnvironmentIntelligence(value: unknown): NonNullable<PlannerRequest['environment']['intelligence']> | null {
+  const parsed = environmentIntelligenceContextSchema.safeParse(value);
+  if (!parsed.success || parsed.data.status !== 'COMPLETED') return null;
+  const context = parsed.data;
+  const controls = [
+    ...context.forms.flatMap((form) => form.inputs.map((input) => [input.label, input.name, input.type].filter(Boolean).join(' '))),
+    ...context.buttons.map((button) => button.text),
+  ].filter(Boolean).slice(0, 30);
+  return {
+    provider: 'OXYLABS',
+    title: context.title,
+    headings: context.headings.slice(0, 20),
+    controls,
+    detectedJourneys: context.detectedJourneys.slice(0, 10),
+    ...(context.visibleTextSummary ? { visibleTextSummary: context.visibleTextSummary.slice(0, 3000) } : {}),
+  };
+}
+
+function environmentIntelligenceSummary(value: unknown, usedByPlanner: boolean) {
+  const parsed = environmentIntelligenceContextSchema.safeParse(value);
+  if (!parsed.success) return null;
+  return summarizeEnvironmentIntelligence({ ...parsed.data, usedByPlanner });
 }
 
 function sanitizeJourneyStep(step: PersistedLaunchSnapshot['journey']['steps'][number]): Record<string, unknown> {

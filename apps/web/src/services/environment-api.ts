@@ -64,6 +64,7 @@ export interface EnvironmentConfig {
     status: 'PASS' | 'WARNING' | 'FAIL';
     message: string;
   }>;
+  environmentIntelligence?: unknown;
 }
 
 export interface Environment {
@@ -143,6 +144,12 @@ class HttpEnvironmentApi {
 
   validate(projectId: string, environmentId: string): Promise<Environment> {
     return this.request(`/projects/${projectId}/environments/${environmentId}/validate`, {
+      method: 'POST',
+    });
+  }
+
+  retrieveIntelligence(projectId: string, environmentId: string): Promise<Environment> {
+    return this.request(`/projects/${projectId}/environments/${environmentId}/intelligence`, {
       method: 'POST',
     });
   }

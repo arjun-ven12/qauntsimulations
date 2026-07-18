@@ -125,4 +125,17 @@ export class EnvironmentRepository {
       },
     }) as Promise<EnvironmentRecord>;
   }
+
+  async saveEnvironmentIntelligence(projectId: string, id: string, intelligence: unknown) {
+    const item = await this.database.environment.findFirst({
+      where: { id, projectId, deletedAt: null },
+      select: { configuration: true },
+    });
+    if (!item) return null;
+    const config = { ...(item.configuration as object), environmentIntelligence: intelligence };
+    return this.database.environment.update({
+      where: { id },
+      data: { configuration: config as Prisma.InputJsonValue },
+    }) as Promise<EnvironmentRecord>;
+  }
 }

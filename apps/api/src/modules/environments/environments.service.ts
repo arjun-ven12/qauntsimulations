@@ -6,9 +6,15 @@ import type { ProjectSafetyConfiguration } from '../projects/projects.types.js';
 import { mapEnvironment } from './environments.mapper.js';
 import type { EnvironmentRepository } from './environments.repository.js';
 import type { EnvironmentInput, EnvironmentRecord } from './environments.types.js';
+import { environmentIntelligenceContextSchema } from './environment-intelligence.schema.js';
+import { OxylabsEnvironmentIntelligenceError, type OxylabsEnvironmentIntelligenceProvider } from './oxylabs-environment-intelligence.provider.js';
 
 export class EnvironmentService {
-  constructor(private readonly repository: EnvironmentRepository) {}
+  constructor(
+    private readonly repository: EnvironmentRepository,
+    private readonly environmentIntelligence?: OxylabsEnvironmentIntelligenceProvider,
+    private readonly intelligenceOptions: { enabled: boolean; required: boolean } = { enabled: false, required: false },
+  ) {}
   private async project(context: AuthContext, projectId: string, edit = false) {
     if (!context.organisationId)
       throw new ApplicationError(
@@ -146,6 +152,48 @@ export class EnvironmentService {
         : 'READY';
     return mapEnvironment((await this.repository.saveValidation(projectId, id, status, results))!);
   }
+
+  async retrieveIntelligence(context: AuthContext, projectId: string, id: string) {
+    const scope = await this.project(context, projectId, true);
+    const item = await this.repository.find(projectId, id);
+    if (!item)
+      throw new ApplicationError('ENVIRONMENT_NOT_FOUND', 'Environment was not found', 404);
+    const allowedHosts = scope.project.safetyPolicies[0]!.domainAllowlist;
+    let intelligence: unknown;
+    try {
+      if (!this.environmentIntelligence || !this.intelligenceOptions.enabled) {
+        throw new OxylabsEnvironmentIntelligenceError('OXYLABS_DISABLED', 'Oxylabs environment intelligence is disabled.');
+      }
+      intelligence = await this.environmentIntelligence.retrieve({ url: item.baseUrl, allowedHosts });
+    } catch (error) {
+      if (this.intelligenceOptions.required) throw mapIntelligenceError(error);
+      const url = new URL(item.baseUrl);
+      intelligence = environmentIntelligenceContextSchema.parse({
+        provider: 'OXYLABS',
+        status: 'UNAVAILABLE',
+        sourceUrl: url.toString(),
+        finalUrl: url.toString(),
+        sourceDomain: url.hostname,
+        targetStatusCode: 0,
+        rendered: false,
+        title: null,
+        headings: [],
+        forms: [],
+        buttons: [],
+        links: [],
+        visibleTextSummary: '',
+        detectedJourneys: [],
+        jobId: null,
+        durationMs: 0,
+        retrievedAt: new Date().toISOString(),
+        usedByPlanner: false,
+        errorCategory: error instanceof OxylabsEnvironmentIntelligenceError ? error.code : 'UNKNOWN_PROVIDER_ERROR',
+      });
+    }
+    const saved = await this.repository.saveEnvironmentIntelligence(projectId, id, intelligence);
+    if (!saved) throw new ApplicationError('ENVIRONMENT_NOT_FOUND', 'Environment was not found', 404);
+    return mapEnvironment(saved);
+  }
 }
 function mapInput(r: EnvironmentRecord): EnvironmentInput {
   return {
@@ -211,4 +259,12 @@ function assertCompatible(input: EnvironmentInput, safety: ProjectSafetyConfigur
 }
 function isUnique(e: unknown) {
   return typeof e === 'object' && e !== null && 'code' in e && e.code === 'P2002';
+}
+
+function mapIntelligenceError(error: unknown): ApplicationError {
+  if (error instanceof OxylabsEnvironmentIntelligenceError) {
+    const status = error.code === 'AUTHENTICATION_ERROR' ? 502 : error.code === 'HOST_NOT_ALLOWED' || error.code === 'UNSAFE_URL' ? 403 : 502;
+    return new ApplicationError(`OXYLABS_${error.code}`, error.message, status);
+  }
+  return new ApplicationError('OXYLABS_UNKNOWN_PROVIDER_ERROR', 'Oxylabs environment intelligence failed.', 502);
 }

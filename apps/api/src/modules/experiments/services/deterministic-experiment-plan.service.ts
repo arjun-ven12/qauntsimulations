@@ -78,6 +78,7 @@ export interface DeterministicExperimentPlan {
     validationDurationMs?: number;
     generatedAt?: string;
     usage?: unknown;
+    environmentIntelligence?: unknown;
   };
 }
 

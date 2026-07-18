@@ -76,6 +76,12 @@ describe('ExperimentPlanPage demo preview', () => {
     expect(html).toContain('Fallback plan');
     expect(html).toContain('Deterministic fallback');
     expect(html).toContain('Malformed provider output');
+    expect(html).toContain('Environment Intelligence');
+    expect(html).toContain('Context by Oxylabs');
+    expect(html).toContain('Rendered public page');
+    expect(html).toContain('tasks-demo-store.onrender.com');
+    expect(html).toContain('Journeys detected');
+    expect(html).toContain('Browse products, Checkout');
     expect(html).not.toContain('DEMO PREVIEW');
     expect(html).not.toContain('Simulated successful ai&amp; plan');
     expect(html).not.toContain('Planned by Kimi via ai&amp;');
@@ -109,6 +115,22 @@ function fallbackPlan(): ExperimentPlanResponse {
       plannerStatus: 'FALLBACK_USED',
       fallbackReason: 'Malformed provider output',
       model: 'moonshotai/kimi-k2.7-code',
+    },
+    environmentIntelligence: {
+      provider: 'OXYLABS',
+      status: 'COMPLETED',
+      sourceDomain: 'tasks-demo-store.onrender.com',
+      rendered: true,
+      title: 'TaskOS Demo Store',
+      headingCount: 1,
+      formCount: 1,
+      inputCount: 2,
+      buttonCount: 2,
+      linkCount: 2,
+      detectedJourneys: ['Browse products', 'Checkout'],
+      durationMs: 1234,
+      usedByPlanner: true,
+      retrievedAt: '2026-07-18T00:00:00.000Z',
     },
   };
 }

@@ -118,6 +118,62 @@ describe('InvestigationPlanningService', () => {
     expect(aiand.request?.controls.maximumWorlds).toBe(demoCreateInvestigationInput.scenario.controls.maximumWorlds);
   });
 
+  it('passes bounded Oxylabs environment intelligence into provider planning and plan metadata', async () => {
+    const aiand = new FakeAiAndPlanner();
+    const result = await new InvestigationPlanningService({ ...options, requestedProvider: 'AIAND', model: 'moonshotai/kimi-k2.7-code' }, undefined, aiand).plan(demoCreateInvestigationInput, {
+      ...scope,
+      launch: {
+        inputSource: 'PERSISTED_CONFIGURATION',
+        actorUserId: 'user',
+        launchedAt: '2026-07-18T00:00:00.000Z',
+        scenario: { prompt: demoCreateInvestigationInput.scenario.prompt, controls: demoCreateInvestigationInput.scenario.controls },
+        environment: {
+          id: 'environment_demo_hosted',
+          name: 'Hosted Demo Store',
+          type: 'PREVIEW',
+          baseUrl: 'https://tasks-demo-store.onrender.com',
+          allowedActions: ['NAVIGATE_APPLICATION', 'PERFORM_CHECKOUT'],
+          environmentIntelligence: {
+            provider: 'OXYLABS',
+            status: 'COMPLETED',
+            sourceUrl: 'https://tasks-demo-store.onrender.com/',
+            finalUrl: 'https://tasks-demo-store.onrender.com/',
+            sourceDomain: 'tasks-demo-store.onrender.com',
+            targetStatusCode: 200,
+            rendered: true,
+            title: 'TaskOS Demo Store',
+            headings: ['Products'],
+            forms: [{ method: 'POST', action: 'https://tasks-demo-store.onrender.com/checkout', inputs: [{ type: 'text', name: 'email', label: null, required: true }] }],
+            buttons: [{ text: 'Checkout', type: 'submit' }],
+            links: [{ text: 'Products', href: 'https://tasks-demo-store.onrender.com/products' }],
+            visibleTextSummary: 'Products checkout payment',
+            detectedJourneys: ['Browse products', 'Checkout'],
+            jobId: 'job_123',
+            durationMs: 1234,
+            retrievedAt: '2026-07-18T00:00:00.000Z',
+          },
+        },
+        journey: { id: 'journey', name: 'Checkout', steps: [], successCondition: { type: 'visible', selector: '#order-confirmation' } },
+        invariants: [],
+        safety: { domainAllowlist: ['tasks-demo-store.onrender.com'], allowedHttpMethods: ['GET', 'POST'], permitCheckoutSubmission: true, permitMockPayment: true, permitTestOrderCreation: true, prohibitedActions: [] },
+        validation: { status: 'READY', warnings: [] },
+      },
+    });
+
+    expect(aiand.request?.environment.intelligence).toMatchObject({
+      provider: 'OXYLABS',
+      title: 'TaskOS Demo Store',
+      detectedJourneys: ['Browse products', 'Checkout'],
+    });
+    expect(JSON.stringify(aiand.request?.environment.intelligence)).not.toContain('<html');
+    expect(result.plan.planner?.environmentIntelligence).toMatchObject({
+      provider: 'OXYLABS',
+      status: 'COMPLETED',
+      sourceDomain: 'tasks-demo-store.onrender.com',
+      usedByPlanner: true,
+    });
+  });
+
   it('uses deterministic fallback when selected ai& configuration is missing or fails', async () => {
     const missing = await new InvestigationPlanningService({ ...options, requestedProvider: 'AIAND' }).plan(demoCreateInvestigationInput, scope);
     expect(missing).toMatchObject({ requestedProvider: 'AIAND', effectiveProvider: 'FALLBACK', plannerStatus: 'FALLBACK_USED' });

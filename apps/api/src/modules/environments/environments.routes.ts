@@ -9,6 +9,7 @@ export function createEnvironmentRouter(controller: EnvironmentController) {
   router.get('/:environmentId', controller.get);
   router.patch('/:environmentId', validateBody(updateEnvironmentSchema, 400), controller.update);
   router.post('/:environmentId/validate', controller.validate);
+  router.post('/:environmentId/intelligence', controller.retrieveIntelligence);
   router.post('/:environmentId/set-default', controller.setDefault);
   return router;
 }
