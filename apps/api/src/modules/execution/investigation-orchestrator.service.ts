@@ -21,6 +21,10 @@ export interface InvestigationTerminalListener {
   synchronizeSafely(investigationId: string): Promise<void>;
 }
 
+export interface InvestigationEvidenceIntelligenceListener {
+  synchronizeSafely(investigationId: string): Promise<void>;
+}
+
 export interface DaytonaFleetOrchestratorOptions {
   perInvestigationLimit: number;
   serverWideLimit: number;
@@ -119,10 +123,15 @@ export class InvestigationOrchestratorService {
     private readonly minimisationPlans = new DeterministicMinimisationPlanService(),
     private readonly finalReports?: FinalEvidenceReportService,
     private terminalListener?: InvestigationTerminalListener,
+    private evidenceIntelligence?: InvestigationEvidenceIntelligenceListener,
   ) {}
 
   setTerminalListener(listener: InvestigationTerminalListener): void {
     this.terminalListener = listener;
+  }
+
+  setEvidenceIntelligenceListener(listener: InvestigationEvidenceIntelligenceListener): void {
+    this.evidenceIntelligence = listener;
   }
 
   start(investigationId: string): void {
@@ -164,6 +173,9 @@ export class InvestigationOrchestratorService {
     if (await this.repository.isCancelled(investigationId)) return;
     await this.repository.finishInvestigation(investigationId);
     logger.info({ investigationId, provider: this.executor.provider, status: 'COMPLETED' }, 'Investigation completed');
+    if (this.evidenceIntelligence) {
+      setImmediate(() => void this.evidenceIntelligence?.synchronizeSafely(investigationId));
+    }
   }
 
   private async runAdaptiveReproduction(context: InvestigationOrchestrationContext): Promise<void> {

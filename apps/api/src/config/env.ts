@@ -39,6 +39,13 @@ export const apiEnvironmentSchema = z
     KIMI_MODEL: z.string().default('kimi-k2.6'),
     KIMI_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(120_000).default(60_000),
     KIMI_MAX_OUTPUT_TOKENS: z.coerce.number().int().min(500).max(10_000).default(3_000),
+    NOSANA_EVIDENCE_INTELLIGENCE_ENABLED: booleanString.default('false'),
+    NOSANA_DEPLOYMENT_ID: optionalString,
+    NOSANA_DEPLOYMENT_ENDPOINT: optionalUrl,
+    NOSANA_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(1_000).max(300_000).default(60_000),
+    NOSANA_MAX_SCREENSHOTS: z.coerce.number().int().min(1).max(3).default(3),
+    NOSANA_MAX_IMAGE_BYTES: z.coerce.number().int().min(1).max(5 * 1024 * 1024).default(5 * 1024 * 1024),
+    NOSANA_REQUIRED: booleanString.default('false'),
     EVIDENCE_STORAGE_PROVIDER: z.enum(['local', 'object']).default('local'),
     EVIDENCE_LOCAL_PATH: z.string().default('./storage/evidence'),
     WORKER_EXECUTION_PROVIDER: z.enum(['local', 'daytona']).default('local'),
@@ -121,6 +128,14 @@ export const apiEnvironmentSchema = z
         path: ['MOONSHOT_API_KEY'],
         message: 'MOONSHOT_API_KEY is required when PLANNER_PROVIDER=kimi and PLANNER_FALLBACK_ENABLED=false',
       });
+    }
+    if (environment.NOSANA_EVIDENCE_INTELLIGENCE_ENABLED) {
+      if (!environment.NOSANA_DEPLOYMENT_ID) {
+        context.addIssue({ code: 'custom', path: ['NOSANA_DEPLOYMENT_ID'], message: 'NOSANA_DEPLOYMENT_ID is required when NOSANA_EVIDENCE_INTELLIGENCE_ENABLED=true' });
+      }
+      if (!environment.NOSANA_DEPLOYMENT_ENDPOINT) {
+        context.addIssue({ code: 'custom', path: ['NOSANA_DEPLOYMENT_ENDPOINT'], message: 'NOSANA_DEPLOYMENT_ENDPOINT is required when NOSANA_EVIDENCE_INTELLIGENCE_ENABLED=true' });
+      }
     }
     if (environment.DAYTONA_MAX_SANDBOXES_PER_INVESTIGATION > environment.DAYTONA_MAX_CONCURRENT_SANDBOXES) {
       context.addIssue({

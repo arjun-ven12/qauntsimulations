@@ -12,6 +12,8 @@ import type {
   PreparedRepairVerificationPersistence,
   RepairVerificationWorldEvidence,
 } from './repair-verification.types.js';
+import { toRuntimeJourney } from '../journeys/journeys.mapper.js';
+import { mapPersistedInvariantToRuntimeDefinition } from '../invariants/invariants.mapper.js';
 
 export interface RepairVerificationReadRepository {
   loadEligibilityContext(input: {
@@ -88,6 +90,12 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
           },
           investigation: {
             include: {
+              environment: true,
+              journey: {
+                include: {
+                  steps: { orderBy: { order: 'asc' } },
+                },
+              },
               plans: { orderBy: { version: 'desc' }, take: 1, select: { plan: true } },
               worlds: {
                 orderBy: { createdAt: 'asc' },
@@ -96,7 +104,12 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
                     orderBy: { createdAt: 'desc' },
                     take: 1,
                     include: {
-                      evaluations: { select: { passed: true } },
+                      evaluations: {
+                        select: {
+                          passed: true,
+                          invariant: true,
+                        },
+                      },
                       attempts: {
                         orderBy: { attempt: 'desc' },
                         take: 1,
@@ -138,7 +151,12 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
     const minimalWorldConfiguration = jsonRecord(finding?.minimalReproduction?.worldConfiguration)
       ?? jsonRecord(minimisation?.finalMinimalTestedConditions);
     const causal = jsonRecord(finding?.causalConditions);
-    const launchSnapshot = readLaunchSnapshot(finding?.investigation.plans[0]?.plan);
+    const safetyPolicy = finding?.project.safetyPolicies[0];
+    const launchSnapshot = readLaunchSnapshot(finding?.investigation.plans[0]?.plan)
+      ?? readLegacyLaunchSnapshot({
+        finding,
+        safetyPolicy,
+      });
 
     return {
       organisationId: input.organisationId,
@@ -167,11 +185,11 @@ export class PrismaRepairVerificationReadRepository implements RepairVerificatio
         deletedAt: targetEnvironment.deletedAt,
         configuration: jsonRecord(targetEnvironment.configuration) ?? {},
       } : null,
-      safetyPolicy: finding?.project.safetyPolicies[0] ? {
-        id: finding.project.safetyPolicies[0].id,
-        domainAllowlist: finding.project.safetyPolicies[0].domainAllowlist,
-        blockedActions: finding.project.safetyPolicies[0].blockedActions,
-        configuration: jsonRecord(finding.project.safetyPolicies[0].configuration) ?? {},
+      safetyPolicy: safetyPolicy ? {
+        id: safetyPolicy.id,
+        domainAllowlist: safetyPolicy.domainAllowlist,
+        blockedActions: safetyPolicy.blockedActions,
+        configuration: jsonRecord(safetyPolicy.configuration) ?? {},
       } : null,
       launchSnapshot,
       minimalWorldConfiguration,
@@ -510,6 +528,84 @@ function readLaunchSnapshot(planValue: unknown): RepairVerificationLaunchSnapsho
       permitTestOrderCreation: safety.permitTestOrderCreation,
     },
   };
+}
+
+function readLegacyLaunchSnapshot(input: {
+  finding: LegacyLaunchFinding | null | undefined;
+  safetyPolicy: {
+    domainAllowlist: string[];
+    configuration: unknown;
+  } | null | undefined;
+}): RepairVerificationLaunchSnapshot | null {
+  const finding = input.finding;
+  const safety = input.safetyPolicy;
+  if (!finding || !safety) return null;
+  const safetyConfiguration = jsonRecord(safety.configuration);
+  if (!safetyConfiguration) return null;
+  const invariants = selectedInvariantsFromEvaluations(finding.investigation.worlds);
+  if (!invariants.length) return null;
+  try {
+    const journey = toRuntimeJourney(finding.investigation.journey);
+    return {
+      journey: {
+        id: journey.id,
+        name: journey.name,
+        steps: journey.steps,
+        successCondition: journey.successCondition,
+      },
+      invariants,
+      environment: {
+        id: finding.investigation.environment.id,
+        name: finding.investigation.environment.name,
+        type: String(finding.investigation.environment.type),
+        baseUrl: finding.investigation.environment.baseUrl,
+      },
+      safety: {
+        domainAllowlist: safety.domainAllowlist,
+        allowedHttpMethods: stringArray(safetyConfiguration.allowedHttpMethods),
+        permitCheckoutSubmission: safetyConfiguration.permitCheckoutSubmission === true,
+        permitMockPayment: safetyConfiguration.permitMockPayment === true,
+        permitTestOrderCreation: (safetyConfiguration.permitTestOrderCreation ?? safetyConfiguration.permitOrderCreation) === true,
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+type LegacyLaunchFinding = {
+  investigation: {
+    environment: {
+      id: string;
+      name: string;
+      type: unknown;
+      baseUrl: string;
+    };
+    journey: Parameters<typeof toRuntimeJourney>[0];
+    worlds: Array<{
+      experiments: Array<{
+        evaluations: Array<{
+          invariant: Parameters<typeof mapPersistedInvariantToRuntimeDefinition>[0];
+        }>;
+      }>;
+    }>;
+  };
+};
+
+function selectedInvariantsFromEvaluations(
+  worlds: LegacyLaunchFinding['investigation']['worlds'],
+): RepairVerificationLaunchSnapshot['invariants'] {
+  const selected = new Map<string, RepairVerificationLaunchSnapshot['invariants'][number]>();
+  for (const world of worlds) {
+    for (const experiment of world.experiments) {
+      for (const evaluation of experiment.evaluations) {
+        if (selected.has(evaluation.invariant.id)) continue;
+        const mapped = mapPersistedInvariantToRuntimeDefinition(evaluation.invariant);
+        selected.set(mapped.id, { ...mapped, config: mapped.config ?? {} });
+      }
+    }
+  }
+  return [...selected.values()];
 }
 
 export function jsonRecord(value: unknown): JsonRecord | null {

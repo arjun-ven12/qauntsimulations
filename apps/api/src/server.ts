@@ -12,6 +12,9 @@ import { AuthService } from './modules/auth/auth.service.js';
 import { JwtAuthTokenService } from './modules/auth/auth-token.service.js';
 import { BcryptPasswordHasher } from './modules/auth/password-hasher.js';
 import { LocalEvidenceMetadataService } from './modules/evidence/local-evidence-metadata.service.js';
+import { EvidenceIntelligenceRepository } from './modules/evidence-intelligence/evidence-intelligence.repository.js';
+import { EvidenceIntelligenceService } from './modules/evidence-intelligence/evidence-intelligence.service.js';
+import { NosanaDeploymentEvidenceIntelligenceProvider } from './modules/evidence-intelligence/nosana-deployment-evidence-intelligence.provider.js';
 import { createSandboxProvider } from './integrations/daytona/daytona-sandbox.service.js';
 import { EnvironmentController } from './modules/environments/environments.controller.js';
 import { EnvironmentRepository } from './modules/environments/environments.repository.js';
@@ -84,6 +87,7 @@ const evidenceRoot = isAbsolute(env.EVIDENCE_LOCAL_PATH)
   : resolve(repositoryRoot, env.EVIDENCE_LOCAL_PATH);
 const investigationRepository = new InvestigationRepository(database);
 const repairVerificationRepository = new PrismaRepairVerificationReadRepository(database);
+const evidenceIntelligenceRepository = new EvidenceIntelligenceRepository(database);
 const openAIPlannerModel = env.OPENAI_PLANNER_MODEL ?? env.OPENAI_MODEL_PLANNER;
 let selectedPlanner: ExperimentPlanner | undefined;
 const plannerModel: string | undefined = env.PLANNER_PROVIDER === 'kimi' ? env.KIMI_MODEL : env.PLANNER_PROVIDER === 'openai' ? openAIPlannerModel : undefined;
@@ -203,6 +207,27 @@ const investigationOrchestrator = new InvestigationOrchestratorService(
   undefined,
   new FinalEvidenceReportService(evidenceRoot),
 );
+if (env.NOSANA_EVIDENCE_INTELLIGENCE_ENABLED) {
+  investigationOrchestrator.setEvidenceIntelligenceListener(new EvidenceIntelligenceService(
+    evidenceIntelligenceRepository,
+    new NosanaDeploymentEvidenceIntelligenceProvider({
+      enabled: env.NOSANA_EVIDENCE_INTELLIGENCE_ENABLED,
+      required: env.NOSANA_REQUIRED,
+      ...(env.NOSANA_DEPLOYMENT_ID ? { deploymentId: env.NOSANA_DEPLOYMENT_ID } : {}),
+      ...(env.NOSANA_DEPLOYMENT_ENDPOINT ? { endpoint: env.NOSANA_DEPLOYMENT_ENDPOINT } : {}),
+      timeoutMs: env.NOSANA_REQUEST_TIMEOUT_MS,
+      maxScreenshots: env.NOSANA_MAX_SCREENSHOTS,
+      maxImageBytes: env.NOSANA_MAX_IMAGE_BYTES,
+    }),
+    evidenceRoot,
+    {
+      enabled: env.NOSANA_EVIDENCE_INTELLIGENCE_ENABLED,
+      required: env.NOSANA_REQUIRED,
+      maxScreenshots: env.NOSANA_MAX_SCREENSHOTS,
+      maxImageBytes: env.NOSANA_MAX_IMAGE_BYTES,
+    },
+  ));
+}
 const repairVerificationExecution = new RepairVerificationExecutionService(
   repairVerificationRepository,
   investigationOrchestrator,
