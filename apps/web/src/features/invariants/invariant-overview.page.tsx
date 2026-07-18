@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
+import { MappedSemanticBadge } from '../../components/semantic-status.js';
 import { ProjectLoading, ProjectMessage, secondaryButton } from '../projects/project-ui.js';
 import { invariantApi } from './invariant-api.js';
 import { templateName, toFormValue } from './invariant-form.model.js';
@@ -9,6 +10,7 @@ import {
   InvariantValidationPanel,
   StatusPill,
 } from './invariant-structured-preview.js';
+import { findingSeverityStatus, setupStatus, validationStatus } from '../runtime/semantic-status.js';
 
 export function InvariantOverviewPage() {
   const { projectId = '', invariantId = '' } = useParams();
@@ -60,22 +62,13 @@ export function InvariantOverviewPage() {
           value={item.type ? templateName(item.type) : 'Unsupported legacy definition'}
         />
         <OverviewItem label="Evaluator" value={item.type ?? 'Unavailable'} mono />
-        <OverviewItem label="Severity" value={item.severity ?? 'Unavailable'} />
-        <OverviewItem label="State" value={item.enabled ? 'Enabled' : 'Disabled'} />
+        <OverviewSemanticItem label="Severity" status={findingSeverityStatus(item.severity)} />
+        <OverviewSemanticItem label="State" status={setupStatus(item.enabled ? 'configured' : 'disabled')} />
         <div className="min-w-0">
           <dt className="text-slate-500">Validation</dt>
           <dd className="mt-1"><StatusPill status={item.validationStatus} /></dd>
         </div>
-        <OverviewItem
-          label="Runtime compatibility"
-          value={
-            !supported
-              ? 'Unsupported definition'
-              : item.enabled
-                ? 'Runtime compatible'
-                : 'Excluded while disabled'
-          }
-        />
+        <OverviewSemanticItem label="Runtime compatibility" status={validationStatus(!supported ? 'UNSUPPORTED' : item.enabled ? 'COMPATIBLE' : 'DISABLED')} />
       </dl>
       {canMutate ? (
         <div className="mt-5">
@@ -129,4 +122,8 @@ function OverviewItem({ label, value, mono = false }: { label: string; value: st
       <dd className={`mt-1 break-words font-bold ${mono ? 'font-mono text-xs' : ''}`}>{value}</dd>
     </div>
   );
+}
+
+function OverviewSemanticItem({ label, status }: { label: string; status: Parameters<typeof MappedSemanticBadge>[0]['status'] }) {
+  return <div className="min-w-0"><dt className="text-slate-500">{label}</dt><dd className="mt-1"><MappedSemanticBadge status={status} /></dd></div>;
 }
