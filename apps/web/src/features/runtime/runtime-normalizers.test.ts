@@ -119,10 +119,11 @@ describe('runtime progress and event formatting', () => {
 
   it('maps statuses to phase tracker states and terminal summaries', async () => {
     expect(phaseTracker('PLANNING')[0]).toMatchObject({ label: 'Plan', state: 'active' });
-    expect(phaseTracker('RUNNING')[1]).toMatchObject({ label: 'Explore', state: 'active' });
-    expect(phaseTracker('ADAPTING')[2]).toMatchObject({ label: 'Reproduce', state: 'active' });
-    expect(phaseTracker('REPRODUCING')[2]).toMatchObject({ label: 'Reproduce', state: 'active' });
-    expect(phaseTracker('MINIMISING')[3]).toMatchObject({ label: 'Minimise', state: 'active' });
+    expect(phaseTracker('PROVISIONING')[1]).toMatchObject({ label: 'Provision', state: 'active' });
+    expect(phaseTracker('RUNNING')[2]).toMatchObject({ label: 'Observe', state: 'active' });
+    expect(phaseTracker('ADAPTING')[3]).toMatchObject({ label: 'Adapt', state: 'active' });
+    expect(phaseTracker('REPRODUCING')[4]).toMatchObject({ label: 'Reproduce', state: 'active' });
+    expect(phaseTracker('MINIMISING')[5]).toMatchObject({ label: 'Minimise', state: 'active' });
     expect(phaseTracker('COMPLETED', 1).every((step) => step.state === 'completed')).toBe(true);
     expect(phaseTracker('COMPLETED', 0).filter((step) => step.state === 'skipped').map((step) => step.label)).toEqual(['Reproduce', 'Minimise']);
     expect(phaseTracker('FAILED').some((step) => step.state === 'stopped')).toBe(true);

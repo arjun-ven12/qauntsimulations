@@ -2,9 +2,11 @@ import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, Settings, ShieldCheck } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { PageHeading } from '../../components/page-heading.js';
+import { MappedSemanticBadge } from '../../components/semantic-status.js';
 import { ProjectApiError, projectApi } from '../../services/project-api.js';
 import { useAuthStore } from '../../stores/auth.store.js';
 import { primaryButton, ProjectLoading, ProjectMessage, secondaryButton } from './project-ui.js';
+import { setupStatus } from '../runtime/semantic-status.js';
 
 export function ProjectOverviewPage() {
   const { projectId = '' } = useParams();
@@ -63,11 +65,12 @@ export function ProjectOverviewPage() {
         title={value.name}
       />
       <div className="grid gap-4 lg:grid-cols-3">
-        <OverviewCard label="Application" value={hostname(value.applicationUrl)} />
-        <OverviewCard label="Repository" value={hostname(value.repositoryUrl)} />
+        <OverviewCard label="Application" value={hostname(value.applicationUrl)} state={value.applicationUrl ? 'configured' : 'incomplete'} />
+        <OverviewCard label="Repository" value={hostname(value.repositoryUrl)} state={value.repositoryUrl ? 'configured' : 'optional'} />
         <OverviewCard
           label="Safety boundary"
           value={`${value.safety.domainAllowlist.length} authorised hosts`}
+          state={value.safety.domainAllowlist.length ? 'configured' : 'incomplete'}
         />
       </div>
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
@@ -98,12 +101,13 @@ export function ProjectOverviewPage() {
   );
 }
 
-function OverviewCard({ label, value }: { label: string; value: string }) {
+function OverviewCard({ label, value, state }: { label: string; value: string; state: 'configured' | 'incomplete' | 'optional' }) {
   return (
     <div className="card min-w-0">
       <ExternalLink aria-hidden="true" className="text-cyan" size={20} />
       <div className="mt-4 text-xs uppercase tracking-widest text-slate-500">{label}</div>
       <div className="mt-1 truncate font-semibold">{value}</div>
+      <div className="mt-3"><MappedSemanticBadge status={setupStatus(state)} /></div>
     </div>
   );
 }

@@ -58,6 +58,25 @@ describe('Rift operational dashboard', () => {
     expect(html).toContain('Checkout Reliability Lab');
     expect(html).not.toContain('TaskOS Demo Commerce');
     expect(html).not.toContain('world count unavailable');
+    expect(html).toContain('data-tone="running"');
+    expect(html).toContain('data-tone="fail"');
+    expect(html).toContain('data-tone="pending"');
+  });
+
+  it('distinguishes terminal and pending investigation states', () => {
+    const html = render({
+      ...seededDemoDashboardData,
+      recentInvestigations: [
+        investigation('completed', 'COMPLETED', 'Completed run'),
+        investigation('failed', 'FAILED', 'Failed run'),
+        investigation('queued', 'QUEUED', 'Queued run'),
+        investigation('cancelled', 'CANCELLED', 'Cancelled run'),
+      ],
+    });
+    expect(html).toContain('aria-label="Completed status"');
+    expect(html).toContain('aria-label="Failed status"');
+    expect(html).toContain('aria-label="Queued status"');
+    expect(html).toContain('aria-label="Cancelled status"');
   });
 
   it('does not add an alternative execution section outside the approved hierarchy', () => {

@@ -112,8 +112,19 @@ describe('Invariant frontend pages', () => {
       const html = renderToStaticMarkup(<InvariantValidationPanel result={result} />);
       expect(html).toContain(status);
       expect(html).toContain(`${status} returned message`);
+      expect(html).toContain(`data-tone="${status === 'PASSED' ? 'pass' : status === 'WARNING' ? 'pending' : 'fail'}"`);
     },
   );
+
+  it('renders readiness and critical severity as separate semantic states', () => {
+    const client = queryClient();
+    client.setQueryData(['invariants', 'project-1'], [invariant()]);
+    const html = renderPage(<InvariantsPage />, '/projects/project-1/invariants', client);
+    expect(html).toContain('aria-label="Ready status"');
+    expect(html).toContain('aria-label="Critical status"');
+    expect(html).toContain('data-tone="pass"');
+    expect(html).toContain('data-tone="fail"');
+  });
 
   it('uses responsive wrapping and stacked template structures without fixed-width controls', () => {
     const html = renderToStaticMarkup(
