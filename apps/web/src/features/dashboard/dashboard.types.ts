@@ -28,6 +28,7 @@ export interface DashboardInvestigationSummary {
   id: string;
   projectId: string;
   projectName: string;
+  name?: string;
   status: string;
   worldCount?: number;
   findingCount?: number;
@@ -37,6 +38,7 @@ export interface DashboardInvestigationSummary {
 
 export interface DashboardFindingSummary {
   id: string;
+  investigationId?: string;
   projectId: string;
   projectName: string;
   title: string;

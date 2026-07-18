@@ -6,6 +6,7 @@ import type { Invariant } from '../invariants/invariant-api.js';
 import { invariantApi } from '../invariants/invariant-api.js';
 import type { Journey } from '../journeys/journey-api.js';
 import { journeyApi } from '../journeys/journey-api.js';
+import { dashboardActivityApi, type DashboardActivity } from './dashboard-activity-api.js';
 import type { DashboardData, DashboardOrganisation, DashboardProject } from './dashboard.types.js';
 
 const primaryDemoProjectName = 'Checkout Reliability Lab';
@@ -15,13 +16,14 @@ export interface DashboardDataSources {
   listEnvironments(projectId: string): Promise<Environment[]>;
   listJourneys(projectId: string): Promise<Journey[]>;
   listInvariants(projectId: string): Promise<Invariant[]>;
+  activity(): Promise<DashboardActivity>;
 }
 
 export interface DashboardDataResult {
   data: DashboardData;
   configurationWarnings: string[];
-  investigationsAvailable: false;
-  findingsAvailable: false;
+  investigationsAvailable: boolean;
+  findingsAvailable: boolean;
 }
 
 export const dashboardDataSources: DashboardDataSources = {
@@ -29,6 +31,7 @@ export const dashboardDataSources: DashboardDataSources = {
   listEnvironments: (projectId) => environmentApi.list(projectId),
   listJourneys: (projectId) => journeyApi.list(projectId),
   listInvariants: (projectId) => invariantApi.list(projectId),
+  activity: () => dashboardActivityApi.get(),
 };
 
 export function dashboardQueryKey(organisationId: string) {
@@ -40,20 +43,47 @@ export async function loadDashboardData(
   sources: DashboardDataSources = dashboardDataSources,
 ): Promise<DashboardDataResult> {
   const projects = await sources.listProjects();
-  const mapped = await Promise.all(
-    projects.map(async (project) => mapProjectReadiness(project, sources)),
-  );
+  const [mapped, activity] = await Promise.all([
+    Promise.all(projects.map(async (project) => mapProjectReadiness(project, sources))),
+    sources.activity().then((value) => ({ value })).catch(() => ({ error: true as const })),
+  ]);
+  const activityValue = 'value' in activity ? activity.value : undefined;
+  const investigationCounts = new Map<string, number>();
+  const findingCounts = new Map<string, number>();
+  for (const item of activityValue?.investigations ?? []) investigationCounts.set(item.projectId, (investigationCounts.get(item.projectId) ?? 0) + 1);
+  for (const item of activityValue?.findings ?? []) findingCounts.set(item.projectId, (findingCounts.get(item.projectId) ?? 0) + 1);
 
   return {
     data: {
       organisation,
-      projects: mapped.map((result) => result.project),
-      recentInvestigations: [],
-      recentFindings: [],
+      projects: mapped.map(({ project }) => ({
+        ...project,
+        recentInvestigationCount: investigationCounts.get(project.id) ?? 0,
+        openFindingCount: findingCounts.get(project.id) ?? 0,
+      })),
+      recentInvestigations: (activityValue?.investigations ?? []).slice(0, 5).map((item) => ({
+        id: item.id,
+        projectId: item.projectId,
+        projectName: item.projectName,
+        name: item.name,
+        status: item.status,
+        findingCount: item.findingsCount,
+        createdAt: item.completedAt ?? item.createdAt,
+      })),
+      recentFindings: (activityValue?.findings ?? []).slice(0, 5).map((item) => ({
+        id: item.id,
+        investigationId: item.investigationId,
+        projectId: item.projectId,
+        projectName: item.projectName,
+        title: item.title,
+        severity: item.severity ?? 'UNKNOWN',
+        status: item.status ?? (item.confidence === null ? 'UNKNOWN' : String(item.confidence)),
+        createdAt: item.createdAt,
+      })),
     },
     configurationWarnings: mapped.flatMap((result) => result.warnings),
-    investigationsAvailable: false,
-    findingsAvailable: false,
+    investigationsAvailable: Boolean(activityValue),
+    findingsAvailable: Boolean(activityValue),
   };
 }
 
