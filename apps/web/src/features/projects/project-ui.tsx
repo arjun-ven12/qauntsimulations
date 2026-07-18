@@ -1,14 +1,15 @@
 import { AlertTriangle, LoaderCircle } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-export const primaryButton =
-  'rift-button-primary';
-export const secondaryButton =
-  'rift-button-secondary';
+export const primaryButton = 'rift-button-primary';
+export const secondaryButton = 'rift-button-secondary';
 
 export function ProjectLoading({ label = 'Loading project…' }: { label?: string }) {
   return (
-    <div aria-live="polite" className="card flex items-center gap-3 text-sm text-[var(--rift-text-secondary)]">
+    <div
+      aria-live="polite"
+      className="card flex items-center gap-3 text-sm text-[var(--rift-text-secondary)]"
+    >
       <LoaderCircle aria-hidden="true" className="animate-spin" size={18} />
       {label}
     </div>
@@ -42,11 +43,13 @@ export function Field({
   label,
   description,
   error,
+  errorId,
   children,
 }: {
   label: string;
   description?: string;
   error?: string | undefined;
+  errorId?: string;
   children: ReactNode;
 }) {
   return (
@@ -57,7 +60,7 @@ export function Field({
       ) : null}
       <span className="mt-2 block">{children}</span>
       {error ? (
-        <span className="mt-1 block text-sm text-red-300" role="alert">
+        <span className="mt-1 block text-sm text-red-300" id={errorId} role="alert">
           {error}
         </span>
       ) : null}

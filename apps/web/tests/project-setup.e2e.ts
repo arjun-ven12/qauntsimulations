@@ -117,9 +117,13 @@ test('Projects renders organisation-scoped cards and opens New Project', async (
   await page.goto('/projects');
   await expect(page.getByTestId('project-list')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Checkout staging' })).toBeVisible();
-  await expect(page.getByText('staging.example.com')).toBeVisible();
-  await expect(page.getByText('github.com')).toBeVisible();
-  await page.getByRole('link', { name: 'New Project' }).click();
+  await expect(page.getByText('Application · staging.example.com')).toBeVisible();
+  await expect(page.getByText('Restrictions').first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open project' }).first()).toHaveAttribute(
+    'href',
+    '/projects/project-1',
+  );
+  await page.getByRole('link', { name: 'New Project', exact: true }).click();
   await expect(page).toHaveURL(/\/projects\/new$/);
 });
 
@@ -162,18 +166,31 @@ test('failed project session refresh clears auth state and redirects to login', 
 
 test('New Project validates required fields and rejects unsafe URL schemes', async ({ page }) => {
   await page.goto('/projects/new');
-  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByText('Enter a project name.')).toBeVisible();
   await expect(page.getByText('Enter the application URL.')).toBeVisible();
-  await expect(page.getByText('Confirm that these targets are authorised')).toBeVisible();
 
   await page.getByLabel('Project name').fill('Checkout staging');
   await page.getByLabel('Application URL').fill('file:///tmp/customer-data');
-  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByText('Enter a valid HTTP or HTTPS URL.')).toBeVisible();
   await page.getByLabel('Application URL').fill('javascript:alert(1)');
-  await page.getByRole('button', { name: 'Create project' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByText('Enter a valid HTTP or HTTPS URL.')).toBeVisible();
+});
+
+test('New Project preserves fields across steps and returns to Projects', async ({ page }) => {
+  await mockList(page);
+  await page.goto('/projects/new');
+  await page.getByLabel('Project name').fill('Checkout staging');
+  await page.getByLabel('Application URL').fill('https://staging.example.com');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByRole('heading', { name: 'Access & Environment' })).toBeVisible();
+  await page.getByRole('button', { name: 'Back' }).click();
+  await expect(page.getByLabel('Project name')).toHaveValue('Checkout staging');
+  await expect(page.getByLabel('Application URL')).toHaveValue('https://staging.example.com');
+  await page.getByLabel('Back to Projects').click();
+  await expect(page).toHaveURL(/\/projects$/);
 });
 
 test('New Project submits once to the real API contract and redirects with the project id', async ({
@@ -199,7 +216,7 @@ test('New Project submits once to the real API contract and redirects with the p
       button.click();
       button.click();
     });
-  await expect(page.getByRole('button', { name: 'Saving project…' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Creating project…' })).toBeDisabled();
   await expect(page).toHaveURL(/\/projects\/project-1\/settings$/);
   expect(requests).toBe(1);
   expect(payload).toMatchObject({
@@ -228,6 +245,8 @@ test('New Project keeps entered values after an API error', async ({ page }) => 
   await page.getByLabel(/I confirm that these targets/).check();
   await page.getByRole('button', { name: 'Create project' }).click();
   await expect(page.getByRole('alert').last()).toContainText('already exists');
+  await page.getByRole('button', { name: 'Back' }).click();
+  await page.getByRole('button', { name: 'Back' }).click();
   await expect(page.getByLabel('Project name')).toHaveValue('Checkout staging');
   await expect(page.getByText('Unsaved changes')).toBeVisible();
 });
@@ -327,7 +346,7 @@ test('direct project routes and browser Back/Forward retain the app shell', asyn
   await page.route('**/api/projects/project-1', async (route) => json(route, details));
   await page.route('**/api/projects/project-1/safety', async (route) => json(route, safety));
   await page.goto('/projects/project-1/settings');
-  await expect(page.getByText('Rift', { exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation').getByRole('link', { name: 'Projects' })).toBeVisible();
   await page.goto('/projects/project-1/safety');
   await page.goBack();
   await expect(page).toHaveURL(/\/projects\/project-1\/settings$/);
@@ -367,6 +386,8 @@ for (const viewport of [
 async function fillRequiredProject(page: Page) {
   await page.getByLabel('Project name').fill('Checkout staging');
   await page.getByLabel('Application URL').fill('https://staging.example.com');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await page.getByRole('button', { name: 'Continue' }).click();
 }
 
 async function mockList(page: Page) {
