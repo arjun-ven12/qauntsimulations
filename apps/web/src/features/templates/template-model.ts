@@ -24,23 +24,6 @@ export type RiftTemplate<TPayload> = {
   updatedAt?: string | undefined;
 };
 
-export const storedTemplateSchema = z.object({
-  id: z.string().min(1),
-  category: templateCategorySchema,
-  source: z.literal('CUSTOM'),
-  name: z.string().trim().min(1).max(120),
-  description: z.string().max(500).optional(),
-  schemaVersion: z.literal(1),
-  payload: z.unknown(),
-  createdAt: z.string().datetime().optional(),
-  updatedAt: z.string().datetime().optional(),
-});
-
-export const templateEnvelopeSchema = z.object({
-  schemaVersion: z.literal(1),
-  templates: z.array(storedTemplateSchema),
-});
-
 export const importedTemplateSchema = z.object({
   id: z.string().optional(),
   category: templateCategorySchema,

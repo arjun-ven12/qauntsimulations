@@ -87,12 +87,61 @@ const details = {
 };
 
 test.beforeEach(async ({ page }) => {
+  const templates: Array<Record<string, unknown>> = [];
+  let nextTemplateId = 1;
   await page.route('**/api/auth/me', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(session),
     });
+  });
+  await page.route('**/api/templates**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const templateId = url.pathname.match(/\/templates\/([^/]+)$/)?.[1];
+    if (request.method() === 'GET' && !templateId) {
+      const category = url.searchParams.get('category');
+      await json(
+        route,
+        templates.filter((template) => !category || template.category === category),
+      );
+      return;
+    }
+    if (request.method() === 'POST') {
+      const input = request.postDataJSON() as Record<string, unknown>;
+      const now = new Date().toISOString();
+      const template = {
+        ...input,
+        id: `template-${nextTemplateId++}`,
+        source: 'CUSTOM',
+        createdAt: now,
+        updatedAt: now,
+      };
+      templates.unshift(template);
+      await json(route, template, 201);
+      return;
+    }
+    const index = templates.findIndex((template) => template.id === templateId);
+    if (request.method() === 'PUT' && index >= 0) {
+      templates[index] = {
+        ...templates[index],
+        ...(request.postDataJSON() as Record<string, unknown>),
+        updatedAt: new Date().toISOString(),
+      };
+      await json(route, templates[index]);
+      return;
+    }
+    if (request.method() === 'DELETE' && index >= 0) {
+      templates.splice(index, 1);
+      await route.fulfill({ status: 204 });
+      return;
+    }
+    await json(
+      route,
+      { error: { code: 'TEMPLATE_NOT_FOUND', message: 'Template not found' } },
+      404,
+    );
   });
 });
 
@@ -202,7 +251,7 @@ test('Project custom templates persist and support apply, reset, rename, duplica
   await page.getByLabel('Application URL').fill('https://templates.example.test');
   await page.getByLabel('Custom template name').fill('Checkout template');
   await page.getByRole('button', { name: 'Save current' }).click();
-  await expect(page.getByText('Saved in this browser', { exact: true })).toBeVisible();
+  await expect(page.getByText('Saved to Rift', { exact: true })).toBeVisible();
 
   await page.getByLabel('Custom template name').fill('checkout TEMPLATE');
   await page.getByRole('button', { name: 'Save current' }).click();
@@ -273,8 +322,10 @@ test('Project custom templates persist and support apply, reset, rename, duplica
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByRole('heading', { name: 'Imported project' })).toHaveCount(0);
-  const scopedKeys = await page.evaluate(() => Object.keys(localStorage));
-  expect(scopedKeys).toContain('rift.templates.v1:org-1:user_owner');
+  const templateStorageKeys = await page.evaluate(() =>
+    Object.keys(localStorage).filter((key) => key.startsWith('rift.templates.')),
+  );
+  expect(templateStorageKeys).toEqual([]);
 });
 
 test('New Project submits once to the real API contract and redirects with the project id', async ({

@@ -82,6 +82,7 @@ const initialSafety = {
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/api/auth/me', async (route) => json(route, ownerSession));
+  await page.route('**/api/templates**', async (route) => json(route, []));
 });
 
 test('Owner edits hosts, methods, toggles and prohibited actions and persists after refresh', async ({

@@ -24,6 +24,7 @@ model User {
   auditLogs                   AuditLog[]               @relation("AuditActor")
   createdRepairVerifications   RepairVerification[]     @relation("RepairVerificationCreator")
   cancelledRepairVerifications RepairVerification[]     @relation("RepairVerificationCanceller")
+  customTemplates             CustomTemplate[]
 }
 
 model Organisation {
@@ -47,6 +48,7 @@ model Organisation {
   findings       Finding[]
   repairs        Repair[]
   repairVerifications RepairVerification[]
+  customTemplates CustomTemplate[]
 }
 
 model OrganisationMember {
@@ -260,6 +262,25 @@ model ScenarioTemplate {
   worldPack      WorldPack?    @relation(fields: [worldPackId], references: [id], onDelete: Cascade)
 
   @@unique([worldPackId, identifier])
+}
+
+model CustomTemplate {
+  id             String                 @id @default(cuid())
+  organisationId String
+  ownerUserId    String
+  category       CustomTemplateCategory
+  name           String
+  normalizedName String
+  description    String?
+  schemaVersion  Int                    @default(1)
+  payload        Json
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  organisation   Organisation           @relation(fields: [organisationId], references: [id], onDelete: Cascade)
+  owner          User                   @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  @@unique([organisationId, ownerUserId, category, normalizedName])
+  @@index([organisationId, ownerUserId, category, updatedAt])
 }
 
 model Invariant {
@@ -798,6 +819,15 @@ enum UserRole {
   ADMIN
   MEMBER
   VIEWER
+}
+
+enum CustomTemplateCategory {
+  PROJECT
+  ENVIRONMENT
+  PROJECT_SAFETY
+  JOURNEY
+  INVARIANT
+  SCENARIO
 }
 
 enum OrganisationInvitationStatus {
