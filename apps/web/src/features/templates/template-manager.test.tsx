@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -31,6 +32,15 @@ describe('TemplateManager', () => {
     expect(html).toContain('Import JSON');
     expect(html).toContain('Export JSON');
     expect(html).not.toContain('Delete');
+  });
+
+  it('provides persisted custom management without browser prompt controls', () => {
+    const source = readFileSync(new URL('./template-manager.tsx', import.meta.url), 'utf8');
+    expect(source).toContain('Rename');
+    expect(source).toContain('Update from current');
+    expect(source).toContain('Duplicate');
+    expect(source).toContain('Delete');
+    expect(source).not.toMatch(/window\.(?:prompt|confirm|alert)/);
   });
 });
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

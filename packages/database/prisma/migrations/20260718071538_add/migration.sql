@@ -1,0 +1,5 @@
+-- RenameIndex
+ALTER INDEX "CustomTemplate_organisationId_ownerUserId_category_normalizedNa" RENAME TO "CustomTemplate_organisationId_ownerUserId_category_normaliz_key";
+
+-- RenameIndex
+ALTER INDEX "CustomTemplate_organisationId_ownerUserId_category_updatedAt_id" RENAME TO "CustomTemplate_organisationId_ownerUserId_category_updatedA_idx";

@@ -1,6 +1,15 @@
 import { ArrowRight, Clock3, Play } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { MappedSemanticBadge, MappedSemanticStatus, SemanticStatus } from '../../components/semantic-status.js';
+import {
+  findingSeverityStatus,
+  findingStateStatus,
+  investigationExecutionStatus,
+  investigationPhaseStatus,
+  projectReadinessStatus,
+  type SemanticTone,
+} from './dashboard-semantic-status.js';
 import {
   compactFindingTitle,
   compactInvestigationTitle,
@@ -14,8 +23,6 @@ import type {
   DashboardFindingSummary,
   DashboardInvestigationSummary,
 } from './dashboard.types.js';
-
-type Tone = 'strong' | 'medium' | 'quiet';
 
 export interface ProductDashboardProps {
   data: DashboardData;
@@ -96,11 +103,11 @@ export function ProductDashboard({
 function MetricsRail({ dashboard }: { dashboard: ReturnType<typeof createDashboardViewModel> }) {
   const activeCount = dashboard.recentInvestigations.filter((item) => isActive(item.status)).length;
   const entries = [
-    { label: 'Active investigations', value: String(activeCount), detail: 'Currently running', tone: activeCount ? 'strong' : 'quiet' },
-    { label: 'Recent investigations', value: String(dashboard.totals.recentInvestigationCount), detail: 'Across all Projects', tone: 'medium' },
-    { label: 'Open findings', value: String(dashboard.totals.openFindingCount), detail: 'Awaiting review', tone: dashboard.totals.openFindingCount ? 'strong' : 'quiet' },
-    { label: 'Ready projects', value: `${dashboard.totals.readyProjectCount}/${dashboard.totals.projectCount}`, detail: 'Configured to run', tone: 'medium' },
-  ] satisfies Array<{ label: string; value: string; detail: string; tone: Tone }>;
+    { label: 'Active investigations', value: String(activeCount), detail: activeCount ? 'Currently running' : 'None currently running', tone: activeCount ? 'running' : 'neutral' },
+    { label: 'Recent investigations', value: String(dashboard.totals.recentInvestigationCount), detail: 'Across all Projects', tone: 'neutral' },
+    { label: 'Open findings', value: String(dashboard.totals.openFindingCount), detail: dashboard.totals.openFindingCount ? 'Awaiting review' : 'No open findings', tone: dashboard.totals.openFindingCount ? 'pending' : 'pass' },
+    { label: 'Ready projects', value: `${dashboard.totals.readyProjectCount}/${dashboard.totals.projectCount}`, detail: dashboard.totals.projectCount && dashboard.totals.readyProjectCount === dashboard.totals.projectCount ? 'All configured to run' : 'Configuration incomplete', tone: dashboard.totals.projectCount === 0 ? 'neutral' : dashboard.totals.readyProjectCount === dashboard.totals.projectCount ? 'pass' : 'pending' },
+  ] satisfies Array<{ label: string; value: string; detail: string; tone: SemanticTone }>;
 
   return (
     <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -111,7 +118,7 @@ function MetricsRail({ dashboard }: { dashboard: ReturnType<typeof createDashboa
           </dt>
           <dd className="mt-2 flex items-baseline justify-between gap-3">
             <span className="text-2xl font-semibold tracking-[-0.04em] text-[var(--rift-text)]">{entry.value}</span>
-            <StatusDot tone={entry.tone} />
+            <SemanticStatus label={entry.detail} tone={entry.tone} />
           </dd>
           <p className="mt-1 text-xs text-[var(--rift-text-muted)]">{entry.detail}</p>
         </div>
@@ -136,7 +143,7 @@ function CurrentInvestigation({
       {availability === 'unavailable' ? <AvailabilityNote /> : item ? (
         <div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-[var(--rift-text-secondary)]">
-            <span className="inline-flex items-center gap-2"><StatusDot tone={statusTone(item.status)} />{humanize(item.status)}</span>
+            <MappedSemanticBadge status={investigationExecutionStatus(item.status)} />
             <span>{displayProjectName(item.projectName)}</span>
             {item.findingCount !== undefined ? <span>{pluralize(item.findingCount, 'finding')}</span> : null}
             {item.createdAt ? <span className="inline-flex items-center gap-1.5"><Clock3 aria-hidden="true" size={14} />{formatDate(item.createdAt)}</span> : null}
@@ -151,23 +158,30 @@ function CurrentInvestigation({
 }
 
 function InvestigationTimeline({ status }: { status: string }) {
-  const steps = ['Plan', 'Provision', 'Observe', 'Adapt', 'Complete'];
+  const steps = ['Plan', 'Provision', 'Observe', 'Adapt', 'Reproduce', 'Minimise', 'Complete'];
   const activeIndex = timelineIndex(status);
   return (
     <div className="mt-6 border-t border-[var(--rift-border)] pt-4">
       <p className="mb-4 text-[11px] font-medium uppercase tracking-[0.14em] text-[var(--rift-text-muted)]">
         Investigation timeline
       </p>
-      <ol className="grid grid-cols-5" aria-label="Investigation timeline">
+      <ol className="grid grid-cols-7" aria-label="Investigation timeline">
         {steps.map((step, index) => {
-          const reached = index <= activeIndex;
+          const terminal = ['COMPLETED', 'FAILED', 'CANCELLED'].includes(status);
+          const state = index < activeIndex || (status === 'COMPLETED' && index === activeIndex)
+            ? 'completed'
+            : index === activeIndex
+              ? status === 'FAILED' ? 'failed' : status === 'CANCELLED' ? 'future' : status === 'QUEUED' ? 'pending' : 'active'
+              : 'future';
+          const semantic = investigationPhaseStatus(state);
           return (
-            <li className="relative min-w-0 pr-2 last:pr-0" key={step}>
+            <li aria-label={`${step}: ${semantic.label}`} className="relative min-w-0 pr-2 last:pr-0" data-tone={semantic.tone} key={step}>
               {index < steps.length - 1 ? (
-                <span aria-hidden="true" className={`absolute left-2 top-[3px] h-px w-[calc(100%-4px)] ${index < activeIndex ? 'bg-[var(--rift-text-secondary)]' : 'bg-[var(--rift-border-strong)]'}`} />
+                <span aria-hidden="true" className={`absolute left-2 top-[3px] h-px w-[calc(100%-4px)] ${index < activeIndex || (terminal && index === activeIndex && status === 'COMPLETED') ? 'bg-[var(--status-pass-indicator)]' : 'bg-[var(--rift-border-strong)]'}`} />
               ) : null}
-              <span aria-hidden="true" className={`relative block size-[7px] rounded-full border ${reached ? 'border-[var(--rift-text)] bg-[var(--rift-text)]' : 'border-[var(--rift-border-strong)] bg-[var(--rift-surface)]'}`} />
-              <span className={`mt-2 block truncate text-[10px] uppercase tracking-[0.08em] ${reached ? 'text-[var(--rift-text-secondary)]' : 'text-[var(--rift-text-muted)]'}`}>{step}</span>
+              <span aria-hidden="true" className={`rift-semantic-dot rift-semantic-dot--${semantic.tone} relative block`} />
+              <span className={`mt-2 block truncate text-[10px] uppercase tracking-[0.08em] rift-semantic-label--${semantic.tone}`}>{step}</span>
+              <span className="sr-only">{semantic.label}</span>
             </li>
           );
         })}
@@ -191,12 +205,12 @@ function NeedsAttention({ item }: { item: DashboardFindingSummary | DashboardPro
     >
       {finding ? (
         <div className="space-y-2 text-sm text-[var(--rift-text-secondary)]">
-          <p className="flex items-center gap-2"><StatusDot tone="strong" />{humanize(finding.severity)} · {humanize(finding.status)}</p>
+          <p className="flex flex-wrap items-center gap-2"><MappedSemanticBadge status={findingSeverityStatus(finding.severity)} /><MappedSemanticBadge status={findingStateStatus(finding.status)} /></p>
           <p className="text-xs text-[var(--rift-text-muted)]">{displayProjectName(finding.projectName)}</p>
         </div>
       ) : project ? (
         <div className="space-y-2 text-sm text-[var(--rift-text-secondary)]">
-          <p className="flex items-center gap-2"><StatusDot tone="medium" />Project setup is incomplete</p>
+          <MappedSemanticStatus status={projectReadinessStatus(false)} />
           <p className="text-xs leading-5 text-[var(--rift-text-muted)]">Finish configuration before launching an investigation.</p>
         </div>
       ) : (
@@ -233,7 +247,7 @@ function RecentInvestigations({
                     <Link className="block truncate hover:text-white" to={dashboardRoutes.investigation(item.id)}>{compactInvestigationTitle(item.name, item.projectName)}</Link>
                   </td>
                   <td className="py-3 pr-4 text-[var(--rift-text-secondary)]">{displayProjectName(item.projectName)}</td>
-                  <td className="py-3 pr-4"><span className="flex items-center gap-2 text-[var(--rift-text-secondary)]"><StatusDot tone={statusTone(item.status)} />{humanize(item.status)}</span></td>
+                  <td className="py-3 pr-4"><MappedSemanticBadge status={investigationExecutionStatus(item.status)} /></td>
                   <td className="py-3 text-right text-[var(--rift-text-muted)]">{item.createdAt ? formatDate(item.createdAt) : '—'}</td>
                 </tr>
               ))}
@@ -256,7 +270,7 @@ function ProjectReadiness({ projects }: { projects: DashboardProjectView[] }) {
             <li className="py-3 first:pt-0 last:pb-0" key={item.project.id}>
               <div className="flex items-center justify-between gap-3">
                 <Link className="min-w-0 truncate text-sm font-medium text-[var(--rift-text)] hover:text-white" to={item.projectHref}>{displayProjectName(item.project.name)}</Link>
-                <span className="flex shrink-0 items-center gap-2 text-xs text-[var(--rift-text-secondary)]"><StatusDot tone={item.ready ? 'strong' : 'medium'} />{item.ready ? 'Ready' : 'Setup'}</span>
+                <MappedSemanticBadge status={projectReadinessStatus(item.ready)} />
               </div>
               <p className="mt-1.5 text-xs leading-5 text-[var(--rift-text-muted)]">
                 {item.project.readyEnvironmentCount}/{item.project.totalEnvironmentCount} environments · {item.project.readyJourneyCount}/{item.project.totalJourneyCount} journeys · {item.project.readyInvariantCount}/{item.project.totalInvariantCount} invariants
@@ -293,8 +307,8 @@ function RecentFindings({
                   <tr key={item.id}>
                     <td className="max-w-72 py-3 pr-4 font-medium text-[var(--rift-text)]"><Link className="block truncate hover:text-white" to={href}>{compactFindingTitle(item.title)}</Link></td>
                     <td className="py-3 pr-4 text-[var(--rift-text-secondary)]">{displayProjectName(item.projectName)}</td>
-                    <td className="py-3 pr-4"><span className="flex items-center gap-2 text-[var(--rift-text-secondary)]"><StatusDot tone={severityTone(item.severity)} />{humanize(item.severity)}</span></td>
-                    <td className="py-3 pr-4 text-[var(--rift-text-secondary)]">{humanize(item.status)}</td>
+                    <td className="py-3 pr-4"><MappedSemanticBadge status={findingSeverityStatus(item.severity)} /></td>
+                    <td className="py-3 pr-4"><MappedSemanticBadge status={findingStateStatus(item.status)} /></td>
                     <td className="py-3 text-right text-[var(--rift-text-muted)]">{item.createdAt ? formatDate(item.createdAt) : '—'}</td>
                   </tr>
                 );
@@ -346,15 +360,6 @@ function EmptyCopy({ children }: { children: ReactNode }) {
   return <p className="text-sm leading-6 text-[var(--rift-text-secondary)]">{children}</p>;
 }
 
-function StatusDot({ tone }: { tone: Tone }) {
-  const color = tone === 'strong'
-    ? 'border-white bg-white'
-    : tone === 'medium'
-      ? 'border-zinc-400 bg-zinc-400'
-      : 'border-zinc-600 bg-zinc-600';
-  return <span aria-hidden="true" className={`size-1.5 shrink-0 rounded-full border ${color}`} />;
-}
-
 function isActive(status: string) {
   return ['RUNNING', 'QUEUED', 'PLANNING', 'PROVISIONING', 'OBSERVING', 'ADAPTING', 'REPRODUCING', 'MINIMISING'].includes(status);
 }
@@ -363,30 +368,15 @@ function isAttention(severity: string) {
   return ['CRITICAL', 'HIGH'].includes(severity);
 }
 
-function statusTone(status: string): Tone {
-  if (status === 'COMPLETED') return 'strong';
-  if (status === 'FAILED' || status === 'CANCELLED') return 'quiet';
-  if (isActive(status)) return 'medium';
-  return 'quiet';
-}
-
-function severityTone(severity: string): Tone {
-  if (isAttention(severity)) return 'strong';
-  if (severity === 'MEDIUM') return 'medium';
-  return 'quiet';
-}
-
 function timelineIndex(status: string) {
   if (status === 'PLANNING' || status === 'QUEUED') return 0;
   if (status === 'PROVISIONING') return 1;
   if (status === 'OBSERVING' || status === 'RUNNING') return 2;
-  if (['ADAPTING', 'REPRODUCING', 'MINIMISING'].includes(status)) return 3;
-  if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(status)) return 4;
+  if (status === 'ADAPTING') return 3;
+  if (status === 'REPRODUCING') return 4;
+  if (status === 'MINIMISING') return 5;
+  if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(status)) return 6;
   return 0;
-}
-
-function humanize(value: string) {
-  return value.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function pluralize(value: number, label: string) {

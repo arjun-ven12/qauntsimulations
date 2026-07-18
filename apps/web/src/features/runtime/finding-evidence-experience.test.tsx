@@ -10,17 +10,21 @@ function withQueryClient(node: ReactNode) {
 }
 
 describe('finding evidence experience', () => {
-  it('renders minimal tested condition language without proven causal claims', async () => {
+  it('renders the summary, separates confidence, and combines condition classifications without proven causal claims', async () => {
     const api = new MockInvestigationApi();
     const finding = await api.getFindingDetail(MOCK_INVESTIGATION_ID, MOCK_FINDING_ID);
     const html = renderToStaticMarkup(withQueryClient(<FindingDetailSections finding={finding} investigationStatus="COMPLETED" />));
 
-    expect(html).toContain('Minimal tested condition set');
+    expect(html).toContain('Finding summary');
+    expect(html).toContain('CONFIRMED — Seven deterministic reproductions');
+    expect(html).toContain('Conditions and boundary');
+    expect(html).toContain('Required');
+    expect(html).toContain('Not required');
     expect(html).toContain('Duplicate-submission mode');
     expect(html).toContain('Repeated checkout submission');
-    expect(html).toContain('No inconclusive conditions were recorded');
-    expect(html).toContain('Business impact');
-    expect(html).not.toMatch(/Proven/i);
+    expect(html).toContain('None recorded');
+    expect(html).toContain('Impact');
+    expect(html).not.toMatch(/proven causal/i);
   });
 
   it('renders one-sided structured bounds without inventing a passing delay', async () => {
@@ -32,6 +36,16 @@ describe('finding evidence experience', () => {
     expect(html).toContain('Only one side of the boundary was recorded');
     expect(html).not.toContain('901 ms definitely fails');
     expect(html).not.toContain('≤ 900 ms');
+  });
+
+  it('uses a categorical matrix when numeric boundary data is unavailable', async () => {
+    const finding = await new MockInvestigationApi().getFindingDetail(MOCK_INVESTIGATION_ID, MOCK_FINDING_ID);
+    const html = renderToStaticMarkup(<FailureRange finding={{ ...finding, causalConditions: { retainedConditions: { paymentMode: 'card' }, removedConditions: { viewport: 'mobile' }, inconclusiveConditions: { browser: 'webkit' } } }} />);
+
+    expect(html).toContain('Categorical failure boundary');
+    expect(html).toContain('numeric scale would be misleading');
+    expect(html).toContain('Payment Mode');
+    expect(html).toContain('Inconclusive');
   });
 
   it('preserves reproduction-step order and renders the empty state', async () => {
@@ -56,18 +70,21 @@ describe('finding evidence experience', () => {
     ));
 
     expect(evidence).toHaveLength(93);
-    expect(html).toContain('93 artifacts grouped by runtime stage');
-    expect(html).toContain('Final reports (2)');
-    expect(html).toContain('Original observation');
-    expect(html).toContain('Minimisation trials');
-    expect(html).toContain('Show more evidence');
+    expect(html).toContain('>93<');
+    expect(html).toContain('Key evidence (8)');
+    expect(html).toContain('Final reports');
+    expect(html).toContain('Reproduction');
+    expect(html).toContain('Reports');
+    expect(html.indexOf('final-report.json')).toBeLessThan(html.indexOf('trace.zip'));
+    expect(html).toContain('aria-label="View final-report.json report"');
+    expect(html).toContain('Technical filename');
     expect(html).not.toContain('/Users/');
     expect(html).not.toContain('reports/cmrol9cxh0001rurb8godxnh6');
     expect(fetch).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 
-  it('renders experiment history, limitations, final reports, and safe causal sequence', async () => {
+  it('renders the hierarchy, experiment history, limitations, key evidence, and safe causal sequence', async () => {
     const api = new MockInvestigationApi();
     const finding = await api.getFindingDetail(MOCK_INVESTIGATION_ID, MOCK_FINDING_ID);
     const worlds = await api.getWorlds(MOCK_INVESTIGATION_ID);
@@ -81,9 +98,22 @@ describe('finding evidence experience', () => {
     expect(html).toContain('Initial');
     expect(html).toContain('Adaptive Reproduction');
     expect(html).toContain('Minimisation');
-    expect(html).toContain('Evidence-supported sequence');
+    expect(html).toContain('Causal explanation');
     expect(html).toContain('Delayed payment response');
     expect(html).toContain('Greedy minimisation was used');
-    expect(html).toContain('Final reports (2)');
+    expect(html).toContain('Key evidence (8)');
+    expect(html.indexOf('Reproduce this failure')).toBeLessThan(html.indexOf('Conditions and boundary'));
+    expect(html.indexOf('Conditions and boundary')).toBeLessThan(html.indexOf('Evidence'));
+    expect(html).toContain('Technical metadata');
+    expect(html).toMatch(/<details class="rounded-xl border[^>]+><summary[^>]+>Technical metadata/);
+  });
+
+  it('places Repair Verification after evidence and renders a neutral empty limitations state', async () => {
+    const finding = await new MockInvestigationApi().getFindingDetail(MOCK_INVESTIGATION_ID, MOCK_FINDING_ID);
+    const html = renderToStaticMarkup(withQueryClient(<FindingDetailSections finding={{ ...finding, causalConditions: { ...finding.causalConditions, limitations: [] } }} investigationStatus="COMPLETED" repairVerification={<section><h2>Repair Verification</h2></section>} />));
+
+    expect(html.indexOf('id="evidence"')).toBeLessThan(html.indexOf('Repair Verification'));
+    expect(html).toContain('No specific limitations were recorded');
+    expect(html).toContain('sm:grid-cols-4');
   });
 });

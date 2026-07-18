@@ -7,6 +7,14 @@ import {
   findingSeverityTone,
   plannerStatusTone,
   repairVerificationTone,
+  businessResultStatus,
+  findingStateStatus,
+  investigationPhaseStatus,
+  invariantReadinessStatus,
+  projectReadinessStatus,
+  setupStatus,
+  validationStatus,
+  worldExecutionStatus,
 } from './semantic-status.js';
 
 describe('Investigation semantic status system', () => {
@@ -40,5 +48,32 @@ describe('Investigation semantic status system', () => {
     expect(repairVerificationTone('COMPLETED', 'REPAIR_VERIFIED')).toBe('pass');
     expect(repairVerificationTone('COMPLETED', 'REGRESSION_DETECTED')).toBe('fail');
     expect(repairVerificationTone('RUNNING', null)).toBe('running');
+  });
+
+  it('keeps world execution and business results independent', () => {
+    expect(worldExecutionStatus('COMPLETED')).toMatchObject({ tone: 'pass', label: 'Completed' });
+    expect(businessResultStatus('FAIL')).toMatchObject({ tone: 'fail', label: 'Fail' });
+    expect(businessResultStatus(undefined)).toMatchObject({ tone: 'neutral', label: 'No business result' });
+  });
+
+  it('maps readiness, validation, setup, finding, and phase states', () => {
+    expect(invariantReadinessStatus('READY').tone).toBe('pass');
+    expect(validationStatus('WARNING').tone).toBe('pending');
+    expect(validationStatus('SKIPPED').tone).toBe('neutral');
+    expect(projectReadinessStatus(false).tone).toBe('pending');
+    expect(setupStatus('optional').tone).toBe('neutral');
+    expect(setupStatus('invalid').tone).toBe('fail');
+    expect(findingStateStatus('REPRODUCED').tone).toBe('fail');
+    expect(investigationPhaseStatus('completed').tone).toBe('pass');
+    expect(investigationPhaseStatus('active').tone).toBe('running');
+    expect(investigationPhaseStatus('future').tone).toBe('neutral');
+  });
+
+  it('uses a readable neutral fallback for unknown values', () => {
+    expect(validationStatus('DEPLOYMENT_MANAGED')).toEqual({
+      tone: 'neutral',
+      label: 'Deployment Managed',
+      accessibleText: 'Deployment Managed status',
+    });
   });
 });

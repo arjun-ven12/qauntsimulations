@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, CirclePlus, MoreHorizontal, Plus, ShieldCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { MappedSemanticBadge } from '../../components/semantic-status.js';
 import { ProjectApiError, projectApi, type ProjectSummary } from '../../services/project-api.js';
+import { setupStatus } from '../runtime/semantic-status.js';
 import { useAuthStore } from '../../stores/auth.store.js';
 import { ProjectLoading, ProjectMessage } from './project-ui.js';
 
@@ -115,11 +117,7 @@ function ProjectCard({ project }: { project: ProjectSummary }) {
               <h2 className="truncate text-xl font-semibold tracking-[-0.025em] text-[var(--rift-text)]">
                 {name}
               </h2>
-              <span
-                className={`mt-1.5 inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.11em] ${configured ? 'border-[var(--status-pass-border)] bg-[var(--status-pass-bg)] text-[var(--status-pass)]' : 'border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] text-[var(--status-pending)]'}`}
-              >
-                {configured ? 'Configured' : 'Incomplete'}
-              </span>
+              <span className="mt-1.5 block"><MappedSemanticBadge status={setupStatus(configured ? 'configured' : 'incomplete')} /></span>
             </div>
           </div>
           <div className="flex shrink-0 flex-col items-end">

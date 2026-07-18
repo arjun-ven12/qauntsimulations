@@ -10,6 +10,7 @@ import {
   confidenceTone,
   executionStatusTone,
   findingSeverityTone,
+  findingStateStatus,
   plannerStatusTone,
   type SemanticStatusTone,
 } from './semantic-status.js';
@@ -61,7 +62,8 @@ import {
 
 export function StatusBadge({ children, tone = 'neutral' }: { children: ReactNode; tone?: SemanticStatusTone | 'cyan' | 'green' | 'red' | 'amber' | 'slate' }) {
   const semanticTone: SemanticStatusTone = tone === 'green' ? 'pass' : tone === 'cyan' ? 'running' : tone === 'red' ? 'fail' : tone === 'amber' ? 'pending' : tone === 'slate' ? 'neutral' : tone;
-  return <span className={`rift-semantic-status rift-semantic-status--${semanticTone}`}>{children}</span>;
+  const label = typeof children === 'string' || typeof children === 'number' ? String(children) : undefined;
+  return <span aria-label={label ? `${label} status` : undefined} className={`rift-semantic-status rift-semantic-status--${semanticTone}`} data-tone={semanticTone}>{children}</span>;
 }
 
 export function PanelState({ title, children, retry }: { title: string; children: string; retry?: () => void }) {
@@ -78,19 +80,19 @@ export function PanelState({ title, children, retry }: { title: string; children
   );
 }
 
-export function RuntimeNav({ investigationId }: { investigationId: string }) {
+export function RuntimeNav({ investigationId, findingContext = false }: { investigationId: string; findingContext?: boolean }) {
   const items = [
     { to: `/investigations/${investigationId}`, label: 'Overview' },
     { to: `/investigations/${investigationId}/live`, label: 'Live run' },
     { to: `/investigations/${investigationId}/plan`, label: 'Plan' },
     { to: `/investigations/${investigationId}/worlds`, label: 'Worlds' },
-    { to: `/investigations/${investigationId}/findings`, label: 'Findings' },
+    { to: `/investigations/${investigationId}/findings`, label: findingContext ? 'Finding' : 'Findings' },
   ];
   return (
-    <nav aria-label="Investigation sections" className="mb-6 flex flex-wrap gap-1 border-b border-[var(--rift-border)]">
+    <nav aria-label="Investigation sections" className="mb-6 flex gap-1 overflow-x-auto border-b border-[var(--rift-border)]">
       {items.map((item) => (
         <NavLink
-          className={({ isActive }) => `border-b-2 px-3 py-2.5 text-sm font-medium transition ${isActive ? 'border-white text-white' : 'border-transparent text-[var(--rift-text-muted)] hover:text-[var(--rift-text)]'}`}
+          className={({ isActive }) => `shrink-0 border-b-2 px-3 py-2.5 text-sm font-medium transition ${isActive ? 'border-white text-white' : 'border-transparent text-[var(--rift-text-muted)] hover:text-[var(--rift-text)]'}`}
           end={item.label === 'Overview'}
           key={item.to}
           to={item.to}
@@ -130,7 +132,7 @@ export function InvestigationOverviewHeader({ progress, plan, workerProvider }: 
         </div>
       </div>
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-[var(--rift-surface-hover)]" aria-label={`${percentage}% complete`}>
-        <div className="h-full bg-white" style={{ width: `${percentage}%` }} />
+        <div className={`h-full ${semanticDotClass(executionStatusTone(progress.status))}`} style={{ width: `${percentage}%` }} />
       </div>
       <PhaseTracker steps={steps} />
     </section>
@@ -144,12 +146,12 @@ export function PlannerProvenanceBadge({ plan }: { plan: ExperimentPlanResponse 
 }
 
 export function PhaseTracker({ steps }: { steps: ReturnType<typeof phaseTracker> }) {
-  const tone = (state: string): SemanticStatusTone => state === 'completed' ? 'pass' : state === 'active' ? 'running' : state === 'stopped' ? 'fail' : state === 'skipped' ? 'pending' : 'neutral';
+  const tone = (state: string): SemanticStatusTone => state === 'completed' ? 'pass' : state === 'active' ? 'running' : state === 'stopped' ? 'fail' : 'neutral';
   return (
-    <ol className="mt-6 grid gap-4 md:grid-cols-5 md:gap-0" aria-label="Investigation phase tracker">
+    <ol className="mt-6 grid gap-4 md:grid-cols-7 md:gap-0" aria-label="Investigation phase tracker">
       {steps.map((step, index) => (
         <li className="relative border-t border-[var(--rift-border-strong)] pt-3 md:pr-3" key={step.id}>
-          <span className={`absolute -top-1 left-0 size-2 rounded-full ${semanticDotClass(tone(step.state))}`} />
+          <span aria-hidden="true" className={`absolute -top-1 left-0 size-2 rounded-full ${semanticDotClass(tone(step.state))}`} />
           <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--rift-text-muted)]">Step {index + 1}</div>
           <div className="mt-1 text-sm font-semibold text-[var(--rift-text)]">{step.label}</div>
           <div className="mt-1 text-xs"><span className={semanticTextClass(tone(step.state))}>{humanize(step.state)}</span></div>
@@ -719,7 +721,7 @@ export function FindingsList({ investigationId, findings }: { investigationId: s
             <h2 className="mt-4 text-xl font-bold">{finding.title}</h2>
             <p className="mt-2 text-[var(--rift-text-secondary)]">{finding.summary}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(causalStatus(finding))}</StatusBadge>
+              <StatusBadge tone={findingStateStatus(causalStatus(finding)).tone}>{humanize(causalStatus(finding))}</StatusBadge>
               <StatusBadge tone={conditionRoleTone('retained')}>{retained} retained</StatusBadge>
               <StatusBadge tone={conditionRoleTone('removed')}>{removed} removed</StatusBadge>
               {hasReport ? <StatusBadge tone="pass">Final report</StatusBadge> : <StatusBadge>No final report</StatusBadge>}
@@ -753,7 +755,7 @@ export function LiveFindingSummary({ investigationId, findings, investigationSta
               <div className="flex flex-wrap gap-2">
                 <StatusBadge tone={findingSeverityTone(finding.severity)}>{finding.severity}</StatusBadge>
                 <StatusBadge tone={confidenceTone(finding.confidence)}>{active && finding.confidence !== 'CONFIRMED' ? 'Possible violation' : finding.confidence}</StatusBadge>
-                <StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(supported)}</StatusBadge>
+                <StatusBadge tone={findingStateStatus(supported).tone}>{humanize(supported)}</StatusBadge>
                 {hasReport ? <StatusBadge tone="pass">Final report available</StatusBadge> : null}
               </div>
               <h3 className="mt-3 text-lg font-bold">{finding.title}</h3>
@@ -813,17 +815,22 @@ export function FailureRange({ finding, boundary }: { finding: Finding | Finding
   const range = boundary ?? failureBoundaryViewModel(finding);
   const hasPassingBound = range.passingBoundMs !== undefined;
   const hasFailingBound = range.failingBoundMs !== undefined;
+  const categorical = [
+    ...Object.entries(conditionRecord(finding, 'retainedConditions')).map(([key, value]) => ({ key, value, role: 'Required' })),
+    ...Object.entries(conditionRecord(finding, 'removedConditions')).map(([key, value]) => ({ key, value, role: 'Not required' })),
+    ...Object.entries(conditionRecord(finding, 'inconclusiveConditions')).map(([key, value]) => ({ key, value, role: 'Inconclusive' })),
+  ];
   return (
-    <section className="card">
-      <h2 className="font-bold">Observed failure boundary</h2>
+    <section className="rounded-lg border border-[var(--rift-border)] p-4">
+      <h2 className="text-lg font-bold">Failure boundary</h2>
       {hasPassingBound || hasFailingBound ? (
         <>
-          <div className="mt-5 grid gap-2 text-center text-xs text-[var(--rift-text-secondary)] md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-center">
-            <div className="rounded-lg border border-[var(--status-pass-border)] bg-[var(--status-pass-bg)] p-2 text-[var(--status-pass)]">Observed stable</div>
+          <div className="mt-5 grid gap-2 text-center text-xs text-[var(--rift-text-secondary)] sm:grid-cols-[1fr_auto_1fr_auto_1fr] sm:items-center">
+            <div className="rounded-lg border border-[var(--status-pass-border)] bg-[var(--status-pass-bg)] p-2 text-[var(--status-pass)]">Stable</div>
             <div aria-label="Passing bound">{hasPassingBound ? `≤ ${range.passingBoundMs!.toLocaleString()} ms` : 'No passing bound'}</div>
-            <div className="rounded-lg border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] p-2 text-[var(--status-pending)]">Untested interval</div>
+            <div className="rounded-lg border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] p-2 text-[var(--status-pending)]">Uncertain</div>
             <div aria-label="Failing bound">{hasFailingBound ? `≥ ${range.failingBoundMs!.toLocaleString()} ms` : 'No failing bound'}</div>
-            <div className="rounded-lg border border-[var(--status-fail-border)] bg-[var(--status-fail-bg)] p-2 text-[var(--status-fail)]">Failure observed</div>
+            <div className="rounded-lg border border-[var(--status-fail-border)] bg-[var(--status-fail-bg)] p-2 text-[var(--status-fail)]">Failure reproduced</div>
           </div>
           {hasPassingBound && hasFailingBound ? (
             <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">
@@ -842,16 +849,31 @@ export function FailureRange({ finding, boundary }: { finding: Finding | Finding
             </ul>
           ) : null}
         </>
-      ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">A bounded timing range could not be established.</p>}
+      ) : categorical.length ? (
+        <div className="mt-4">
+          <p className="text-sm text-[var(--rift-text-secondary)]">This finding has categorical conditions, so a numeric scale would be misleading.</p>
+          <div className="mt-3 overflow-hidden rounded-lg border border-[var(--rift-border)]" role="table" aria-label="Categorical failure boundary">
+            {categorical.map((item) => <div className="grid gap-1 border-t border-[var(--rift-border)] px-3 py-2 first:border-t-0 sm:grid-cols-[1fr_1fr_auto]" key={`${item.role}-${item.key}`} role="row"><span className="font-medium" role="cell">{formatConditionKey(item.key)}</span><span className="text-sm text-[var(--rift-text-secondary)]" role="cell">{formatConditionValue(item.key, item.value)}</span><span className="text-xs text-[var(--rift-text-muted)]" role="cell">{item.role}</span></div>)}
+          </div>
+        </div>
+      ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">No numeric or categorical failure boundary was recorded.</p>}
     </section>
   );
 }
 
 export function ReproductionSteps({ finding }: { finding: Finding | FindingDetail }) {
   const steps = reproductionSteps(finding);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'unavailable'>('idle');
+  const copy = async () => {
+    if (!steps.length || !globalThis.navigator?.clipboard) { setCopyState('unavailable'); return; }
+    try {
+      await globalThis.navigator.clipboard.writeText(steps.map((step, index) => `${index + 1}. ${step}`).join('\n'));
+      setCopyState('copied');
+    } catch { setCopyState('unavailable'); }
+  };
   return (
-    <section className="card">
-      <h2 className="font-bold">Deterministic reproduction steps</h2>
+    <section className="rounded-lg border border-[var(--rift-border)] p-4" id="reproduction-steps">
+      <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-bold">Deterministic steps</h3>{steps.length ? <button className="rift-button-secondary min-h-9 px-3 py-1.5 text-xs" onClick={() => void copy()} type="button">{copyState === 'copied' ? 'Copied' : copyState === 'unavailable' ? 'Copy unavailable' : 'Copy reproduction'}</button> : null}</div>
       {steps.length ? <ol className="mt-4 list-decimal space-y-2 pl-5 text-[var(--rift-text-secondary)]">{steps.map((step, index) => <li key={`${index}-${step}`}>{step}</li>)}</ol> : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">Structured reproduction steps were not generated for this finding.</p>}
     </section>
   );
@@ -870,24 +892,34 @@ export function EvidenceViewer({
   worlds?: InvestigationWorld[];
   experiments?: InvestigationExperiment[];
 }) {
-  const [typeFilter, setTypeFilter] = useState('ALL');
+  const [view, setView] = useState('KEY');
   const [search, setSearch] = useState('');
   const groups = useMemo(() => evidenceStageGroups(evidence, { finding, worlds, experiments }), [evidence, experiments, finding, worlds]);
-  const filters = ['ALL', 'FINAL_REPORT', 'SCREENSHOT', 'TRACE', 'CONSOLE_LOG', 'NETWORK_LOG', 'WORKER_RESULT', 'ENVIRONMENT_MANIFEST'];
-  const visibleGroups = useMemo(() => Object.entries(groups).map(([label, items]) => {
+  const filters = ['KEY', 'REPRODUCTION', 'SCREENSHOT', 'TRACE', 'NETWORK_LOG', 'CONSOLE_LOG', 'FINAL_REPORT', 'ALL'];
+  const keyEvidence = useMemo(() => selectKeyEvidence(evidence), [evidence]);
+  const selectedGroups = view === 'KEY'
+    ? { 'Key evidence': keyEvidence }
+    : view === 'ALL'
+      ? groups
+      : view === 'REPRODUCTION'
+        ? Object.fromEntries(Object.entries(groups).filter(([label]) => ['Exact reproduction', 'Final confirmation'].includes(label)))
+        : { [humanize(view)]: evidence.filter((artifact) => artifact.type === view) };
+  const visibleGroups = useMemo(() => Object.entries(selectedGroups).map(([label, items]) => {
     const filtered = items.filter((artifact) => {
-      const matchesType = typeFilter === 'ALL' || artifact.type === typeFilter;
       const haystack = `${artifact.id} ${artifact.type} ${evidenceFilename(artifact)} ${artifact.experimentId} ${JSON.stringify(artifact.metadata ?? {})}`.toLowerCase();
-      return matchesType && haystack.includes(search.toLowerCase());
+      return haystack.includes(search.toLowerCase());
     });
     return [label, filtered] as const;
-  }), [groups, search, typeFilter]);
+  }), [search, selectedGroups]);
+  const reproductionRuns = finding?.reproductionCount ?? 0;
+  const reports = evidence.filter((artifact) => artifact.type === 'FINAL_REPORT').length;
+  const divergenceTraces = evidence.filter((artifact) => JSON.stringify(artifact.metadata ?? {}).toLowerCase().includes('divergence')).length;
   return (
-    <section className="card">
+    <section className="card" id="evidence">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-bold">Evidence</h2>
-          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{evidence.length.toLocaleString()} artifacts grouped by runtime stage. Report bodies load only when opened.</p>
+          <h2 className="text-xl font-bold">Evidence</h2>
+          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">Prioritised by relevance. Artifact bodies load only when opened.</p>
         </div>
         <input
           aria-label="Search evidence"
@@ -897,23 +929,29 @@ export function EvidenceViewer({
           value={search}
         />
       </div>
+      <dl className="mt-4 grid grid-cols-2 gap-3 border-y border-[var(--rift-border)] py-4 sm:grid-cols-4">
+        <Metric label="Artifacts" value={evidence.length} />
+        <Metric label="Reproduction runs" value={reproductionRuns} />
+        <Metric label="Final reports" value={reports} />
+        <Metric label="First-divergence traces" value={divergenceTraces} />
+      </dl>
       <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="Evidence type filters">
         {filters.map((filter) => (
           <button
-            className={`rounded-full px-3 py-1 text-xs ${typeFilter === filter ? 'bg-white text-black' : 'bg-[var(--rift-surface-raised)] text-[var(--rift-text-secondary)]'}`}
+            className={`rounded-full px-3 py-1.5 text-xs ${view === filter ? 'bg-white text-black' : 'bg-[var(--rift-surface-raised)] text-[var(--rift-text-secondary)]'}`}
             key={filter}
-            onClick={() => setTypeFilter(filter)}
+            onClick={() => setView(filter)}
             role="tab"
-            aria-selected={typeFilter === filter}
+            aria-selected={view === filter}
             type="button"
           >
-            {filter === 'ALL' ? 'All' : humanize(filter)}
+            {filter === 'KEY' ? 'Key evidence' : filter === 'REPRODUCTION' ? 'Reproduction' : filter === 'FINAL_REPORT' ? 'Reports' : humanize(filter)}
           </button>
         ))}
       </div>
       <div className="mt-4 space-y-4">
         {visibleGroups.map(([label, items]) => (
-          <details className="rounded-xl bg-[var(--rift-surface-raised)] p-3" key={label} open={label === 'Final reports' || label === 'Original observation'}>
+          <details className="rounded-xl bg-[var(--rift-surface-raised)] p-3" key={`${view}-${label}`} open={label === 'Key evidence' || label === 'Final reports'}>
             <summary className="cursor-pointer font-semibold">{label} ({items.length})</summary>
             {items.length ? (
               <EvidenceGroupItems items={items} investigationId={investigationId} experiments={experiments} />
@@ -923,6 +961,38 @@ export function EvidenceViewer({
       </div>
     </section>
   );
+}
+
+function evidencePriority(artifact: EvidenceArtifactResponse): number {
+  const metadata = JSON.stringify(artifact.metadata ?? {}).toLowerCase();
+  if (artifact.type === 'FINAL_REPORT') return 0;
+  if (metadata.includes('first_divergence') || metadata.includes('first divergence')) return 1;
+  if (artifact.type === 'TRACE') return 2;
+  if (artifact.type === 'SCREENSHOT') return 3;
+  if (artifact.type === 'NETWORK_LOG') return 4;
+  if (artifact.type === 'ENVIRONMENT_MANIFEST') return 5;
+  return 10;
+}
+
+function selectKeyEvidence(evidence: EvidenceArtifactResponse[]): EvidenceArtifactResponse[] {
+  const sorted = [...evidence].sort((a, b) => evidencePriority(a) - evidencePriority(b) || a.createdAt.localeCompare(b.createdAt));
+  const selected: EvidenceArtifactResponse[] = [];
+  const add = (artifact: EvidenceArtifactResponse | undefined) => { if (artifact && !selected.some((item) => item.id === artifact.id)) selected.push(artifact); };
+  sorted.filter((artifact) => artifact.type === 'FINAL_REPORT').slice(0, 2).forEach(add);
+  add(sorted.find((artifact) => JSON.stringify(artifact.metadata ?? {}).toLowerCase().includes('divergence')));
+  ['TRACE', 'SCREENSHOT', 'NETWORK_LOG', 'ENVIRONMENT_MANIFEST', 'CONSOLE_LOG', 'WORKER_RESULT'].forEach((type) => add(sorted.find((artifact) => artifact.type === type)));
+  sorted.forEach((artifact) => { if (selected.length < 8) add(artifact); });
+  return selected.slice(0, 8);
+}
+
+function evidenceRelevance(artifact: EvidenceArtifactResponse): string {
+  if (artifact.type === 'FINAL_REPORT') return 'Investigation conclusion and supporting references.';
+  if (artifact.type === 'TRACE') return 'Replayable browser execution around the observed failure.';
+  if (artifact.type === 'SCREENSHOT') return 'Visual state captured during the relevant world.';
+  if (artifact.type === 'NETWORK_LOG') return 'Request-level evidence for the observed outcome.';
+  if (artifact.type === 'CONSOLE_LOG') return 'Runtime messages captured during execution.';
+  if (artifact.type === 'ENVIRONMENT_MANIFEST') return 'Environment context needed to interpret the result.';
+  return 'Supporting artifact captured during the investigation.';
 }
 
 function EvidenceGroupItems({ items, investigationId, experiments }: { items: EvidenceArtifactResponse[]; investigationId: string; experiments: InvestigationExperiment[] }) {
@@ -951,14 +1021,15 @@ function EvidenceCard({ artifact, investigationId, experiments }: { artifact: Ev
     <div className="rounded-lg border border-[var(--rift-border)] p-3 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="font-semibold">{humanize(artifact.type)}</span>
-        <span className="text-xs text-[var(--rift-text-muted)]">{artifact.mimeType} · {artifact.sizeBytes.toLocaleString()} bytes</span>
+        <StatusBadge tone="neutral">{humanize(artifact.type)}</StatusBadge>
       </div>
-      <dl className="mt-2 grid gap-2 text-xs text-[var(--rift-text-muted)] md:grid-cols-3">
-        <div><dt className="sr-only">Filename</dt><dd className="font-mono text-[var(--rift-text-secondary)]">{filename}</dd></div>
-        <div><dt>World</dt><dd className="font-mono">{worldId ? shortId(worldId, 14) : 'Not recorded'}</dd></div>
+      <p className="mt-1 text-sm text-[var(--rift-text-secondary)]">{evidenceRelevance(artifact)}</p>
+      <dl className="mt-3 grid gap-2 text-xs text-[var(--rift-text-muted)] sm:grid-cols-3">
+        <div><dt>Context</dt><dd>{worldId ? `World ${shortId(worldId, 10)}` : 'Investigation'}</dd></div>
         <div><dt>Created</dt><dd>{formatDate(artifact.createdAt)}</dd></div>
-        {artifact.checksum ? <div><dt>Checksum</dt><dd className="font-mono">{shortId(artifact.checksum, 14)}</dd></div> : null}
+        <div><dt>Size</dt><dd>{artifact.sizeBytes.toLocaleString()} bytes</dd></div>
       </dl>
+      <details className="mt-2"><summary className="cursor-pointer text-xs text-[var(--rift-text-muted)]">Technical filename</summary><p className="mt-1 break-all font-mono text-xs text-[var(--rift-text-secondary)]">{filename}</p></details>
       {artifact.type === 'FINAL_REPORT'
         ? <FinalReportPreview artifact={artifact} investigationId={investigationId} />
         : <p className="mt-2 text-xs text-[var(--rift-text-secondary)]">{artifact.type === 'SCREENSHOT'
@@ -976,6 +1047,8 @@ function FinalReportPreview({ artifact, investigationId }: { artifact: EvidenceA
   return (
     <div className="mt-3">
       <button
+        aria-expanded={open}
+        aria-label={`${open ? 'Hide' : 'View'} ${evidenceFilename(artifact)} report`}
         className="rounded-lg border border-[var(--rift-border-strong)] px-3 py-2 text-xs font-bold text-white"
         onClick={() => setOpen((value) => !value)}
         type="button"
@@ -1051,23 +1124,23 @@ export function FindingDetailSections({
   worlds = [],
   experiments = [],
   evidence,
+  repairVerification,
 }: {
   finding: FindingDetail;
   investigationStatus?: string | undefined;
   worlds?: InvestigationWorld[];
   experiments?: InvestigationExperiment[];
   evidence?: EvidenceArtifactResponse[];
+  repairVerification?: ReactNode;
 }) {
   const retained = conditionRecord(finding, 'retainedConditions');
   const removed = conditionRecord(finding, 'removedConditions');
   const inconclusive = conditionRecord(finding, 'inconclusiveConditions');
   const allEvidence = evidence ?? finding.evidence;
-  const finalReports = allEvidence.filter((artifact) => artifact.type === 'FINAL_REPORT' || finalReportIds(finding).includes(artifact.id));
   const limitations = findingList(finding, 'limitations');
   const businessImpact = findingText(finding, 'businessImpact') ?? 'Business impact was not provided for this finding.';
-  const originalObservation = findingText(finding, 'originalObservation') ?? finding.summary;
   const confidenceExplanation = findingTextOrList(finding, 'confidenceExplanation');
-  const reproducedRuns = finding.reproductions.filter((run) => run.reproduced).length;
+  const reproducedRuns = finding.reproductionCount;
   const contradictoryRuns = finding.reproductions.filter((run) => !run.reproduced).length;
   const findingBoundary = failureBoundaryViewModel(finding);
   const worldBoundary = findingBoundary.passingBoundMs === undefined || findingBoundary.failingBoundMs === undefined
@@ -1083,66 +1156,49 @@ export function FindingDetailSections({
     : findingBoundary;
   return (
     <div className="space-y-5">
-      <section className="card">
-        <div className="flex flex-wrap gap-2">
-          <StatusBadge tone={findingSeverityTone(finding.severity)}>{finding.severity}</StatusBadge>
-          <StatusBadge tone={confidenceTone(finding.confidence)}>{finding.confidence}</StatusBadge>
-          <StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(causalStatus(finding))}</StatusBadge>
-          {investigationStatus ? <StatusBadge tone={executionStatusTone(investigationStatus)}>{humanize(investigationStatus)}</StatusBadge> : null}
-          {finalReports.length ? <StatusBadge tone="pass">Final report available</StatusBadge> : null}
-        </div>
-        <h2 className="mt-4 text-2xl font-bold">{finding.title}</h2>
-        <p className="mt-3 text-[var(--rift-text-secondary)]">{finding.summary}</p>
-        <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">
-          {finding.reproductionCount} validated reproductions. This is a supported minimal-tested
-          condition set, not an absolute claim of global minimality.
-        </p>
-      </section>
-      <section className="card">
-        <h2 className="font-bold">Executive summary</h2>
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <SummaryBlock title="Business impact">{businessImpact}</SummaryBlock>
-          <SummaryBlock title="Original observation">{originalObservation}</SummaryBlock>
-          <SummaryBlock title="Failed invariants">{findingList(finding, 'failedInvariantIds').join(', ') || 'Not recorded'}</SummaryBlock>
-          <SummaryBlock title="First observed world">{formatValue(causalConditions(finding).sourceWorldId)}</SummaryBlock>
+      <section className="card border border-[var(--rift-border-strong)]" aria-labelledby="finding-summary-heading">
+        <h2 className="text-xl font-bold" id="finding-summary-heading">Finding summary</h2>
+        <div className="mt-5 grid gap-x-8 gap-y-5 border-t border-[var(--rift-border)] pt-5 md:grid-cols-2">
+          <SummaryBlock title="Impact">{businessImpact}</SummaryBlock>
+          <SummaryBlock title="Required conditions">{Object.keys(retained).length ? Object.entries(retained).map(([key, value]) => `${formatConditionKey(key)}: ${formatConditionValue(key, value)}`).join(' · ') : 'No required conditions were recorded.'}</SummaryBlock>
+          <SummaryBlock title="Reproduction">{reproducedRuns.toLocaleString()} successful · {contradictoryRuns.toLocaleString()} control or contradictory</SummaryBlock>
+          <SummaryBlock title="Confidence">{finding.confidence}{confidenceExplanation ? ` — ${confidenceExplanation}` : ''}</SummaryBlock>
+          <SummaryBlock title="First observed">{formatDate(finding.createdAt)}</SummaryBlock>
+          {findingList(finding, 'failedInvariantIds').length ? <SummaryBlock title="Failed invariants">{findingList(finding, 'failedInvariantIds').join(', ')}</SummaryBlock> : null}
+          {findingText(finding, 'firstDivergence') ? <SummaryBlock title="First divergence">{findingText(finding, 'firstDivergence')}</SummaryBlock> : null}
         </div>
       </section>
-      <section className="card">
-        <h2 className="font-bold">Reproduction confidence</h2>
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <Metric label="Classification" value={finding.confidence} />
-          <Metric label="Validated reproductions" value={finding.reproductionCount} />
-          <Metric label="Exact reproduction" value={reproducedRuns > 0 ? 'Reproduced' : 'Not recorded'} />
-          <Metric label="Contradictory/control runs" value={contradictoryRuns} />
-        </div>
-        {confidenceExplanation ? <p className="mt-4 text-sm text-[var(--rift-text-secondary)]">{confidenceExplanation}</p> : null}
+      <TechnicalMetadata finding={finding} investigationStatus={investigationStatus} />
+      <section className="card" aria-labelledby="reproduction-heading">
+        <h2 className="text-xl font-bold" id="reproduction-heading">Reproduce this failure</h2>
+        <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">Uses the exact persisted steps and the minimum tested condition set recorded by the investigation.</p>
+        <dl className="mt-4 grid grid-cols-2 gap-3 border-y border-[var(--rift-border)] py-4 sm:grid-cols-4">
+          <Metric label="Confidence" value={finding.confidence} />
+          <Metric label="Successful" value={reproducedRuns} />
+          <Metric label="Controlled comparisons" value={contradictoryRuns} />
+          <Metric label="Required conditions" value={Object.keys(retained).length} />
+        </dl>
+        <div className="mt-4"><ReproductionSteps finding={finding} /></div>
       </section>
-      <MinimalConditionSummary finding={finding} boundary={boundary} />
-      <div className="grid gap-5 lg:grid-cols-3">
-        <ConditionBlock title="Retained in minimal tested set" conditions={retained} empty="No retained conditions were recorded." tone={conditionRoleTone('retained')} />
-        <ConditionBlock title="Removed conditions" conditions={removed} empty="No removed conditions were recorded." tone={conditionRoleTone('removed')} />
-        <ConditionBlock title="Inconclusive conditions" conditions={inconclusive} empty="No inconclusive conditions were recorded." tone={conditionRoleTone('inconclusive')} />
-      </div>
-      <FailureRange finding={finding} boundary={boundary} />
-      <ReproductionSteps finding={finding} />
+      <section className="card" aria-labelledby="conditions-heading">
+        <h2 className="text-xl font-bold" id="conditions-heading">Conditions and boundary</h2>
+        <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">One combined view of the minimum tested condition set. “Required” means retained by the recorded minimisation, not globally proven.</p>
+        <ConditionAnalysis retained={retained} removed={removed} inconclusive={inconclusive} />
+        <div className="mt-5"><FailureRange finding={finding} boundary={boundary} /></div>
+      </section>
+      <CausalSequence finding={finding} />
       <details className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface)]">
         <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-[var(--rift-text)] marker:hidden">Supporting experiment record</summary>
-        <div className="grid gap-5 border-t border-[var(--rift-border)] p-5">
+        <div className="border-t border-[var(--rift-border)] p-5">
           <ExperimentHistory worlds={worlds} experiments={experiments} evidence={allEvidence} />
-          <CausalSequence finding={finding} />
         </div>
       </details>
       <EvidenceViewer evidence={allEvidence} investigationId={finding.investigationId} finding={finding} worlds={worlds} experiments={experiments} />
+      {repairVerification}
       <details className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface)]">
         <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-[var(--rift-text)] marker:hidden">Limitations</summary>
         <div className="border-t border-[var(--rift-border)] px-5 py-4">
-          {limitations.length ? <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--rift-text-secondary)]">{limitations.map((item) => <li key={item}>{item}</li>)}</ul> : (
-            <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--rift-text-secondary)]">
-              <li>Minimality is based on deterministic recorded worlds, not exhaustive global search.</li>
-              <li>The timing result is bounded between observed passing and failing values, not an exact universal threshold.</li>
-              <li>The result is tied to the configured checkout fixture and provider execution context.</li>
-            </ul>
-          )}
+          {limitations.length ? <ul className="list-disc space-y-1 pl-5 text-sm text-[var(--rift-text-secondary)]">{limitations.map((item) => <li key={item}>{item}</li>)}</ul> : <p className="text-sm text-[var(--rift-text-secondary)]">No specific limitations were recorded for this finding.</p>}
         </div>
       </details>
     </div>
@@ -1150,25 +1206,30 @@ export function FindingDetailSections({
 }
 
 function SummaryBlock({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3"><h3 className="text-xs uppercase tracking-widest text-[var(--rift-text-muted)]">{title}</h3><p className="mt-2 text-sm text-[var(--rift-text-secondary)]">{children}</p></div>;
+  return <div><h3 className="text-xs font-medium text-[var(--rift-text-muted)]">{title}</h3><p className="mt-1 text-sm text-[var(--rift-text-secondary)]">{children}</p></div>;
 }
 
-function MinimalConditionSummary({ finding, boundary }: { finding: FindingDetail; boundary?: FailureBoundaryViewModel | undefined }) {
-  const retained = conditionRecord(finding, 'retainedConditions');
-  const range = boundary ?? failureBoundaryViewModel(finding);
-  const finalConfirmation = finding.reproductions.some((run) => run.reproduced) ? 'Reproduced' : 'Not recorded';
+function ConditionAnalysis({ retained, removed, inconclusive }: { retained: Record<string, unknown>; removed: Record<string, unknown>; inconclusive: Record<string, unknown> }) {
+  const groups = [
+    { label: 'Required', conditions: retained, tone: 'fail' as const, empty: 'No required conditions recorded.' },
+    { label: 'Not required', conditions: removed, tone: 'pass' as const, empty: 'No removed conditions recorded.' },
+    { label: 'Inconclusive', conditions: inconclusive, tone: 'pending' as const, empty: 'None recorded.' },
+  ];
   return (
-    <section className="card border-[var(--rift-border-strong)]">
-      <h2 className="font-bold">Minimal tested condition set</h2>
-      <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-[var(--rift-text-secondary)]">
-        {Object.entries(retained).map(([key, value]) => <li key={key}>{formatConditionKey(key)}: {formatConditionValue(key, value)}</li>)}
-        {range.failingBoundMs !== undefined ? <li>Failure observed at {range.failingBoundMs.toLocaleString()} ms</li> : null}
-        {range.passingBoundMs !== undefined ? <li>Passing behaviour observed at {range.passingBoundMs.toLocaleString()} ms</li> : null}
-        <li>Final minimal-set confirmation: {finalConfirmation}</li>
-        <li>Claim level: minimal tested set, not globally minimal conditions.</li>
-      </ul>
-    </section>
+    <div className="mt-5 grid gap-4 lg:grid-cols-3">
+      {groups.map((group) => <section className="rounded-lg border border-[var(--rift-border)] p-4" key={group.label}><div className="flex items-center justify-between gap-2"><h3 className="font-semibold">{group.label}</h3><StatusBadge tone={group.tone}>{Object.keys(group.conditions).length}</StatusBadge></div>{Object.keys(group.conditions).length ? <dl className="mt-3 space-y-3">{Object.entries(group.conditions).map(([key, value]) => <div key={key}><dt className="text-xs text-[var(--rift-text-muted)]">{formatConditionKey(key)}</dt><dd className="mt-0.5 text-sm text-[var(--rift-text-secondary)]">{formatConditionValue(key, value)}</dd></div>)}</dl> : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">{group.empty}</p>}</section>)}
+    </div>
   );
+}
+
+function TechnicalMetadata({ finding, investigationStatus }: { finding: FindingDetail; investigationStatus?: string | undefined }) {
+  const conditions = causalConditions(finding);
+  const rows = ([
+    ['Investigation ID', finding.investigationId], ['Finding ID', finding.id], ['World ID', conditions.sourceWorldId ?? conditions.worldId],
+    ['Experiment ID', conditions.sourceExperimentId ?? conditions.experimentId], ['Minimisation run ID', conditions.minimisationRunId],
+    ['Investigation status', investigationStatus], ['Created', formatDate(finding.createdAt)], ['Updated', formatDate(finding.updatedAt)],
+  ] as [string, unknown][]).filter((row) => row[1] !== undefined && row[1] !== null);
+  return <details className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface)]"><summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold marker:hidden">Technical metadata</summary><dl className="grid gap-3 border-t border-[var(--rift-border)] p-5 sm:grid-cols-2">{rows.map(([label, value]) => <div key={String(label)}><dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt><dd className="mt-1 break-all font-mono text-xs text-[var(--rift-text-secondary)]">{formatValue(value)}</dd></div>)}</dl></details>;
 }
 
 function ExperimentHistory({ worlds, experiments, evidence }: { worlds: InvestigationWorld[]; experiments: InvestigationExperiment[]; evidence: EvidenceArtifactResponse[] }) {
@@ -1214,11 +1275,12 @@ function ExperimentHistory({ worlds, experiments, evidence }: { worlds: Investig
 function CausalSequence({ finding }: { finding: FindingDetail }) {
   const sequence = findingList(finding, 'causalSequence');
   return (
-    <section className="card">
-      <h2 className="font-bold">Evidence-supported sequence</h2>
+    <section className="card" aria-labelledby="causal-explanation-heading">
+      <h2 className="text-xl font-bold" id="causal-explanation-heading">Causal explanation</h2>
+      <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">Evidence-supported sequence recorded by the investigation. It does not imply stronger causality than the underlying comparisons.</p>
       {sequence.length ? (
-        <ol className="mt-4 space-y-2 text-sm text-[var(--rift-text-secondary)]">
-          {sequence.map((item, index) => <li className="rounded-xl bg-[var(--rift-surface-raised)] p-3" key={`${index}-${item}`}>{index + 1}. {item}</li>)}
+        <ol className="mt-4 grid gap-2 text-sm text-[var(--rift-text-secondary)] md:grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]">
+          {sequence.map((item, index) => <li className="flex items-center gap-2" key={`${index}-${item}`}><span className="flex-1 rounded-lg border border-[var(--rift-border)] p-3">{item}</span>{index < sequence.length - 1 ? <span aria-hidden="true" className="hidden text-[var(--rift-text-muted)] md:block">→</span> : null}</li>)}
         </ol>
       ) : <p className="mt-3 text-sm text-[var(--rift-text-muted)]">A structured causal sequence was not recorded for this finding.</p>}
     </section>
