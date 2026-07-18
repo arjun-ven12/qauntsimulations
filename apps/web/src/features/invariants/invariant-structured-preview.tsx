@@ -1,4 +1,6 @@
 import type { InvariantValidationResult } from './invariant-api.js';
+import { MappedSemanticBadge } from '../../components/semantic-status.js';
+import { findingSeverityStatus, setupStatus, validationStatus } from '../runtime/semantic-status.js';
 import { templateName, type InvariantFormValue } from './invariant-form.model.js';
 
 export function InvariantStructuredPreview({ value }: { value: InvariantFormValue }) {
@@ -22,8 +24,8 @@ export function InvariantStructuredPreview({ value }: { value: InvariantFormValu
         <PreviewItem label="Template" value={templateName(value.type)} />
         <PreviewItem label="Evaluator" value={value.type} mono />
         <PreviewItem label="Business rule" value={value.description || 'Not provided'} />
-        <PreviewItem label="Severity" value={value.severity} />
-        <PreviewItem label="Enabled status" value={value.enabled ? 'Enabled' : 'Disabled'} />
+        <PreviewSemanticItem label="Severity" status={findingSeverityStatus(value.severity)} />
+        <PreviewSemanticItem label="Enabled status" status={setupStatus(value.enabled ? 'configured' : 'disabled')} />
         <PreviewItem label="Required observation" value={observation} />
         {value.type === 'NO_DUPLICATE_ORDER' ? (
           <PreviewItem
@@ -52,7 +54,8 @@ export function InvariantValidationPanel({
       <div className="mt-4 space-y-3">
         {result.checks.map((check) => (
           <article
-            className="min-w-0 rounded-lg border border-slate-700 bg-slate-950/40 p-4"
+            className={`rift-semantic-callout--${validationStatus(check.status).tone} min-w-0 rounded-lg border bg-[var(--rift-surface-raised)] p-4`}
+            data-tone={validationStatus(check.status).tone}
             key={check.key}
           >
             <div className="flex flex-wrap items-start gap-2">
@@ -70,17 +73,7 @@ export function InvariantValidationPanel({
 }
 
 export function StatusPill({ status }: { status: string }) {
-  const classes =
-    status === 'READY' || status === 'PASSED'
-      ? 'border-emerald-800 bg-emerald-950/40 text-emerald-300'
-      : status === 'INVALID' || status === 'FAILED'
-        ? 'border-red-800 bg-red-950/40 text-red-300'
-        : 'border-amber-800 bg-amber-950/40 text-amber-300';
-  return (
-    <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-black ${classes}`}>
-      {status}
-    </span>
-  );
+  return <MappedSemanticBadge status={validationStatus(status)} />;
 }
 
 function PreviewItem({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
@@ -92,6 +85,10 @@ function PreviewItem({ label, value, mono = false }: { label: string; value: str
       </dd>
     </div>
   );
+}
+
+function PreviewSemanticItem({ label, status }: { label: string; status: Parameters<typeof MappedSemanticBadge>[0]['status'] }) {
+  return <div className="min-w-0"><dt className="text-slate-500">{label}</dt><dd className="mt-1"><MappedSemanticBadge status={status} /></dd></div>;
 }
 
 function checkLabel(key: string) {

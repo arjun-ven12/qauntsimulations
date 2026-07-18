@@ -29,17 +29,19 @@ export function phaseLabel(status: string): string {
 }
 
 export type PhaseTrackerStep = {
-  id: 'PLAN' | 'EXPLORE' | 'REPRODUCE' | 'MINIMISE' | 'COMPLETE';
+  id: 'PLAN' | 'PROVISION' | 'OBSERVE' | 'ADAPT' | 'REPRODUCE' | 'MINIMISE' | 'COMPLETE';
   label: string;
   state: 'completed' | 'active' | 'pending' | 'skipped' | 'stopped';
 };
 
-const phaseOrder: PhaseTrackerStep['id'][] = ['PLAN', 'EXPLORE', 'REPRODUCE', 'MINIMISE', 'COMPLETE'];
+const phaseOrder: PhaseTrackerStep['id'][] = ['PLAN', 'PROVISION', 'OBSERVE', 'ADAPT', 'REPRODUCE', 'MINIMISE', 'COMPLETE'];
 
 export function phaseStepForStatus(status: string): PhaseTrackerStep['id'] {
   if (status === 'PLANNING') return 'PLAN';
-  if (['QUEUED', 'PROVISIONING', 'RUNNING', 'OBSERVING'].includes(status)) return 'EXPLORE';
-  if (['ADAPTING', 'REPRODUCING'].includes(status)) return 'REPRODUCE';
+  if (['QUEUED', 'PROVISIONING'].includes(status)) return 'PROVISION';
+  if (['RUNNING', 'OBSERVING'].includes(status)) return 'OBSERVE';
+  if (status === 'ADAPTING') return 'ADAPT';
+  if (status === 'REPRODUCING') return 'REPRODUCE';
   if (status === 'MINIMISING') return 'MINIMISE';
   return 'COMPLETE';
 }
@@ -47,7 +49,9 @@ export function phaseStepForStatus(status: string): PhaseTrackerStep['id'] {
 export function phaseTracker(status: string, findingsCount = 0): PhaseTrackerStep[] {
   const labels: Record<PhaseTrackerStep['id'], string> = {
     PLAN: 'Plan',
-    EXPLORE: 'Explore',
+    PROVISION: 'Provision',
+    OBSERVE: 'Observe',
+    ADAPT: 'Adapt',
     REPRODUCE: 'Reproduce',
     MINIMISE: 'Minimise',
     COMPLETE: 'Complete',

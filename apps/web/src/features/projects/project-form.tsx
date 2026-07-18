@@ -170,14 +170,17 @@ export function ProjectForm({
             aria-label="Project setup progress"
             className="mb-6 grid grid-cols-3 overflow-hidden rounded-lg border border-[var(--rift-border)] bg-[var(--rift-surface)]"
           >
-            {steps.map((label, index) => (
-              <li
+            {steps.map((label, index) => {
+              const tone = index === step && Object.keys(errors).length ? 'fail' : index < step ? 'pass' : index === step ? 'running' : 'neutral';
+              const state = tone === 'fail' ? 'Invalid' : tone === 'pass' ? 'Completed' : tone === 'running' ? 'Current' : 'Not started';
+              return <li
                 aria-current={index === step ? 'step' : undefined}
                 className={`min-w-0 border-l border-[var(--rift-border)] px-3 py-3 first:border-l-0 sm:px-4 ${index === step ? 'bg-[var(--rift-surface-raised)]' : ''}`}
+                data-tone={tone}
                 key={label}
               >
                 <span
-                  className={`block text-[10px] font-semibold tracking-[0.14em] ${index <= step ? 'text-[var(--rift-text)]' : 'text-[var(--rift-text-muted)]'}`}
+                  className={`block text-[10px] font-semibold tracking-[0.14em] rift-semantic-label--${tone}`}
                 >
                   0{index + 1}
                 </span>
@@ -186,8 +189,9 @@ export function ProjectForm({
                 >
                   {label}
                 </span>
-              </li>
-            ))}
+                <span className="sr-only">{state}</span>
+              </li>;
+            })}
           </ol>
 
           <div className="sr-only" ref={errorSummary} role="alert" tabIndex={-1}>
@@ -654,11 +658,14 @@ function SummaryRow({
   value: string;
   configured: boolean;
 }) {
+  const tone = value === 'Optional' ? 'neutral' : configured ? 'pass' : 'pending';
   return (
     <div className="flex items-start justify-between gap-3 py-3 first:pt-0">
       <dt className="text-sm text-[var(--rift-text-secondary)]">{label}</dt>
       <dd
-        className={`flex min-w-0 items-center gap-1.5 text-right text-xs font-medium ${configured ? 'text-[var(--status-pass)]' : 'text-[var(--status-pending)]'}`}
+        aria-label={`${value} status`}
+        className={`rift-semantic-label rift-semantic-label--${tone} min-w-0 text-right text-xs font-medium`}
+        data-tone={tone}
       >
         {configured ? <Check aria-hidden="true" size={13} /> : null}
         <span className="max-w-32 truncate" title={value}>

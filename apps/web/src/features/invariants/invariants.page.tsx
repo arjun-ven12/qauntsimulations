@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Copy, Trash2 } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
+import { MappedSemanticBadge } from '../../components/semantic-status.js';
 import { PageHeading } from '../../components/page-heading.js';
 import {
   primaryButton,
@@ -12,6 +13,7 @@ import { invariantApi, type Invariant } from './invariant-api.js';
 import { templateName } from './invariant-form.model.js';
 import { useCanMutateInvariants } from './invariant-permissions.js';
 import { StatusPill } from './invariant-structured-preview.js';
+import { findingSeverityStatus, setupStatus } from '../runtime/semantic-status.js';
 
 export function InvariantsPage() {
   const { projectId = '' } = useParams();
@@ -96,8 +98,8 @@ export function InvariantsPage() {
                   value={invariant.type ? templateName(invariant.type) : 'Unsupported legacy definition'}
                 />
                 <Summary label="Evaluator" value={invariant.type ?? 'Unavailable'} mono />
-                <Summary label="Severity" value={invariant.severity ?? 'Unavailable'} />
-                <Summary label="State" value={invariant.enabled ? 'Enabled' : 'Disabled'} />
+                <SemanticSummary label="Severity" status={findingSeverityStatus(invariant.severity)} />
+                <SemanticSummary label="State" status={setupStatus(invariant.enabled ? 'configured' : 'disabled')} />
                 <Summary label="Validation" value={invariant.validationStatus} />
                 <Summary label="Updated" value={formatTime(invariant.updatedAt)} />
               </dl>
@@ -149,6 +151,10 @@ function Summary({ label, value, mono = false }: { label: string; value: string;
       </dd>
     </div>
   );
+}
+
+function SemanticSummary({ label, status }: { label: string; status: Parameters<typeof MappedSemanticBadge>[0]['status'] }) {
+  return <div className="min-w-0"><dt className="text-slate-500">{label}</dt><dd className="mt-1"><MappedSemanticBadge status={status} /></dd></div>;
 }
 
 function formatTime(value: string) {

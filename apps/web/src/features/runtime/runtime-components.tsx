@@ -10,6 +10,7 @@ import {
   confidenceTone,
   executionStatusTone,
   findingSeverityTone,
+  findingStateStatus,
   plannerStatusTone,
   type SemanticStatusTone,
 } from './semantic-status.js';
@@ -62,7 +63,8 @@ import {
 
 export function StatusBadge({ children, tone = 'neutral' }: { children: ReactNode; tone?: SemanticStatusTone | 'cyan' | 'green' | 'red' | 'amber' | 'slate' }) {
   const semanticTone: SemanticStatusTone = tone === 'green' ? 'pass' : tone === 'cyan' ? 'running' : tone === 'red' ? 'fail' : tone === 'amber' ? 'pending' : tone === 'slate' ? 'neutral' : tone;
-  return <span className={`rift-semantic-status rift-semantic-status--${semanticTone}`}>{children}</span>;
+  const label = typeof children === 'string' || typeof children === 'number' ? String(children) : undefined;
+  return <span aria-label={label ? `${label} status` : undefined} className={`rift-semantic-status rift-semantic-status--${semanticTone}`} data-tone={semanticTone}>{children}</span>;
 }
 
 export function PanelState({ title, children, retry }: { title: string; children: string; retry?: () => void }) {
@@ -127,7 +129,7 @@ export function InvestigationOverviewHeader({ progress, plan, workerProvider }: 
         </div>
       </div>
       <div className="mt-5 h-2 overflow-hidden rounded-full bg-[var(--rift-surface-hover)]" aria-label={`${percentage}% complete`}>
-        <div className="h-full bg-white" style={{ width: `${percentage}%` }} />
+        <div className={`h-full ${semanticDotClass(executionStatusTone(progress.status))}`} style={{ width: `${percentage}%` }} />
       </div>
       <PhaseTracker steps={steps} />
     </section>
@@ -135,12 +137,12 @@ export function InvestigationOverviewHeader({ progress, plan, workerProvider }: 
 }
 
 export function PhaseTracker({ steps }: { steps: ReturnType<typeof phaseTracker> }) {
-  const tone = (state: string): SemanticStatusTone => state === 'completed' ? 'pass' : state === 'active' ? 'running' : state === 'stopped' ? 'fail' : state === 'skipped' ? 'pending' : 'neutral';
+  const tone = (state: string): SemanticStatusTone => state === 'completed' ? 'pass' : state === 'active' ? 'running' : state === 'stopped' ? 'fail' : 'neutral';
   return (
-    <ol className="mt-6 grid gap-4 md:grid-cols-5 md:gap-0" aria-label="Investigation phase tracker">
+    <ol className="mt-6 grid gap-4 md:grid-cols-7 md:gap-0" aria-label="Investigation phase tracker">
       {steps.map((step, index) => (
         <li className="relative border-t border-[var(--rift-border-strong)] pt-3 md:pr-3" key={step.id}>
-          <span className={`absolute -top-1 left-0 size-2 rounded-full ${semanticDotClass(tone(step.state))}`} />
+          <span aria-hidden="true" className={`absolute -top-1 left-0 size-2 rounded-full ${semanticDotClass(tone(step.state))}`} />
           <div className="text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--rift-text-muted)]">Step {index + 1}</div>
           <div className="mt-1 text-sm font-semibold text-[var(--rift-text)]">{step.label}</div>
           <div className="mt-1 text-xs"><span className={semanticTextClass(tone(step.state))}>{humanize(step.state)}</span></div>
@@ -547,7 +549,7 @@ export function FindingsList({ investigationId, findings }: { investigationId: s
             <h2 className="mt-4 text-xl font-bold">{finding.title}</h2>
             <p className="mt-2 text-[var(--rift-text-secondary)]">{finding.summary}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(causalStatus(finding))}</StatusBadge>
+              <StatusBadge tone={findingStateStatus(causalStatus(finding)).tone}>{humanize(causalStatus(finding))}</StatusBadge>
               <StatusBadge tone={conditionRoleTone('retained')}>{retained} retained</StatusBadge>
               <StatusBadge tone={conditionRoleTone('removed')}>{removed} removed</StatusBadge>
               {hasReport ? <StatusBadge tone="pass">Final report</StatusBadge> : <StatusBadge>No final report</StatusBadge>}
@@ -581,7 +583,7 @@ export function LiveFindingSummary({ investigationId, findings, investigationSta
               <div className="flex flex-wrap gap-2">
                 <StatusBadge tone={findingSeverityTone(finding.severity)}>{finding.severity}</StatusBadge>
                 <StatusBadge tone={confidenceTone(finding.confidence)}>{active && finding.confidence !== 'CONFIRMED' ? 'Possible violation' : finding.confidence}</StatusBadge>
-                <StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(supported)}</StatusBadge>
+                <StatusBadge tone={findingStateStatus(supported).tone}>{humanize(supported)}</StatusBadge>
                 {hasReport ? <StatusBadge tone="pass">Final report available</StatusBadge> : null}
               </div>
               <h3 className="mt-3 text-lg font-bold">{finding.title}</h3>
@@ -915,7 +917,7 @@ export function FindingDetailSections({
         <div className="flex flex-wrap gap-2">
           <StatusBadge tone={findingSeverityTone(finding.severity)}>{finding.severity}</StatusBadge>
           <StatusBadge tone={confidenceTone(finding.confidence)}>{finding.confidence}</StatusBadge>
-          <StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(causalStatus(finding))}</StatusBadge>
+          <StatusBadge tone={findingStateStatus(causalStatus(finding)).tone}>{humanize(causalStatus(finding))}</StatusBadge>
           {investigationStatus ? <StatusBadge tone={executionStatusTone(investigationStatus)}>{humanize(investigationStatus)}</StatusBadge> : null}
           {finalReports.length ? <StatusBadge tone="pass">Final report available</StatusBadge> : null}
         </div>

@@ -19,20 +19,35 @@
   --rift-warning: #f59e0b;
   --rift-fail: #ef4444;
   --status-pass: #34d399;
+  --status-pass-fg: #6ee7b7;
   --status-pass-bg: rgba(52, 211, 153, 0.09);
   --status-pass-border: rgba(52, 211, 153, 0.28);
+  --status-pass-indicator: #34d399;
+  --status-pass-hover: rgba(52, 211, 153, 0.14);
   --status-running: #60a5fa;
+  --status-running-fg: #93c5fd;
   --status-running-bg: rgba(96, 165, 250, 0.09);
   --status-running-border: rgba(96, 165, 250, 0.28);
+  --status-running-indicator: #60a5fa;
+  --status-running-hover: rgba(96, 165, 250, 0.14);
   --status-pending: #fbbf24;
+  --status-pending-fg: #fcd34d;
   --status-pending-bg: rgba(251, 191, 36, 0.09);
   --status-pending-border: rgba(251, 191, 36, 0.28);
+  --status-pending-indicator: #fbbf24;
+  --status-pending-hover: rgba(251, 191, 36, 0.14);
   --status-fail: #fb7185;
+  --status-fail-fg: #fda4af;
   --status-fail-bg: rgba(251, 113, 133, 0.09);
   --status-fail-border: rgba(251, 113, 133, 0.28);
+  --status-fail-indicator: #fb7185;
+  --status-fail-hover: rgba(251, 113, 133, 0.14);
   --status-neutral: #a1a1aa;
+  --status-neutral-fg: #d4d4d8;
   --status-neutral-bg: rgba(161, 161, 170, 0.08);
   --status-neutral-border: rgba(161, 161, 170, 0.24);
+  --status-neutral-indicator: #a1a1aa;
+  --status-neutral-hover: rgba(161, 161, 170, 0.12);
 }
 
 @layer base {
@@ -193,7 +208,7 @@
     color: var(--rift-fail);
   }
   .rift-semantic-status {
-    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
+    @apply inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-semibold;
   }
   .rift-semantic-status--pass {
     border-color: var(--status-pass-border);
@@ -220,6 +235,26 @@
     background: var(--status-neutral-bg);
     color: var(--status-neutral);
   }
+  .rift-semantic-label { @apply inline-flex items-center gap-2 text-sm; }
+  .rift-semantic-label--pass { color: var(--status-pass-fg); }
+  .rift-semantic-label--running { color: var(--status-running-fg); }
+  .rift-semantic-label--pending { color: var(--status-pending-fg); }
+  .rift-semantic-label--fail { color: var(--status-fail-fg); }
+  .rift-semantic-label--neutral { color: var(--status-neutral-fg); }
+  .rift-semantic-dot { @apply size-1.5 shrink-0 rounded-full; background: var(--status-neutral-indicator); }
+  .rift-semantic-dot--pass { background: var(--status-pass-indicator); }
+  .rift-semantic-dot--running { background: var(--status-running-indicator); }
+  .rift-semantic-dot--pending { background: var(--status-pending-indicator); }
+  .rift-semantic-dot--fail { background: var(--status-fail-indicator); }
+  .rift-semantic-dot--neutral { background: var(--status-neutral-indicator); }
+  .rift-semantic-dot--pulse { animation: rift-status-pulse 1.8s ease-in-out infinite; }
+  .rift-semantic-callout--pass { border-color: var(--status-pass-border); }
+  .rift-semantic-callout--running { border-color: var(--status-running-border); }
+  .rift-semantic-callout--pending { border-color: var(--status-pending-border); }
+  .rift-semantic-callout--fail { border-color: var(--status-fail-border); }
+  .rift-semantic-callout--neutral { border-color: var(--status-neutral-border); }
+  @keyframes rift-status-pulse { 50% { opacity: 0.35; transform: scale(0.82); } }
+  @media (prefers-reduced-motion: reduce) { .rift-semantic-dot--pulse { animation: none; } }
   .badge {
     @apply inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold;
     border-color: var(--rift-border);
