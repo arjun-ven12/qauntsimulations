@@ -1,18 +1,23 @@
 # Two-minute TaskOS demo
 
-1. Sign in and open **Dashboard**. Confirm the active organisation and recent activity are populated from live API data.
-2. Open the latest Investigation from **Recent Investigations**, then open its Finding.
-3. From the Finding, choose **Verify repair**. Select the repaired Environment, acknowledge authorised testing, and review the bounded preflight plan.
-4. Queue Repair Verification and use the returned verification page to follow its status. The Finding remains the entry point for verification history.
+This demonstration uses only current Product data. Do not paste database IDs, create a new Investigation, or imply that a hosted execution has completed.
 
-## Backup plan
+1. Sign in and open **Dashboard**. Confirm the active organisation, the `Checkout Reliability Lab` Project, and the real Recent Investigations and Recent Findings cards. Those cards are populated from the active organisation's activity API, not fixtures.
+2. Open the latest completed checkout Investigation from **Recent Investigations**. Confirm its Environment is `Local Demo Store` and its status and timestamps are shown by TaskOS.
+3. Open the confirmed critical Finding from the Investigation. Use the existing evidence, reproduction, and final-report views to explain the delayed-payment duplicate-submission behaviour. The strongest current proof has 13 bounded Worlds, 58 evidence artifacts, and three reproductions.
+4. Point out **Verify repair** on the Finding. Select an authorised READY Environment and review the bounded preflight plan: the minimal reproduction, original passing controls, adjacent regression Worlds, and selected Invariants. Do not queue a new verification during this release demonstration.
 
-If no recent activity is available, open a Project from Dashboard, confirm Environment/Journey/Invariant readiness, then launch a normal Scenario Investigation. Do not use hardcoded URLs or database IDs. If runtime execution is unavailable, show the prepared plan and existing Finding detail instead of claiming a completed run.
+## What this proves
 
-## Release checklist
+- Public Render fixture: verified.
+- Daytona sandbox lifecycle: verified.
+- Evidence-backed TaskOS Investigation: verified using the existing reachable `Local Demo Store` path.
+- Dashboard activity, Investigation/Finding navigation, and Repair Verification Product workflow: implemented.
 
-- Dashboard shows only API-returned activity and links use returned IDs.
-- Investigation links open `/investigations/:investigationId`.
-- Finding links open `/investigations/:investigationId/findings/:findingId`.
-- Repair Verification is launched from a Finding and retains the Finding context.
-- Empty, loading, error, and permission states are verified before presenting the demo.
+## What remains blocked or pending
+
+- Daytona-to-Render execution is externally blocked by the Daytona organisation-level outbound-network policy.
+- A hosted Repair Verification is pending outbound network access. The implementation must not be described as `FIX_CONFIRMED`, `DEFECT_STILL_PRESENT`, or `REGRESSION_DETECTED` without an authoritative completed verification.
+- This guide does not assert a public TaskOS API or web deployment.
+
+See [backup-demo-plan.md](backup-demo-plan.md) if the activity feed or a browser session is unavailable, and [release-checklist.md](release-checklist.md) for the release gate.
