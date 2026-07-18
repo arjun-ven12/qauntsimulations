@@ -54,6 +54,7 @@ export interface PersistedLaunchSnapshot {
     };
     testData?: Record<string, unknown>;
     allowedActions?: string[];
+    environmentIntelligence?: unknown;
   };
   journey: RuntimeJourney;
   invariants: RuntimeInvariantDefinition[];

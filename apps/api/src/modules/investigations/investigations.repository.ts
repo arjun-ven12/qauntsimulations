@@ -8,6 +8,7 @@ import type { DeterministicExperimentPlan } from '../experiments/services/determ
 import { readJourneyConfiguration, toRuntimeJourney } from '../journeys/journeys.mapper.js';
 import { persistedInvariantAssertionSchema } from '../invariants/invariants.schema.js';
 import { mapPersistedInvariantToRuntimeDefinition } from '../invariants/invariants.mapper.js';
+import { environmentIntelligenceContextSchema } from '../environments/environment-intelligence.schema.js';
 import type {
   AdaptiveFindingCandidate,
   AdaptiveFindingUpdateInput,
@@ -175,6 +176,7 @@ function runtimeEnvironmentConfiguration(configuration: Record<string, unknown>)
   const resetMethod = stringValue(reset.method);
   const paymentMode = stringValue(payment.mode);
   const paymentResult = stringValue(payment.result);
+  const environmentIntelligence = environmentIntelligenceContextSchema.safeParse(configuration.environmentIntelligence);
   return {
     reset: {
       mode: stringValue(reset.mode) ?? 'NONE',
@@ -190,6 +192,7 @@ function runtimeEnvironmentConfiguration(configuration: Record<string, unknown>)
     },
     testData,
     allowedActions: stringArray(configuration.allowedActions),
+    ...(environmentIntelligence.success ? { environmentIntelligence: environmentIntelligence.data } : {}),
   };
 }
 

@@ -232,6 +232,15 @@ function compactAiAndInput(request: PlannerRequest) {
       environment: request.environment.name,
       origin: request.environment.origin,
     },
+    environmentContext: request.environment.intelligence ? {
+      provider: request.environment.intelligence.provider,
+      title: request.environment.intelligence.title,
+      headings: request.environment.intelligence.headings,
+      controls: request.environment.intelligence.controls,
+      detectedJourneys: request.environment.intelligence.detectedJourneys,
+      visibleTextSummary: request.environment.intelligence.visibleTextSummary,
+      note: 'Observed public page context from Oxylabs; incomplete and non-authoritative.',
+    } : undefined,
     allowed: {
       worlds: request.controls.maximumWorlds,
       browsers: request.controls.allowedBrowsers,

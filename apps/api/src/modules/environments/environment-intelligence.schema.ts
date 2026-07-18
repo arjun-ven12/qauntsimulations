@@ -8,7 +8,7 @@ export const environmentIntelligenceContextSchema = z.object({
   sourceUrl: z.string().url(),
   finalUrl: z.string().url(),
   sourceDomain: z.string().min(1).max(253),
-  targetStatusCode: z.number().int().min(100).max(599),
+  targetStatusCode: z.number().int().min(0).max(599),
   rendered: z.boolean(),
   title: z.string().max(300).nullable(),
   headings: z.array(z.string().max(200)).max(20),

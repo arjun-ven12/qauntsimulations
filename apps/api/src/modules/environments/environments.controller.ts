@@ -71,4 +71,17 @@ export class EnvironmentController {
       next(e);
     }
   };
+  retrieveIntelligence = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      res.json(
+        await this.service.retrieveIntelligence(
+          req.auth!,
+          String(req.params.projectId),
+          String(req.params.environmentId),
+        ),
+      );
+    } catch (e) {
+      next(e);
+    }
+  };
 }

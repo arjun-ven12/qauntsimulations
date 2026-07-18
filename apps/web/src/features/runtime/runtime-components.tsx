@@ -269,6 +269,8 @@ export function ExperimentPlanPanel({
         </div>
       </section>
 
+      <EnvironmentIntelligencePanel intelligence={plan.environmentIntelligence ?? null} />
+
       <section className="card">
         <h2 className="font-bold">Plan progression</h2>
         <ol className="mt-5 grid gap-4 md:grid-cols-6" aria-label="Experiment plan progression">
@@ -319,6 +321,49 @@ export function ExperimentPlanPanel({
         {rejected.length ? <ListBlock title="Rejected plan items" items={rejected.map((item) => typeof item === 'string' ? item : formatValue(item))} empty="No rejected plan items." tone="pending" /> : null}
       </details>
     </div>
+  );
+}
+
+function EnvironmentIntelligencePanel({ intelligence }: { intelligence: ExperimentPlanResponse['environmentIntelligence'] | null }) {
+  if (!intelligence) {
+    return (
+      <section className="card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-bold">Environment Intelligence</h2>
+          <StatusBadge tone="neutral">No external context</StatusBadge>
+        </div>
+        <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">External context unavailable. Planning continued without Oxylabs.</p>
+      </section>
+    );
+  }
+  const completed = intelligence.provider === 'OXYLABS' && intelligence.status === 'COMPLETED';
+  return (
+    <section className="card">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="font-bold">Environment Intelligence</h2>
+          <p className="mt-2 text-sm text-[var(--rift-text-secondary)]">
+            {completed ? 'Rendered public page context retrieved and bounded for planning.' : 'External context unavailable. Planning continued without Oxylabs.'}
+          </p>
+        </div>
+        <StatusBadge tone={completed ? 'pass' : 'pending'}>{completed ? 'Context by Oxylabs' : 'External context unavailable'}</StatusBadge>
+      </div>
+      {completed ? (
+        <dl className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+          <ProvenanceMetric label="Provider" value="Context by Oxylabs" />
+          <ProvenanceMetric label="Rendered" value={intelligence.rendered ? 'Rendered public page' : 'Not rendered'} />
+          <ProvenanceMetric label="Source" value={intelligence.sourceDomain} />
+          <ProvenanceMetric label="Forms detected" value={intelligence.formCount} />
+          <ProvenanceMetric label="Actions detected" value={intelligence.buttonCount + intelligence.linkCount} />
+          <ProvenanceMetric label="Context available to planner" value={intelligence.usedByPlanner ? 'Yes' : 'No'} />
+        </dl>
+      ) : null}
+      {completed && intelligence.detectedJourneys.length ? (
+        <p className="mt-4 text-sm text-[var(--rift-text-secondary)]">
+          Journeys detected: <span className="font-semibold text-white">{intelligence.detectedJourneys.join(', ')}</span>
+        </p>
+      ) : null}
+    </section>
   );
 }
 

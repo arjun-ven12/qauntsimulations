@@ -23,6 +23,14 @@ export interface PlannerRequest {
     type?: string;
     origin?: string;
     capabilities?: { allowedActions?: string[]; payment?: Record<string, unknown>; reset?: Record<string, unknown> };
+    intelligence?: {
+      provider: 'OXYLABS';
+      title?: string | null;
+      headings: string[];
+      controls: string[];
+      detectedJourneys: string[];
+      visibleTextSummary?: string;
+    };
   };
   journey: { id: string; name: string; supportedVariables: string[]; supportedActionTypes?: string[]; steps?: unknown[] };
   controls: {

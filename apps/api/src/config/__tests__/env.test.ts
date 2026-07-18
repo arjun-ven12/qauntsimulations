@@ -207,4 +207,37 @@ describe('API environment security', () => {
       NOSANA_MAX_SCREENSHOTS: '4',
     }).success).toBe(false);
   });
+
+  it('keeps Oxylabs environment intelligence disabled by default and validates safe activation', () => {
+    const defaults = apiEnvironmentSchema.parse(requiredEnvironment);
+    expect(defaults.OXYLABS_ENABLED).toBe(false);
+    expect(defaults.OXYLABS_REQUIRED).toBe(false);
+    expect(defaults.OXYLABS_BASE_URL).toBe('https://realtime.oxylabs.io/v1/queries');
+    expect(defaults.OXYLABS_SOURCE).toBe('universal');
+    expect(defaults.OXYLABS_RENDER_MODE).toBe('html');
+    expect(defaults.OXYLABS_REQUEST_TIMEOUT_MS).toBe(120_000);
+    expect(defaults).not.toHaveProperty('PUBLIC_OXYLABS_PASSWORD');
+
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      OXYLABS_ENABLED: 'true',
+    }).success).toBe(false);
+
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      OXYLABS_ENABLED: 'true',
+      OXYLABS_USERNAME: 'user',
+      OXYLABS_PASSWORD: 'password',
+      OXYLABS_BASE_URL: 'https://realtime.oxylabs.io/v1/queries',
+      OXYLABS_SOURCE: 'universal',
+      OXYLABS_REQUEST_TIMEOUT_MS: '120000',
+      OXYLABS_RENDER_MODE: 'html',
+      OXYLABS_REQUIRED: 'false',
+    }).success).toBe(true);
+
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      OXYLABS_BASE_URL: 'http://realtime.oxylabs.io/v1/queries',
+    }).success).toBe(false);
+  });
 });

@@ -114,6 +114,7 @@ export class InvestigationService {
       plannerStatus,
       schemaPassed,
       safetyPassed,
+      environmentIntelligence: planner?.environmentIntelligence ?? null,
       plannerMetadata: planner,
     };
   }
