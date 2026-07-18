@@ -47,7 +47,7 @@ export function ContextualNavigation() {
 
   if (!context.back) return null;
   return (
-    <Link aria-label={`Back to ${context.back.label}`} className="mb-5 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 py-2 text-sm font-bold text-slate-300 hover:bg-slate-900 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan" to={context.back.to}>
+    <Link aria-label={`Back to ${context.back.label}`} className="mb-5 inline-flex min-h-11 items-center gap-1 rounded-lg px-2 py-2 text-sm font-semibold text-[var(--rift-text-secondary)] transition hover:bg-[var(--rift-surface-hover)] hover:text-[var(--rift-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" to={context.back.to}>
       <ChevronLeft aria-hidden="true" size={17} /> Back to {context.back.label}
     </Link>
   );

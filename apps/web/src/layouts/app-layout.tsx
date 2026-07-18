@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Activity, Boxes, FlaskConical, Gauge, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
+import { Activity, Boxes, Gauge, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { ContextualNavigation } from '../components/contextual-navigation.js';
@@ -11,7 +11,7 @@ const runtimeInvestigationId = import.meta.env.VITE_DEMO_INVESTIGATION_ID ?? 'cm
 export const appNavigation = [
   { to: '/dashboard', label: 'Dashboard', icon: Gauge },
   { to: '/projects', label: 'Projects', icon: Boxes },
-  { to: `/investigations/${runtimeInvestigationId}`, label: 'Live Investigation', icon: Activity },
+  { to: `/investigations/${runtimeInvestigationId}`, label: 'Investigations', icon: Activity },
   {
     to: `/investigations/${runtimeInvestigationId}/findings`,
     label: 'Findings',
@@ -60,25 +60,19 @@ export function AppLayout() {
   }
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[250px_1fr]">
-      <aside className="border-r border-slate-800 bg-slate-950 p-5">
-        <div className="mb-10 flex items-center gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-cyan text-ink">
-            <FlaskConical size={22} />
-          </span>
-          <div>
-            <div className="font-black tracking-tight">Rift</div>
-            <div className="text-xs text-slate-500">RELIABILITY</div>
-          </div>
+    <div className="min-h-screen bg-[var(--rift-bg)] lg:grid lg:grid-cols-[264px_1fr]">
+      <aside className="border-r border-[var(--rift-border)] bg-[var(--rift-sidebar)] p-5 lg:min-h-screen">
+        <div className="mb-8 pt-1">
+          <div aria-label="Rift" className="text-sm font-semibold tracking-[0.22em] text-[var(--rift-primary)]">RIFT</div>
         </div>
         {organisation ? (
-          <div className="mb-6 rounded-xl border border-slate-800 bg-slate-900/70 p-3">
-            <label className="text-xs font-bold text-slate-400" htmlFor="organisation-switcher">
-              Active organisation
+          <div className="mb-6 flex min-h-11 items-center gap-2 border-y border-[var(--rift-border)] py-1">
+            <label className="shrink-0 text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--rift-text-muted)]" htmlFor="organisation-switcher">
+              Workspace
             </label>
             <select
-              aria-label="Active organisation"
-              className="mt-2 w-full text-sm"
+              aria-label="Workspace selector"
+              className="w-full min-w-0 border-0 bg-transparent px-1 py-1.5 text-sm font-medium text-[var(--rift-text)] focus:shadow-none"
               disabled={switching || !memberships?.length}
               id="organisation-switcher"
               onChange={(event) => void changeOrganisation(event.target.value)}
@@ -96,23 +90,25 @@ export function AppLayout() {
               ) : null}
             </select>
             {switching ? (
-              <p className="mt-2 text-xs text-cyan" role="status">
+              <p className="sr-only" role="status">
                 Switching organisation…
-              </p>
-            ) : null}
-            {switchError ? (
-              <p className="mt-2 text-xs text-red-300" role="alert">
-                {switchError}
               </p>
             ) : null}
           </div>
         ) : null}
-        <nav aria-label="Rift navigation" className="space-y-2">
+        {switchError ? (
+          <p className="-mt-4 mb-4 text-xs text-[var(--rift-fail)]" role="alert">
+            {switchError}
+          </p>
+        ) : null}
+        <nav aria-label="Rift navigation" className="space-y-1.5">
           {appNavigation.map(({ to, label, icon: Icon }) => (
             <NavLink
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm ${
-                  isActive ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-900'
+                `flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'border border-[var(--rift-border-strong)] bg-[var(--rift-surface-raised)] text-[var(--rift-text)]'
+                    : 'border border-transparent text-[var(--rift-text-secondary)] hover:bg-[var(--rift-surface-hover)] hover:text-[var(--rift-text)]'
                 }`
               }
               key={to}
@@ -122,7 +118,7 @@ export function AppLayout() {
               {label}
               {label === 'Invitations' && pendingInvitationCount > 0 ? (
                 <span
-                  className="ml-auto rounded-full bg-cyan px-2 py-0.5 text-xs font-bold text-ink"
+                  className="ml-auto rounded-full border border-[var(--rift-border-strong)] bg-[var(--rift-primary)] px-2 py-0.5 text-xs font-semibold text-[var(--rift-primary-text)]"
                   aria-label={`${pendingInvitationCount} pending invitations`}
                 >
                   {pendingInvitationCount}
@@ -132,14 +128,14 @@ export function AppLayout() {
           ))}
         </nav>
         <button
-          className="mt-10 flex items-center gap-2 text-sm text-slate-500"
+          className="mt-10 flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium text-[var(--rift-text-muted)] transition hover:bg-[var(--rift-surface-hover)] hover:text-[var(--rift-text)]"
           onClick={() => void logout()}
           type="button"
         >
           <LogOut size={16} /> Sign out
         </button>
       </aside>
-      <main className="min-w-0 p-6 lg:p-10">
+      <main className="min-w-0 bg-[var(--rift-bg)] p-6 lg:p-10">
         <ContextualNavigation />
         <Outlet />
       </main>
