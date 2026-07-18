@@ -1,0 +1,25 @@
+{
+  "investigationId": "investigation_demo",
+  "worldId": "world_failed",
+  "findingId": "finding_demo",
+  "invariantType": "NO_DUPLICATE_PAYMENT",
+  "expectedBehavior": "One submitted checkout should create at most one payment request.",
+  "observedOutcome": "FAIL",
+  "screenshots": [
+    {
+      "evidenceId": "evidence_before",
+      "role": "BEFORE",
+      "safeInputReference": "screenshots/world_failed/before.png"
+    },
+    {
+      "evidenceId": "evidence_failure",
+      "role": "FAILURE",
+      "safeInputReference": "screenshots/world_failed/failure.png"
+    }
+  ],
+  "worldDimensions": {
+    "paymentDelayMs": 1200,
+    "doubleSubmit": true,
+    "duplicateSubmissionBug": true
+  }
+}

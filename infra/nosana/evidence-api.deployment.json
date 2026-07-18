@@ -1,0 +1,19 @@
+{
+  "version": "0.1",
+  "type": "container",
+  "meta": {
+    "trigger": "deployment",
+    "name": "taskos-evidence-api"
+  },
+  "ops": [
+    {
+      "type": "container/run",
+      "id": "taskos-evidence-api",
+      "args": {
+        "image": "ghcr.io/arjun-ven12/taskos-nosana-evidence@sha256:9da4c11a58fefab89fb8e08b0534703550c3801ae31facc1f070937342b18346",
+        "gpu": true,
+        "expose": 8000
+      }
+    }
+  ]
+}

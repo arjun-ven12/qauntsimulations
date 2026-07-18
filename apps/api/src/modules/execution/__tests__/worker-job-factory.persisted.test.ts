@@ -112,6 +112,52 @@ describe('WorkerJobFactoryService persisted launch inputs', () => {
     expect(JSON.stringify(job)).not.toContain('checkout-journey.json');
   });
 
+  it('normalises legacy checkout snapshots that waited for cart items before opening the cart', async () => {
+    evidenceRoot = await mkdtemp(join(tmpdir(), 'taskos-worker-job-'));
+    const job = await new WorkerJobFactoryService(evidenceRoot).create({
+      investigationId: 'investigation',
+      worldId: 'world',
+      experimentId: 'experiment',
+      workerId: 'worker',
+      environmentBaseUrl: launch.environment.baseUrl,
+      invariantId: 'unused-legacy-id',
+      world: {
+        key: 'baseline',
+        name: 'Baseline',
+        browser: 'chromium',
+        viewport: 'desktop-1440x900',
+        networkProfile: 'normal',
+        userProfile: 'impatient',
+        paymentDelayMs: 1200,
+        duplicateSubmissionBug: false,
+        doubleSubmit: true,
+        doubleSubmitIntervalMs: 100,
+        expectedOutcome: 'PASS',
+        reason: 'Persisted launch worker job test.',
+        randomSeed: 1,
+        creationOrder: 0,
+      },
+      journey: {
+        ...launch.journey,
+        steps: [
+          { type: 'goto', path: '/products/test-product' },
+          { type: 'click', selector: '[data-testid="add-to-cart"]' },
+          { type: 'assertVisible', selector: '[data-testid="cart-item"]' },
+          { type: 'click', selector: '[data-testid="open-cart"]' },
+          { type: 'click', selector: '[data-testid="pay-button"]', name: 'Persisted pay' },
+        ],
+      },
+      invariants: launch.invariants,
+      launch,
+    });
+
+    expect(job.journey.steps.slice(1, 4)).toEqual([
+      expect.objectContaining({ type: 'click', selector: '[data-testid="add-to-cart"]' }),
+      expect.objectContaining({ type: 'click', selector: '[data-testid="open-cart"]' }),
+      expect.objectContaining({ type: 'assertVisible', selector: '[data-testid="cart-item"]' }),
+    ]);
+  });
+
   it('fails closed when no persisted snapshots or explicit fixture path are available', async () => {
     evidenceRoot = await mkdtemp(join(tmpdir(), 'taskos-worker-job-'));
     await expect(

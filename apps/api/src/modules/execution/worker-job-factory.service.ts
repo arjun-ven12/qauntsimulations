@@ -79,14 +79,34 @@ export class WorkerJobFactoryService {
 }
 
 function withPaymentSubmit(journey: WorkerJob['journey'] | RuntimeJourney): WorkerJob['journey'] {
+  const steps = normaliseLegacyCartOrder(journey.steps);
   return workerJobSchema.shape.journey.parse({
     ...journey,
-    steps: journey.steps.map((step) =>
+    steps: steps.map((step) =>
       step.type === 'click' && /pay|payment|submit/i.test(step.selector)
         ? { ...step, type: 'submitPayment' as const, name: step.name ?? 'Submit payment' }
         : step,
     ),
   });
+}
+
+function normaliseLegacyCartOrder(steps: Array<WorkerJob['journey']['steps'][number] | RuntimeJourney['steps'][number]>) {
+  const normalised = [...steps];
+  for (let index = 0; index < normalised.length - 1; index += 1) {
+    const current = normalised[index];
+    const next = normalised[index + 1];
+    const currentWaitsForCartItem = current
+      && (current.type === 'waitFor' || current.type === 'assertVisible')
+      && current.selector === '[data-testid="cart-item"]';
+    const nextOpensCart = next
+      && next.type === 'click'
+      && next.selector === '[data-testid="open-cart"]';
+    if (currentWaitsForCartItem && nextOpensCart) {
+      normalised[index] = next;
+      normalised[index + 1] = current;
+    }
+  }
+  return normalised;
 }
 
 function firstJourneyPath(journey: WorkerJob['journey']): string | undefined {

@@ -37,9 +37,69 @@ describe('Rift operational dashboard', () => {
     expect(html).toContain('Investigation timeline');
     expect(html).not.toContain('Verify a checkout flow with a long prompt');
 
-    const terminalOnly = render({ ...seededDemoDashboardData, recentInvestigations: [investigation('failed', 'FAILED', 'Completed checkout review')] });
+    const terminalOnly = render({
+      ...seededDemoDashboardData,
+      recentInvestigations: [
+        investigation('failed', 'FAILED', 'Completed checkout review'),
+      ],
+    });
+
     expect(terminalOnly).toContain('Current investigation');
     expect(terminalOnly).toContain('Completed checkout review');
+  });
+
+  it('renders real recent investigation and finding activity', () => {
+    const data: DashboardData = {
+      ...seededDemoDashboardData,
+      recentInvestigations: [
+        {
+          id: 'investigation-1',
+          projectId: 'project_demo_checkout',
+          projectName: 'Checkout Reliability Lab',
+          name: 'Duplicate checkout investigation',
+          status: 'RUNNING',
+          worldCount: 4,
+          findingCount: 1,
+          createdAt: '2026-07-18T00:00:00.000Z',
+        },
+      ],
+      recentFindings: [
+        {
+          id: 'finding-1',
+          investigationId: 'investigation-1',
+          projectId: 'project_demo_checkout',
+          projectName: 'Checkout Reliability Lab',
+          title: 'Duplicate payment request',
+          severity: 'CRITICAL',
+          status: 'OPEN',
+          createdAt: '2026-07-18T00:00:00.000Z',
+          href: '/investigations/investigation-1/findings/finding-1',
+        },
+      ],
+    };
+
+    const html = render(data);
+
+    expect(html).toContain('RUNNING');
+    expect(html).toContain('Duplicate checkout investigation');
+    expect(html).toContain('4 worlds');
+    expect(html).toContain('1 finding');
+    expect(html).toContain('Duplicate payment request');
+    expect(html).toContain('CRITICAL');
+    expect(html).toContain('OPEN');
+    expect(html).toContain('/investigations/investigation-1/findings/finding-1');
+  });
+
+  it('renders a first-Project empty state when Product data is empty', () => {
+    const html = render({
+      organisation: { id: 'org-empty', name: 'Empty Organisation', role: 'OWNER' },
+      projects: [],
+      recentInvestigations: [],
+      recentFindings: [],
+    });
+
+    expect(html).toContain('No investigation running');
+    expect(html).toContain('No Project configuration is available yet.');
   });
 
   it('renders recent investigations and findings as compact tables with safe display names', () => {
@@ -47,9 +107,27 @@ describe('Rift operational dashboard', () => {
       ...seededDemoDashboardData,
       projects: [{ ...seededDemoDashboardData.projects[0]!, name: 'TaskOS Demo Commerce' }],
       recentInvestigations: [
-        { ...investigation('investigation-1', 'RUNNING', 'Test the checkout flow under delayed payment responses and repeated user interaction.'), projectName: 'TaskOS Demo Commerce' },
+        {
+          ...investigation(
+            'investigation-1',
+            'RUNNING',
+            'Test the checkout flow under delayed payment responses and repeated user interaction.',
+          ),
+          projectName: 'TaskOS Demo Commerce',
+        },
       ],
-      recentFindings: [{ id: 'finding-1', investigationId: 'investigation-1', projectId: 'project_demo_checkout', projectName: 'TaskOS Demo Commerce', title: 'Duplicate payment request', severity: 'CRITICAL', status: 'OPEN', createdAt: '2026-07-18T00:00:00.000Z' }],
+      recentFindings: [
+        {
+          id: 'finding-1',
+          investigationId: 'investigation-1',
+          projectId: 'project_demo_checkout',
+          projectName: 'TaskOS Demo Commerce',
+          title: 'Duplicate payment request',
+          severity: 'CRITICAL',
+          status: 'OPEN',
+          createdAt: '2026-07-18T00:00:00.000Z',
+        },
+      ],
     });
 
     expect(html).toContain('<table');
@@ -84,7 +162,13 @@ describe('Rift operational dashboard', () => {
   });
 
   it('keeps creation permission-aware for an empty organisation', () => {
-    const data: DashboardData = { organisation: { id: 'org-empty', name: 'Empty Organisation', role: 'VIEWER' }, projects: [], recentInvestigations: [], recentFindings: [] };
+    const data: DashboardData = {
+      organisation: { id: 'org-empty', name: 'Empty Organisation', role: 'VIEWER' },
+      projects: [],
+      recentInvestigations: [],
+      recentFindings: [],
+    };
+
     const html = render(data, { canCreateProject: false });
 
     expect(html).toContain('No investigation running');
@@ -94,6 +178,7 @@ describe('Rift operational dashboard', () => {
 
   it('keeps the dashboard monochrome, compact, and responsive', () => {
     const html = render(seededDemoDashboardData);
+
     expect(html).toContain('sm:grid-cols-2');
     expect(html).toContain('xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]');
     expect(html).toContain('rift-surface h-full rounded-xl');
@@ -113,6 +198,19 @@ function investigation(id: string, status: string, name: string) {
   };
 }
 
-function render(data: DashboardData, props: { canCreateProject?: boolean; activityAvailability?: { investigations: 'available' | 'unavailable'; findings: 'available' | 'unavailable' } } = {}) {
-  return renderToStaticMarkup(<MemoryRouter><ProductDashboard data={data} {...props} /></MemoryRouter>);
+function render(
+  data: DashboardData,
+  props: {
+    canCreateProject?: boolean;
+    activityAvailability?: {
+      investigations: 'available' | 'unavailable';
+      findings: 'available' | 'unavailable';
+    };
+  } = {},
+) {
+  return renderToStaticMarkup(
+    <MemoryRouter>
+      <ProductDashboard data={data} {...props} />
+    </MemoryRouter>,
+  );
 }

@@ -28,7 +28,7 @@ export interface DashboardInvestigationSummary {
   id: string;
   projectId: string;
   projectName: string;
-  name?: string;
+  name: string;
   status: string;
   worldCount?: number;
   findingCount?: number;
