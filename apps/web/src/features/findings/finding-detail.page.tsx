@@ -29,6 +29,7 @@ export function FindingDetailPage() {
   const range = boundedRange(finding.data);
   const sourceWorld = conditions.sourceWorldId ?? conditions.worldId;
   const sourceExperiment = conditions.sourceExperimentId ?? conditions.experimentId;
+  const gpuAnalysis = (evidence.data ?? finding.data.evidence).find((artifact) => artifact.metadata?.provider === 'NOSANA' && artifact.metadata?.role === 'SUPPLEMENTAL');
 
   return (
     <>
@@ -62,6 +63,16 @@ export function FindingDetailPage() {
         </dl>
       </section>
       <section className="card mb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-bold">GPU Evidence Analysis</h2>
+            <p className="mt-1 text-sm text-slate-400">Supplemental AI analysis — deterministic invariant results remain authoritative.</p>
+          </div>
+          <StatusBadge tone={gpuAnalysis ? 'green' : 'slate'}>{gpuAnalysis ? 'Completed' : 'Unavailable'}</StatusBadge>
+        </div>
+        {gpuAnalysis ? <GpuAnalysisSummary metadata={gpuAnalysis.metadata ?? {}} /> : <p className="mt-4 text-sm text-slate-400">No Nosana supplemental analysis is attached for this Finding yet.</p>}
+      </section>
+      <section className="card mb-5">
         <h2 className="font-bold">Reproduction</h2>
         <p className="mt-3 text-sm text-slate-400">
           {finding.data.reproductions.filter((run) => run.reproduced).length} reproduced runs and {finding.data.reproductions.filter((run) => !run.reproduced).length} contradictory/control runs are linked to this finding.
@@ -81,5 +92,30 @@ export function FindingDetailPage() {
         worlds={worlds.data ?? []}
       />
     </>
+  );
+}
+
+function GpuAnalysisSummary({ metadata }: { metadata: Record<string, unknown> }) {
+  const changes = Array.isArray(metadata.visualChanges) ? metadata.visualChanges.slice(0, 5) : [];
+  return (
+    <div className="mt-4 space-y-4 text-sm">
+      <dl className="grid gap-3 md:grid-cols-4">
+        <div><dt className="text-xs text-slate-500">Provider</dt><dd className="font-bold">Nosana</dd></div>
+        <div><dt className="text-xs text-slate-500">Role</dt><dd className="font-bold">Supplemental</dd></div>
+        <div><dt className="text-xs text-slate-500">GPU</dt><dd className="font-bold">{formatValue(metadata.gpuName ?? 'Nosana deployment')}</dd></div>
+        <div><dt className="text-xs text-slate-500">Confidence</dt><dd className="font-bold">{typeof metadata.confidence === 'number' ? `${Math.round(metadata.confidence * 100)}%` : 'Not recorded'}</dd></div>
+      </dl>
+      <p className="text-xs text-slate-500">Model: {formatValue(metadata.model)}</p>
+      {typeof metadata.summary === 'string' ? <p className="rounded-xl bg-slate-950 p-3 text-slate-300">{metadata.summary}</p> : null}
+      {typeof metadata.likelyFailureMechanism === 'string' ? <p className="text-slate-400">Likely mechanism: {metadata.likelyFailureMechanism}</p> : null}
+      {changes.length ? (
+        <ul className="list-disc space-y-1 pl-5 text-slate-400">
+          {changes.map((change, index) => {
+            const item = change && typeof change === 'object' && !Array.isArray(change) ? change as Record<string, unknown> : {};
+            return <li key={index}>{formatValue(item.region)} — {formatValue(item.observation)}</li>;
+          })}
+        </ul>
+      ) : <p className="text-slate-500">No visual-change observations were recorded.</p>}
+    </div>
   );
 }

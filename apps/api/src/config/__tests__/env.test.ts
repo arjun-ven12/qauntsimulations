@@ -144,4 +144,33 @@ describe('API environment security', () => {
   it('does not select Kimi merely because its key exists', () => {
     expect(apiEnvironmentSchema.parse({ ...requiredEnvironment, MOONSHOT_API_KEY: 'test-key' }).PLANNER_PROVIDER).toBe('deterministic');
   });
+
+  it('keeps Nosana evidence intelligence disabled by default and validates bounded activation', () => {
+    const defaults = apiEnvironmentSchema.parse(requiredEnvironment);
+    expect(defaults.NOSANA_EVIDENCE_INTELLIGENCE_ENABLED).toBe(false);
+    expect(defaults.NOSANA_REQUIRED).toBe(false);
+    expect(defaults.NOSANA_MAX_SCREENSHOTS).toBe(3);
+    expect(defaults.NOSANA_MAX_IMAGE_BYTES).toBe(5_242_880);
+    expect(defaults).not.toHaveProperty('NOSANA_KEY_PATH');
+
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      NOSANA_EVIDENCE_INTELLIGENCE_ENABLED: 'true',
+    }).success).toBe(false);
+
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      NOSANA_EVIDENCE_INTELLIGENCE_ENABLED: 'true',
+      NOSANA_DEPLOYMENT_ID: 'deployment_123',
+      NOSANA_DEPLOYMENT_ENDPOINT: 'https://taskos-nosana.example.com',
+      NOSANA_REQUEST_TIMEOUT_MS: '60000',
+      NOSANA_MAX_SCREENSHOTS: '3',
+      NOSANA_MAX_IMAGE_BYTES: '5242880',
+    }).success).toBe(true);
+
+    expect(apiEnvironmentSchema.safeParse({
+      ...requiredEnvironment,
+      NOSANA_MAX_SCREENSHOTS: '4',
+    }).success).toBe(false);
+  });
 });
