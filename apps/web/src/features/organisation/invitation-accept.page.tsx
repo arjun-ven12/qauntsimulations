@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { ContextualNavigation } from '../../components/contextual-navigation.js';
 import { InvitationApiError, invitationApi } from '../../services/invitation-api.js';
 import { useAuthStore } from '../../stores/auth.store.js';
 import { primaryButton, secondaryButton } from '../projects/project-ui.js';
@@ -41,7 +42,7 @@ export function InvitationAcceptPage() {
       setError(
         requestError instanceof InvitationApiError
           ? requestError.message
-          : 'WorldLab could not accept this invitation.',
+          : 'Rift could not accept this invitation.',
       );
     } finally {
       setPending(false);
@@ -59,7 +60,7 @@ export function InvitationAcceptPage() {
       setError(
         requestError instanceof InvitationApiError
           ? requestError.message
-          : 'WorldLab could not decline this invitation.',
+          : 'Rift could not decline this invitation.',
       );
     } finally {
       setPending(false);
@@ -69,7 +70,8 @@ export function InvitationAcceptPage() {
   return (
     <main className="grid min-h-screen place-items-center bg-slate-950 p-5">
       <section className="card w-full max-w-xl" aria-labelledby="invitation-preview-title">
-        <div className="eyebrow">TaskOS WorldLab</div>
+        <ContextualNavigation />
+        <div className="eyebrow">Rift</div>
         <h1 className="mt-3 text-2xl font-black" id="invitation-preview-title">
           Organisation invitation
         </h1>

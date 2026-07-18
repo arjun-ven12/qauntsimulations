@@ -6,7 +6,7 @@ import { ShoppingBag } from 'lucide-react';
 import type { DemoConfig, OrderRecord, PaymentRecord } from './demo-api.js';
 import './styles.css';
 
-const PRODUCT = { name: 'TaskOS Test Product', price: 12_900, currency: 'SGD' };
+const PRODUCT = { name: 'Rift Test Product', price: 12_900, currency: 'SGD' };
 
 function Layout() {
   const [cartItems, setCartItems] = useState(0);
@@ -39,13 +39,13 @@ function Layout() {
 function Product({ onAdd }: { onAdd: () => void }) {
   return (
     <section className="product" data-testid="product-page">
-      <div aria-label="TaskOS test product" className="photo">
+      <div aria-label="Rift test product" className="photo">
         ◒
       </div>
       <div>
         <div className="kicker">Deterministic demo fixture</div>
         <h1>{PRODUCT.name}</h1>
-        <p className="muted">A seeded product for repeatable WorldLab checkout investigations.</p>
+        <p className="muted">A seeded product for repeatable Rift checkout investigations.</p>
         <p className="price">S$129.00</p>
         <p>5 in stock</p>
         <button className="primary" data-testid="add-to-cart" onClick={onAdd} type="button">

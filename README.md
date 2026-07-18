@@ -1,6 +1,6 @@
-# TaskOS WorldLab
+# Rift
 
-TaskOS WorldLab is a modular-monolith foundation for adaptive, counterfactual reliability experiments. It plans experimental worlds, executes deterministic Playwright journeys in isolated sandboxes, records evidence, and turns reproduced invariant violations into findings.
+Rift is a modular-monolith foundation for adaptive, counterfactual reliability experiments. It plans experimental worlds, executes deterministic Playwright journeys in isolated sandboxes, records evidence, and turns reproduced invariant violations into findings.
 
 ## Quick start
 

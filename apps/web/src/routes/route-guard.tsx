@@ -17,7 +17,7 @@ function AuthLoading() {
       aria-live="polite"
       className="grid min-h-screen place-items-center bg-[#09090b] text-sm text-slate-400"
     >
-      Restoring WorldLab…
+      Restoring Rift…
     </main>
   );
 }

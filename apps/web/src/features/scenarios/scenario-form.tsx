@@ -338,7 +338,7 @@ export function ScenarioForm({
             onClick={() => void launch()}
             type="button"
           >
-            {launchPending || localLaunchPending ? 'Launching WorldLab…' : 'Launch Investigation'}
+            {launchPending || localLaunchPending ? 'Launching Rift…' : 'Launch Investigation'}
           </button>
         </div>
         {!readyForCurrentPayload ? (

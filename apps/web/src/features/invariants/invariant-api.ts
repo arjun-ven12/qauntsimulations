@@ -151,7 +151,7 @@ class HttpInvariantApi {
       });
     } catch {
       throw new InvariantApiError(
-        'WorldLab could not reach the Invariant service.',
+        'Rift could not reach the Invariant service.',
         0,
         'NETWORK_ERROR',
       );

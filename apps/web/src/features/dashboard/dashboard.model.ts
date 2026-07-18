@@ -30,6 +30,12 @@ export interface DashboardViewModel {
     recentInvestigationCount: number;
     openFindingCount: number;
   };
+  executionOverview: {
+    worldsExecuted: number | null;
+    completionRate: number | null;
+    openFindingCount: number;
+    repairsVerified: null;
+  };
 }
 
 export function createDashboardViewModel(data: DashboardData): DashboardViewModel {
@@ -60,6 +66,12 @@ export function createDashboardViewModel(data: DashboardData): DashboardViewMode
         0,
       ),
     },
+    executionOverview: {
+      worldsExecuted: knownWorldTotal(recentInvestigations),
+      completionRate: completionRate(recentInvestigations),
+      openFindingCount: recentFindings.filter((finding) => finding.status === 'OPEN').length,
+      repairsVerified: null,
+    },
   };
 }
 
@@ -86,4 +98,25 @@ function timestamp(value?: string) {
   if (!value) return 0;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function knownWorldTotal(investigations: DashboardInvestigationSummary[]) {
+  const knownWorldCounts = investigations
+    .map((investigation) => investigation.worldCount)
+    .filter((count): count is number => count !== undefined);
+
+  return knownWorldCounts.length ? knownWorldCounts.reduce((total, count) => total + count, 0) : null;
+}
+
+function completionRate(investigations: DashboardInvestigationSummary[]) {
+  const concluded = investigations.filter((investigation) =>
+    ['COMPLETED', 'FAILED', 'CANCELLED'].includes(investigation.status),
+  );
+  if (!concluded.length) return null;
+
+  return Math.round(
+    (concluded.filter((investigation) => investigation.status === 'COMPLETED').length /
+      concluded.length) *
+      100,
+  );
 }

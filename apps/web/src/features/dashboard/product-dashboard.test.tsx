@@ -5,190 +5,95 @@ import { seededDemoDashboardData } from './dashboard.fixtures.js';
 import { ProductDashboard } from './product-dashboard.js';
 import type { DashboardData } from './dashboard.types.js';
 
-describe('isolated Product Dashboard', () => {
-  it('renders organisation, primary demo Project, readiness, onboarding, and Product actions', () => {
+describe('Rift operational dashboard', () => {
+  it('uses the approved operational hierarchy without an organisation label above the title', () => {
     const html = render(seededDemoDashboardData);
-    expect(html).toContain('TaskOS Demo');
-    expect(html).toContain('OWNER');
-    expect(html).toContain('Checkout Reliability Lab');
-    expect(html).toContain('Primary demo');
-    expect(html).toContain('Configuration readiness');
-    expect(html).toContain('Project ready for investigation');
-    expect(html).toContain('4 of 4 readiness steps complete');
-    expect(html).toContain('Start Investigation');
-    expect(html).not.toContain('Continue Setup');
-    expect(html).toContain('/projects/project_demo_checkout/investigations/new');
-    expect(html).toContain('1/1 READY');
-    expect(html).toContain('2/2 READY');
+
+    expect(html).toContain('Dashboard');
+    expect(html).toContain('Start investigation');
+    expect(html).toContain('Active investigations');
+    expect(html).toContain('Recent investigations');
+    expect(html).toContain('Open findings');
+    expect(html).toContain('Ready projects');
+    expect(html).toContain('Current investigation');
+    expect(html).toContain('Needs attention');
+    expect(html).toContain('Project readiness');
+    expect(html).toContain('Recent findings');
+    expect(html).not.toContain('Rift Demo');
+    expect(html).not.toContain('Search activity');
   });
 
-  it('renders honest empty states without fabricating runtime history', () => {
-    const html = render(seededDemoDashboardData);
-    expect(html).toContain('No Investigations yet');
-    expect(html).toContain('No Findings yet');
-    expect(html).not.toContain('COMPLETED');
-    expect(html).not.toContain('Duplicate checkout submission under delayed payment');
-  });
-
-  it('keeps Investigation lifecycle and Finding business status presentation separate', () => {
-    const data: DashboardData = {
+  it('uses active work when present and otherwise shows the latest record as current', () => {
+    const html = render({
       ...seededDemoDashboardData,
-      projects: [
-        {
-          ...seededDemoDashboardData.projects[0]!,
-          recentInvestigationCount: 1,
-          openFindingCount: 1,
-        },
-      ],
       recentInvestigations: [
-        {
-          id: 'investigation-1',
-          projectId: 'project_demo_checkout',
-          projectName: 'Checkout Reliability Lab',
-          status: 'RUNNING',
-          worldCount: 4,
-          findingCount: 1,
-          createdAt: '2026-07-18T00:00:00.000Z',
-        },
+        investigation('failed', 'FAILED', 'Verify a checkout flow with a long prompt that must not become the heading'),
+        investigation('running', 'RUNNING', 'Delayed payment verification'),
       ],
-      recentFindings: [
-        {
-          id: 'finding-1',
-          projectId: 'project_demo_checkout',
-          projectName: 'Checkout Reliability Lab',
-          title: 'Duplicate payment request',
-          severity: 'CRITICAL',
-          status: 'OPEN',
-          createdAt: '2026-07-18T00:00:00.000Z',
-          href: '/investigations/investigation-1/findings/finding-1',
-        },
-      ],
-    };
-    const html = render(data);
-    expect(html).toContain('RUNNING');
-    expect(html).toContain('4 worlds');
-    expect(html).toContain('1 finding');
-    expect(html).toContain('Duplicate payment request');
-    expect(html).toContain('CRITICAL');
-    expect(html).toContain('OPEN');
-    expect(html).toContain('/investigations/investigation-1/findings/finding-1');
-  });
-
-  it('renders a first-Project empty state when Product data is empty', () => {
-    const html = render({
-      organisation: { id: 'org-empty', name: 'Empty Organisation', role: 'OWNER' },
-      projects: [],
-      recentInvestigations: [],
-      recentFindings: [],
     });
-    expect(html).toContain('No Projects yet');
-    expect(html).toContain('Create your first Project');
-    expect(html).toContain('/projects/new');
+
+    expect(html).toContain('>Current investigation</p>');
+    expect(html).toContain('Delayed payment verification');
+    expect(html).toContain('Investigation timeline');
+    expect(html).not.toContain('Verify a checkout flow with a long prompt');
+
+    const terminalOnly = render({ ...seededDemoDashboardData, recentInvestigations: [investigation('failed', 'FAILED', 'Completed checkout review')] });
+    expect(terminalOnly).toContain('Current investigation');
+    expect(terminalOnly).toContain('Completed checkout review');
   });
 
-  it('does not give TaskOS Demo Commerce seeded primary-demo treatment', () => {
+  it('renders recent investigations and findings as compact tables with safe display names', () => {
     const html = render({
       ...seededDemoDashboardData,
-      projects: [
-        {
-          ...seededDemoDashboardData.projects[0]!,
-          id: 'project-commerce',
-          name: 'TaskOS Demo Commerce',
-          isPrimaryDemo: false,
-        },
+      projects: [{ ...seededDemoDashboardData.projects[0]!, name: 'TaskOS Demo Commerce' }],
+      recentInvestigations: [
+        { ...investigation('investigation-1', 'RUNNING', 'Test the checkout flow under delayed payment responses and repeated user interaction.'), projectName: 'TaskOS Demo Commerce' },
       ],
+      recentFindings: [{ id: 'finding-1', investigationId: 'investigation-1', projectId: 'project_demo_checkout', projectName: 'TaskOS Demo Commerce', title: 'Duplicate payment request', severity: 'CRITICAL', status: 'OPEN', createdAt: '2026-07-18T00:00:00.000Z' }],
     });
-    expect(html).toContain('Featured Project');
-    expect(html).not.toContain('Primary demo');
-    expect(html).not.toContain('data-testid="primary-demo-project"');
-    expect(html).toContain('data-testid="featured-project"');
-  });
 
-  it('retains seeded primary-demo treatment for Checkout Reliability Lab', () => {
-    const html = render(seededDemoDashboardData);
+    expect(html).toContain('<table');
+    expect(html).toContain('Investigation</th>');
+    expect(html).toContain('Finding</th>');
     expect(html).toContain('Checkout Reliability Lab');
-    expect(html).toContain('Primary demo');
-    expect(html).toContain('data-testid="primary-demo-project"');
+    expect(html).not.toContain('TaskOS Demo Commerce');
+    expect(html).not.toContain('world count unavailable');
   });
 
-  it('shows Create Project actions for an OWNER with CREATE_PROJECTS permission', () => {
-    const html = render(emptyDashboard('OWNER'), { canCreateProject: true });
-    expect(html).toContain('Create Project');
-    expect(html).toContain('Create your first Project');
-    expect(html).toContain('/projects/new');
+  it('does not add an alternative execution section outside the approved hierarchy', () => {
+    expect(render(seededDemoDashboardData)).not.toContain('Execution overview');
   });
 
-  it('matches current Product rules by allowing a MEMBER with CREATE_PROJECTS permission', () => {
-    const html = render(emptyDashboard('MEMBER'), { canCreateProject: true });
-    expect(html).toContain('Create Project');
-    expect(html).toContain('Create your first Project');
+  it('keeps creation permission-aware for an empty organisation', () => {
+    const data: DashboardData = { organisation: { id: 'org-empty', name: 'Empty Organisation', role: 'VIEWER' }, projects: [], recentInvestigations: [], recentFindings: [] };
+    const html = render(data, { canCreateProject: false });
+
+    expect(html).toContain('No investigation running');
+    expect(html).toContain('No Project configuration is available yet.');
+    expect(html).not.toContain('Create project');
   });
 
-  it('shows a permission-aware empty state without creation links when permission is absent', () => {
-    const html = render(emptyDashboard('VIEWER'), { canCreateProject: false });
-    expect(html).toContain('view Projects but not create them');
-    expect(html).not.toContain('Create Project');
-    expect(html).not.toContain('/projects/new');
+  it('keeps the dashboard monochrome, compact, and responsive', () => {
+    const html = render(seededDemoDashboardData);
+    expect(html).toContain('sm:grid-cols-2');
+    expect(html).toContain('xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]');
+    expect(html).toContain('rift-surface h-full rounded-xl');
+    expect(html).not.toContain('bg-gradient');
+    expect(html).not.toContain('bg-cyan');
   });
-
-  it('offers Continue Setup instead of Start Investigation for an incomplete Project', () => {
-    const html = render({
-      ...seededDemoDashboardData,
-      projects: [
-        {
-          ...seededDemoDashboardData.projects[0]!,
-          readyJourneyCount: 0,
-        },
-      ],
-    });
-    expect(html).toContain('Continue Setup');
-    expect(html).toContain('/projects/project_demo_checkout/journeys');
-    expect(html).not.toContain('Start Investigation');
-  });
-
-  it('renders honest unavailable states when aggregate runtime APIs do not exist', () => {
-    const html = renderToStaticMarkup(
-      <MemoryRouter>
-        <ProductDashboard
-          activityAvailability={{ findings: 'unavailable', investigations: 'unavailable' }}
-          data={seededDemoDashboardData}
-        />
-      </MemoryRouter>,
-    );
-    expect(html).toContain('Recent Investigations unavailable');
-    expect(html).toContain('Recent Findings unavailable');
-    expect(html).not.toContain('No Investigations yet');
-  });
-
-  it.each(['desktop', 'tablet', 'mobile'])(
-    'uses wrapping and responsive grids for %s presentation',
-    () => {
-      const html = render(seededDemoDashboardData);
-      expect(html).toContain('min-w-0');
-      expect(html).toContain('flex-wrap');
-      expect(html).toContain('sm:grid-cols-2');
-      expect(html).toContain('xl:grid-cols-2');
-      expect(html).not.toMatch(/min-w-\[[0-9]/);
-    },
-  );
 });
 
-function emptyDashboard(role: string): DashboardData {
+function investigation(id: string, status: string, name: string) {
   return {
-    organisation: { id: 'org-empty', name: 'Empty Organisation', role },
-    projects: [],
-    recentInvestigations: [],
-    recentFindings: [],
+    id,
+    projectId: 'project_demo_checkout',
+    projectName: 'Checkout Reliability Lab',
+    name,
+    status,
+    createdAt: '2026-07-18T00:00:00.000Z',
   };
 }
 
-function render(
-  data: DashboardData,
-  props: { canCreateProject?: boolean } = {},
-) {
-  return renderToStaticMarkup(
-    <MemoryRouter>
-      <ProductDashboard data={data} {...props} />
-    </MemoryRouter>,
-  );
+function render(data: DashboardData, props: { canCreateProject?: boolean; activityAvailability?: { investigations: 'available' | 'unavailable'; findings: 'available' | 'unavailable' } } = {}) {
+  return renderToStaticMarkup(<MemoryRouter><ProductDashboard data={data} {...props} /></MemoryRouter>);
 }

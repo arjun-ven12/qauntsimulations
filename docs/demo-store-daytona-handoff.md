@@ -241,7 +241,7 @@ The production server must:
 * return JSON for API errors
 * fail clearly when `dist/index.html` is missing
 
-No database, authentication secret, TaskOS API, OpenAI key or Daytona key is required by the demo store.
+No database, authentication secret, Rift API, OpenAI key or Daytona key is required by the demo store.
 
 ## Container deployment
 
@@ -292,7 +292,7 @@ NOSANA_API_KEY
 GITHUB_TOKEN
 ```
 
-The TaskOS API outside the sandbox uses `DAYTONA_API_KEY` to create and manage the sandbox.
+The Rift API outside the sandbox uses `DAYTONA_API_KEY` to create and manage the sandbox.
 
 The sandbox itself does not need that key.
 

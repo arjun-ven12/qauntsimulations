@@ -327,7 +327,7 @@ test('direct project routes and browser Back/Forward retain the app shell', asyn
   await page.route('**/api/projects/project-1', async (route) => json(route, details));
   await page.route('**/api/projects/project-1/safety', async (route) => json(route, safety));
   await page.goto('/projects/project-1/settings');
-  await expect(page.getByText('TaskOS', { exact: true })).toBeVisible();
+  await expect(page.getByText('Rift', { exact: true })).toBeVisible();
   await page.goto('/projects/project-1/safety');
   await page.goBack();
   await expect(page).toHaveURL(/\/projects\/project-1\/settings$/);

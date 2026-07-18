@@ -13,12 +13,12 @@ class DashboardActivityApi {
   async get(retry = true): Promise<DashboardActivity> {
     let response: Response;
     try { response = await fetch(`${this.baseUrl}/organisations/current/activity`, { credentials: 'include' }); }
-    catch { throw new Error('TaskOS could not load dashboard activity.'); }
+    catch { throw new Error('Rift could not load dashboard activity.'); }
     const payload = await response.json() as { error?: { message?: string } };
     if (response.status === 401 && retry) {
       try { await authApi.refresh(); return this.get(false); } catch { await useAuthStore.getState().signOut(); }
     }
-    if (!response.ok) throw new Error(payload.error?.message ?? 'TaskOS could not load dashboard activity.');
+    if (!response.ok) throw new Error(payload.error?.message ?? 'Rift could not load dashboard activity.');
     return activitySchema.parse(payload);
   }
 }

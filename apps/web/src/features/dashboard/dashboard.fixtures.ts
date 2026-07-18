@@ -3,7 +3,7 @@ import type { DashboardData } from './dashboard.types.js';
 export const seededDemoDashboardData: DashboardData = {
   organisation: {
     id: 'organisation_demo_taskos',
-    name: 'TaskOS Demo',
+    name: 'Rift Demo',
     role: 'OWNER',
   },
   projects: [

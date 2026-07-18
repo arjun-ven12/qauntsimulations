@@ -186,7 +186,7 @@ class HttpProjectApi {
       });
     } catch {
       throw new ProjectApiError(
-        'WorldLab could not reach the project service. Check your connection and try again.',
+        'Rift could not reach the project service. Check your connection and try again.',
         0,
         'NETWORK_ERROR',
       );

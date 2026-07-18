@@ -179,7 +179,7 @@ export function SafetySettingsPage() {
       setError(
         requestError instanceof ProjectApiError
           ? requestError.message
-          : 'WorldLab could not save safety settings.',
+          : 'Rift could not save safety settings.',
       );
     } finally {
       submissionInFlight.current = false;
@@ -190,7 +190,7 @@ export function SafetySettingsPage() {
   return (
     <section className="mx-auto max-w-5xl">
       <PageHeading
-        description="Define the exact boundary WorldLab must obey. Unknown targets remain denied."
+        description="Define the exact boundary Rift must obey. Unknown targets remain denied."
         eyebrow={project.data.name}
         title="Safety Settings"
       />
@@ -339,7 +339,7 @@ export function SafetySettingsPage() {
 
       <section className="card mt-6 min-w-0">
         <h2 className="text-xl font-bold">Prohibited actions</h2>
-        <p className="mt-1 text-sm text-slate-400">Actions TaskOS must never perform.</p>
+        <p className="mt-1 text-sm text-slate-400">Actions Rift must never perform.</p>
         {value.prohibitedActions.length === 0 ? (
           <p className="mt-4 text-sm text-slate-500">No prohibited actions configured.</p>
         ) : (

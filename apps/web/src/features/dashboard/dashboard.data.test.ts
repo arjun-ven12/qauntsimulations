@@ -8,6 +8,7 @@ import {
   loadDashboardData,
   type DashboardDataSources,
 } from './dashboard.data.js';
+import type { DashboardActivity } from './dashboard-activity-api.js';
 
 const organisation = { id: 'org-current', name: 'Current Organisation', role: 'OWNER' };
 
@@ -38,20 +39,79 @@ describe('Dashboard Product data adapter', () => {
     ]);
     expect(result.data.recentInvestigations).toEqual([]);
     expect(result.data.recentFindings).toEqual([]);
-    expect(result.investigationsAvailable).toBe(false);
-    expect(result.findingsAvailable).toBe(false);
+    expect(result.investigationsAvailable).toBe(true);
+    expect(result.findingsAvailable).toBe(true);
   });
 
   it('does not mark another commerce demo as the primary seeded demo', async () => {
     const result = await loadDashboardData(
       organisation,
-      sourceFixture({ projects: [project('project-commerce', 'TaskOS Demo Commerce')] }),
+      sourceFixture({ projects: [project('project-commerce', 'Rift Demo Commerce')] }),
     );
 
     expect(result.data.projects[0]).toMatchObject({
-      name: 'TaskOS Demo Commerce',
+      name: 'Rift Demo Commerce',
       isPrimaryDemo: false,
     });
+  });
+
+  it('uses the tenant-scoped activity feed for recent activity without fabricating records', async () => {
+    const result = await loadDashboardData(
+      organisation,
+      sourceFixture({
+        projects: [project('project-real', 'Checkout Reliability Lab')],
+        activity: {
+          investigations: [{
+            id: 'investigation-1',
+            projectId: 'project-real',
+            projectName: 'Checkout Reliability Lab',
+            name: 'Delayed payment verification',
+            status: 'RUNNING',
+            createdAt: '2026-07-17T08:00:00.000Z',
+            completedAt: null,
+            findingsCount: 2,
+          }],
+          findings: [{
+            id: 'finding-1',
+            investigationId: 'investigation-1',
+            projectId: 'project-real',
+            projectName: 'Checkout Reliability Lab',
+            title: 'Duplicate payment risk',
+            severity: 'CRITICAL',
+            confidence: 'HIGH',
+            status: 'OPEN',
+            createdAt: '2026-07-17T09:00:00.000Z',
+          }],
+        },
+      }),
+    );
+
+    expect(result.data.recentInvestigations).toEqual([expect.objectContaining({
+      id: 'investigation-1',
+      name: 'Delayed payment verification',
+      findingCount: 2,
+    })]);
+    expect(result.data.recentFindings).toEqual([expect.objectContaining({
+      id: 'finding-1',
+      investigationId: 'investigation-1',
+      severity: 'CRITICAL',
+    })]);
+    expect(result.data.projects[0]).toMatchObject({
+      recentInvestigationCount: 1,
+      openFindingCount: 1,
+    });
+  });
+
+  it('keeps configuration available when the read-only activity feed fails', async () => {
+    const sources = sourceFixture({ projects: [project('project-real', 'Checkout Reliability Lab')] });
+    sources.activity = vi.fn().mockRejectedValue(new Error('Activity unavailable'));
+
+    const result = await loadDashboardData(organisation, sources);
+
+    expect(result.data.projects).toHaveLength(1);
+    expect(result.data.recentInvestigations).toEqual([]);
+    expect(result.investigationsAvailable).toBe(false);
+    expect(result.findingsAvailable).toBe(false);
   });
 
   it('keeps Project configuration visible when a child Product API partially fails', async () => {
@@ -93,17 +153,20 @@ function sourceFixture({
   environments = [],
   journeys = [],
   invariants = [],
+  activity = { investigations: [], findings: [] },
 }: {
   projects: ProjectSummary[];
   environments?: Environment[];
   journeys?: Journey[];
   invariants?: Invariant[];
+  activity?: DashboardActivity;
 }): DashboardDataSources {
   return {
     listProjects: vi.fn().mockResolvedValue(projects),
     listEnvironments: vi.fn().mockResolvedValue(environments),
     listJourneys: vi.fn().mockResolvedValue(journeys),
     listInvariants: vi.fn().mockResolvedValue(invariants),
+    activity: vi.fn().mockResolvedValue(activity),
   };
 }
 

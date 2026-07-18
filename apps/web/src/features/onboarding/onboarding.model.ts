@@ -22,7 +22,7 @@ const definitions: ReadonlyArray<{
   {
     id: 'environment',
     label: 'Prepare an Environment',
-    description: 'Validate at least one target where TaskOS may run.',
+    description: 'Validate at least one target where Rift may run.',
     route: (projectId) => `/projects/${projectId}/environments`,
     complete: (project) => project.readyEnvironmentCount > 0,
   },

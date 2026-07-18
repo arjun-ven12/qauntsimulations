@@ -73,7 +73,7 @@ class HttpOrganisationApi {
         headers: { 'Content-Type': 'application/json', ...init?.headers },
       });
     } catch {
-      throw new OrganisationApiError('WorldLab could not load your organisation.', 0);
+      throw new OrganisationApiError('Rift could not load your organisation.', 0);
     }
     const payload = response.status === 204 ? undefined : ((await response.json()) as unknown);
     if (response.status === 401 && retrySession) {
@@ -87,7 +87,7 @@ class HttpOrganisationApi {
     if (!response.ok) {
       const error = payload as { error?: { message?: string } };
       throw new OrganisationApiError(
-        error.error?.message ?? 'WorldLab could not load your organisation.',
+        error.error?.message ?? 'Rift could not load your organisation.',
         response.status,
       );
     }

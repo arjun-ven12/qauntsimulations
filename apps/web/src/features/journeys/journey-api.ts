@@ -188,7 +188,7 @@ class HttpJourneyApi {
         headers: { 'Content-Type': 'application/json', ...init?.headers },
       });
     } catch {
-      throw new JourneyApiError('WorldLab could not reach the Journey service.', 0, 'NETWORK_ERROR');
+      throw new JourneyApiError('Rift could not reach the Journey service.', 0, 'NETWORK_ERROR');
     }
     const payload = response.status === 204 ? undefined : ((await response.json()) as unknown);
     if (response.status === 401 && retry) {
