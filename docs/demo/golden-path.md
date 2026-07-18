@@ -1,14 +1,11 @@
-# Golden path demo
+# Historical golden-path reference
 
-1. Register and create the organisation owner account.
-2. Create the Demo Store project.
-3. Add `http://localhost:5174` as a demo environment.
-4. Select the Commerce checkout journey.
-5. Ask TaskOS to test delayed payment responses and impatient users.
-6. OpenAI (or the local mock) returns a validated structured plan.
-7. Daytona sandboxes (or mock workers) receive Playwright jobs for multiple worlds.
-8. The delayed response world triggers the controlled duplicate submission defect.
-9. Adaptive selection launches controls, latency neighbours, another browser, and three exact reproductions.
-10. Screenshots, trace, console/network logs, and invariant evaluations are collected.
-11. Three reproductions promote the defect to a confirmed finding.
-12. The finding page displays the minimum reproduction and offers repair verification.
+This is a capability reference, not a claim about the currently available hosted execution path. For the release demonstration, use [two-minute-demo.md](two-minute-demo.md).
+
+1. Configure a Project, authorised Environment, checkout Journey, and explicit Invariants.
+2. TaskOS creates bounded execution Worlds and runs Playwright Journeys through the configured execution provider.
+3. The delayed-response World can exercise the controlled duplicate-submission defect.
+4. TaskOS collects evidence and invariant evaluations, then uses bounded controls and reproductions to support a Finding.
+5. The Finding exposes Repair Verification, which prepares a minimal reproduction, controls, and bounded regression Worlds before any result is derived.
+
+The public Render Demo Store is verified. Daytona sandbox lifecycle is verified. Daytona-to-Render execution is currently externally blocked by the Daytona organisation's outbound-network policy; this document does not claim a hosted run or hosted repair result.
