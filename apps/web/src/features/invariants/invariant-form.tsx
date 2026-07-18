@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Field, primaryButton, secondaryButton } from '../projects/project-ui.js';
-import type {
-  InvariantInput,
-  InvariantValidationResult,
-} from './invariant-api.js';
+import {
+  TemplateManager,
+  builtInTemplate,
+  invariantTemplatePayloadSchema,
+  type InvariantTemplatePayload,
+} from '../templates/index.js';
+import type { InvariantInput, InvariantValidationResult } from './invariant-api.js';
 import {
   invariantFormErrors,
   invariantTemplates,
@@ -13,8 +16,10 @@ import {
   valuesMatch,
   type InvariantFormValue,
 } from './invariant-form.model.js';
-import { InvariantStructuredPreview, InvariantValidationPanel } from './invariant-structured-preview.js';
-import { InvariantTemplatePicker } from './invariant-template-picker.js';
+import {
+  InvariantStructuredPreview,
+  InvariantValidationPanel,
+} from './invariant-structured-preview.js';
 
 const methods = ['POST', 'PUT', 'PATCH'] as const;
 const severities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
@@ -48,8 +53,7 @@ export function InvariantForm({
   const errors = invariantFormErrors(value);
   const dirty = !valuesMatch(value, savedValue);
   const blockingValidation = validation?.checks.some((check) => check.status === 'FAILED') ?? false;
-  const saveDisabled =
-    pending || readOnly || Object.keys(errors).length > 0 || blockingValidation;
+  const saveDisabled = pending || readOnly || Object.keys(errors).length > 0 || blockingValidation;
 
   useEffect(() => {
     if (!successMessage) {
@@ -85,7 +89,9 @@ export function InvariantForm({
       setValue((current) => ({ ...current, validationStatus: result.status }));
     } catch (validationFailure) {
       setValidationError(
-        validationFailure instanceof Error ? validationFailure.message : 'Invariant validation failed.',
+        validationFailure instanceof Error
+          ? validationFailure.message
+          : 'Invariant validation failed.',
       );
     } finally {
       setValidating(false);
@@ -118,18 +124,35 @@ export function InvariantForm({
         </p>
       ) : null}
 
-      <fieldset className="space-y-6" disabled={readOnly}>
-        <FormSection
-          description="Choose one of the evaluator definitions supported by the runtime."
-          title="Suggested templates"
-        >
-          <InvariantTemplatePicker
-            disabled={readOnly}
-            onSelect={(template) => change(templateValue(template))}
-            selectedType={value.type}
-          />
-        </FormSection>
+      {!readOnly ? (
+        <TemplateManager
+          builtIns={invariantTemplates.map((template) =>
+            builtInTemplate(
+              'INVARIANT',
+              `invariant-built-in-${template.id}`,
+              template.displayName,
+              template.description,
+              invariantTemplateValue(templateValue(template)),
+            ),
+          )}
+          category="INVARIANT"
+          onApply={(payload) => change({ ...structuredClone(payload), validationStatus: 'DRAFT' })}
+          payloadSchema={invariantTemplatePayloadSchema}
+          preview={(payload) => (
+            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+              <TemplatePreview label="Evaluator" value={payload.type} />
+              <TemplatePreview label="Severity" value={payload.severity} />
+              <TemplatePreview
+                label="Request paths"
+                value={String(payload.configuration.requestPatterns.length)}
+              />
+            </dl>
+          )}
+          value={invariantTemplateValue(value)}
+        />
+      ) : null}
 
+      <fieldset className="space-y-6" disabled={readOnly}>
         <FormSection
           description="The business rule is descriptive context. It is never executed."
           title="Basic details"
@@ -201,7 +224,7 @@ export function InvariantForm({
               description="Disabled Invariants remain saved and editable, but are excluded from future investigations by default."
               label="Enabled state"
             >
-              <label className="flex min-h-11 items-center gap-3 rounded-lg border border-slate-700 px-4">
+              <label className="rift-choice-control flex min-h-11 items-center gap-3 px-4">
                 <input
                   checked={value.enabled}
                   onChange={(event) => change({ ...value, enabled: event.target.checked })}
@@ -240,7 +263,7 @@ export function InvariantForm({
             <div className="flex flex-wrap gap-3">
               {methods.map((method) => (
                 <label
-                  className="flex min-h-11 items-center gap-2 rounded-lg border border-slate-700 px-4"
+                  className="rift-choice-control flex min-h-11 items-center gap-2 px-4"
                   key={method}
                 >
                   <input
@@ -361,7 +384,15 @@ function FormSection({
   );
 }
 
-function ReviewItem({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+function ReviewItem({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
   return (
     <div className="min-w-0">
       <dt className="text-slate-500">{label}</dt>
@@ -372,6 +403,22 @@ function ReviewItem({ label, value, mono = false }: { label: string; value: stri
 
 function friendlySeverity(severity: (typeof severities)[number]) {
   return `${severity.charAt(0)}${severity.slice(1).toLowerCase()} (${severity})`;
+}
+
+function TemplatePreview({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt>
+      <dd className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function invariantTemplateValue(value: InvariantFormValue): InvariantTemplatePayload {
+  const { validationStatus: _validationStatus, ...payload } = value;
+  return payload;
 }
 
 function runtimeCompatibility(

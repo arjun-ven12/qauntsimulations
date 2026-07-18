@@ -282,7 +282,7 @@ test('login submits the backend payload and redirects', async ({ page }) => {
   await page.goto('/login');
   await fillLogin(page);
   await page.getByRole('button', { name: 'Continue to Rift' }).click();
-  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
   expect(payload).toEqual({
     email: 'person@taskos.dev',
     password: 'correct-horse-battery-staple',
@@ -332,8 +332,8 @@ test('an authenticated session cannot navigate back to a guest auth route', asyn
     });
   });
   await page.goto('/login');
-  await expect(page).toHaveURL(/\/projects$/);
-  await expect(page.getByRole('heading', { name: 'Projects' })).toBeVisible();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
 });
 
 test('login returns to the originally requested protected route', async ({ page }) => {
@@ -457,7 +457,7 @@ test('registration submits the existing backend payload', async ({ page }) => {
   await page.getByLabel('Email address').fill('person@taskos.dev');
   await page.getByLabel('Password', { exact: true }).fill('correct-horse-battery-staple');
   await page.getByRole('button', { name: 'Create account' }).click();
-  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
   expect(payload).toEqual({
     displayName: 'Sam Rivera',
     organisationName: 'World Reliability',
@@ -486,7 +486,7 @@ test('pending state prevents duplicate login requests', async ({ page }) => {
       button.click();
     });
   await expect(page.getByRole('button', { name: 'Signing in…' })).toBeDisabled();
-  await expect(page).toHaveURL(/\/projects$/);
+  await expect(page).toHaveURL(/\/dashboard$/);
   expect(requests).toBe(1);
 });
 

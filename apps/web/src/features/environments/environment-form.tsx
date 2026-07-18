@@ -9,6 +9,12 @@ import {
 } from '../../services/environment-api.js';
 import { projectApi } from '../../services/project-api.js';
 import { primaryButton, secondaryButton } from '../projects/project-ui.js';
+import {
+  TemplateManager,
+  builtInTemplate,
+  environmentTemplatePayloadSchema,
+  type EnvironmentTemplatePayload,
+} from '../templates/index.js';
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'];
 const ENVIRONMENT_TYPES: EnvironmentInput['type'][] = [
@@ -131,13 +137,60 @@ export function EnvironmentForm({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!authorised || safetyQuery.isPending || safetyQuery.isError || blockingReasons.length) return;
+    if (!authorised || safetyQuery.isPending || safetyQuery.isError || blockingReasons.length)
+      return;
     const { validationResults: _validationResults, ...cleanConfiguration } = value.configuration;
     onSubmit({ ...value, configuration: cleanConfiguration, acknowledgement: true });
   }
 
   return (
     <form className="mx-auto mt-6 max-w-[1050px] space-y-6" onSubmit={submit}>
+      <TemplateManager
+        builtIns={[
+          builtInTemplate(
+            'ENVIRONMENT',
+            'environment-built-in-local',
+            'Local development',
+            'Local application, API, mock payment, and isolated test-data defaults.',
+            environmentTemplateValue(environmentDefaults()),
+          ),
+        ]}
+        category="ENVIRONMENT"
+        onApply={(payload) => {
+          setValue((current) =>
+            initialise({
+              ...current,
+              ...payload,
+              configuration: {
+                ...current.configuration,
+                ...payload.configuration,
+                reset: {
+                  ...current.configuration.reset,
+                  ...payload.configuration.reset,
+                },
+                testData: {
+                  ...current.configuration.testData,
+                  ...payload.configuration.testData,
+                },
+                credentialReferences: current.configuration.credentialReferences,
+              },
+            }),
+          );
+          setAuthorised(false);
+        }}
+        payloadSchema={environmentTemplatePayloadSchema}
+        preview={(payload) => (
+          <dl className="grid gap-3 text-sm sm:grid-cols-3">
+            <TemplatePreviewItem label="Type" value={payload.type} />
+            <TemplatePreviewItem label="Base URL" value={payload.baseUrl} />
+            <TemplatePreviewItem
+              label="Allowed actions"
+              value={String(payload.configuration.allowedActions.length)}
+            />
+          </dl>
+        )}
+        value={environmentTemplateValue(value)}
+      />
       <FormSection
         description="Name this test target and describe how it is used."
         number="01"
@@ -153,9 +206,7 @@ export function EnvironmentForm({
           />
           <SelectField
             label="Type"
-            onChange={(type) =>
-              setValue({ ...value, type: type as EnvironmentInput['type'] })
-            }
+            onChange={(type) => setValue({ ...value, type: type as EnvironmentInput['type'] })}
             value={value.type}
           >
             {ENVIRONMENT_TYPES.map((type) => (
@@ -163,7 +214,10 @@ export function EnvironmentForm({
             ))}
           </SelectField>
           <div className="md:col-span-2">
-            <label className="block text-sm font-bold text-slate-200" htmlFor="environment-description">
+            <label
+              className="block text-sm font-bold text-slate-200"
+              htmlFor="environment-description"
+            >
               Description
             </label>
             <textarea
@@ -254,7 +308,7 @@ export function EnvironmentForm({
             <EmptyState>No feature flags configured.</EmptyState>
           ) : null}
           {configuration.featureFlags.map((flag, index) => (
-            <div className="min-w-0 rounded-xl border border-slate-800 p-4" key={index}>
+            <div className="rift-editable-row min-w-0 p-4" key={index}>
               <div className="grid min-w-0 gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <TextField
                   label="Key"
@@ -271,7 +325,11 @@ export function EnvironmentForm({
                     const type = nextType as typeof flag.type;
                     updateFeatureFlag(
                       index,
-                      { ...flag, type, value: type === 'BOOLEAN' ? false : type === 'NUMBER' ? 0 : '' },
+                      {
+                        ...flag,
+                        type,
+                        value: type === 'BOOLEAN' ? false : type === 'NUMBER' ? 0 : '',
+                      },
                       configuration,
                       setConfiguration,
                     );
@@ -371,7 +429,10 @@ export function EnvironmentForm({
             onChange={(mode) =>
               setConfiguration({
                 ...configuration,
-                payment: { ...configuration.payment, mode: mode as EnvironmentConfig['payment']['mode'] },
+                payment: {
+                  ...configuration.payment,
+                  mode: mode as EnvironmentConfig['payment']['mode'],
+                },
               })
             }
             value={configuration.payment.mode}
@@ -505,7 +566,9 @@ export function EnvironmentForm({
           {configuration.reset.mode === 'SCRIPT_REFERENCE' ? (
             <TextField
               label="Script reference"
-              onChange={(scriptReference) => updateReset({ scriptReference: nullable(scriptReference) })}
+              onChange={(scriptReference) =>
+                updateReset({ scriptReference: nullable(scriptReference) })
+              }
               placeholder="env://RESET_SCRIPT"
               required
               value={configuration.reset.scriptReference ?? ''}
@@ -607,7 +670,7 @@ export function EnvironmentForm({
             <EmptyState>No credential references configured.</EmptyState>
           ) : null}
           {configuration.credentialReferences.map((credential, index) => (
-            <div className="min-w-0 rounded-xl border border-slate-800 p-4" key={index}>
+            <div className="rift-editable-row min-w-0 p-4" key={index}>
               <div className="grid min-w-0 gap-4 md:grid-cols-3">
                 <TextField
                   label="Label"
@@ -619,7 +682,7 @@ export function EnvironmentForm({
                 <TextField
                   label="Reference"
                   onChange={(reference) => updateCredential(index, { ...credential, reference })}
-                placeholder="1password://TaskOS/test-user"
+                  placeholder="1password://TaskOS/test-user"
                   required
                   value={credential.reference}
                 />
@@ -675,10 +738,7 @@ export function EnvironmentForm({
           {ACTIONS.map((action) => {
             const reason = getActionBlockingReason(action, safetyQuery.data);
             return (
-              <label
-                className="min-w-0 rounded-xl border border-slate-800 p-4 text-sm"
-                key={action}
-              >
+              <label className="rift-choice-control min-w-0 p-4 text-sm" key={action}>
                 <span className="flex min-w-0 items-start gap-3">
                   <input
                     checked={configuration.allowedActions.includes(action)}
@@ -693,11 +753,11 @@ export function EnvironmentForm({
                     }
                     type="checkbox"
                   />
-                  <span className="min-w-0 break-words font-bold text-slate-200">
-                    {action}
-                  </span>
+                  <span className="min-w-0 break-words font-bold text-slate-200">{action}</span>
                 </span>
-                {reason ? <span className="mt-2 block text-xs text-amber-300">{reason}</span> : null}
+                {reason ? (
+                  <span className="mt-2 block text-xs text-amber-300">{reason}</span>
+                ) : null}
               </label>
             );
           })}
@@ -729,7 +789,9 @@ export function EnvironmentForm({
               <p className="text-sm font-bold text-slate-300">Project-wide prohibited actions</p>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-400">
                 {safetyQuery.data.prohibitedActions.map((action) => (
-                  <li className="break-words" key={action}>{action}</li>
+                  <li className="break-words" key={action}>
+                    {action}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -747,14 +809,20 @@ export function EnvironmentForm({
           <SummaryItem label="Type" value={value.type} />
           <SummaryItem label="Base URL" value={value.baseUrl || 'Not set'} />
           <SummaryItem label="Feature flags" value={String(configuration.featureFlags.length)} />
-          <SummaryItem label="Payment" value={`${configuration.payment.mode} · ${configuration.payment.result}`} />
+          <SummaryItem
+            label="Payment"
+            value={`${configuration.payment.mode} · ${configuration.payment.result}`}
+          />
           <SummaryItem label="Reset" value={configuration.reset.mode} />
           <SummaryItem label="Data isolation" value={configuration.testData.isolation} />
           <SummaryItem
             label="Credential references"
             value={String(configuration.credentialReferences.length)}
           />
-          <SummaryItem label="Allowed actions" value={String(configuration.allowedActions.length)} />
+          <SummaryItem
+            label="Allowed actions"
+            value={String(configuration.allowedActions.length)}
+          />
         </dl>
         <div className="mt-5 border-t border-slate-800 pt-5">
           <CheckboxRow
@@ -930,7 +998,7 @@ function CheckboxRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex min-w-0 items-start gap-3 text-sm text-slate-200">
+    <label className="rift-choice-control flex min-h-11 min-w-0 items-start gap-3 p-3 text-sm text-slate-200">
       <input
         checked={checked}
         className="mt-0.5 shrink-0"
@@ -943,7 +1011,11 @@ function CheckboxRow({
 }
 
 function EmptyState({ children }: { children: ReactNode }) {
-  return <p className="rounded-xl border border-dashed border-slate-700 p-4 text-sm text-slate-400">{children}</p>;
+  return (
+    <p className="rounded-xl border border-dashed border-slate-700 p-4 text-sm text-slate-400">
+      {children}
+    </p>
+  );
 }
 
 function SummaryItem({ label, value }: { label: string; value: string }) {
@@ -953,6 +1025,29 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 break-words text-sm text-slate-200">{value}</dd>
     </div>
   );
+}
+
+function TemplatePreviewItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt>
+      <dd className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function environmentTemplateValue(value: EnvironmentInput): EnvironmentTemplatePayload {
+  const {
+    credentialReferences: _credentialReferences,
+    validationResults: _validationResults,
+    ...configuration
+  } = value.configuration;
+  const { credentialReference: _credentialReference, ...reset } = configuration.reset;
+  const { customerCredentialReference: _customerCredentialReference, ...testData } =
+    configuration.testData;
+  return { ...value, configuration: { ...configuration, reset, testData } };
 }
 
 function updateFeatureFlag(

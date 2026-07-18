@@ -1,5 +1,5 @@
 import type { Finding, InvestigationProgress } from '@taskos/shared-types';
-import { ArrowRight, Check, FileText, ShieldCheck } from 'lucide-react';
+import { ArrowRight, FileText, ShieldCheck } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type {
@@ -18,6 +18,8 @@ import {
   phaseLabel,
   terminalSummary,
 } from '../runtime/runtime-normalizers.js';
+import { StatusBadge } from '../runtime/runtime-components.js';
+import { confidenceTone, executionStatusTone, findingSeverityTone, type SemanticStatusTone } from '../runtime/semantic-status.js';
 
 type InvestigationReportProps = {
   investigationId: string;
@@ -55,7 +57,7 @@ export function InvestigationReport({
         <div className="grid lg:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.65fr)]">
           <div className="p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-3">
-              <ReportStatus>{phaseLabel(progress.status)}</ReportStatus>
+              <StatusBadge tone={executionStatusTone(progress.status)}>{phaseLabel(progress.status)}</StatusBadge>
               <span className="text-xs font-medium uppercase tracking-[0.14em] text-[var(--rift-text-muted)]">{progress.status}</span>
             </div>
             <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--rift-text-muted)]">Investigation conclusion</p>
@@ -82,7 +84,7 @@ export function InvestigationReport({
           </div>
 
           <dl className="grid grid-cols-2 border-t border-[var(--rift-border)] lg:grid-cols-1 lg:border-l lg:border-t-0">
-            <ReportMetric label="Confidence" value={finding ? humanize(finding.confidence) : active ? 'Pending' : 'No finding'} />
+            <ReportMetric label="Confidence" tone={finding ? confidenceTone(finding.confidence) : active ? 'pending' : 'neutral'} value={finding ? humanize(finding.confidence) : active ? 'Pending' : 'No finding'} />
             <ReportMetric label="Validated reproductions" value={finding ? finding.reproductionCount.toLocaleString() : '0'} />
             <ReportMetric label="Evidence artifacts" value={evidence.length.toLocaleString()} />
             <ReportMetric label="Worlds tested" value={completedWorlds(progress.progress).toLocaleString()} />
@@ -100,14 +102,14 @@ export function InvestigationReport({
                   <h2 className="text-xl font-semibold tracking-[-0.025em] text-[var(--rift-text)]">{finding.title}</h2>
                   <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--rift-text-secondary)]">{finding.summary}</p>
                 </div>
-                <ReportStatus>{humanize(finding.confidence)}</ReportStatus>
+                <div className="flex flex-wrap gap-2"><StatusBadge tone={findingSeverityTone(finding.severity)}>{humanize(finding.severity)}</StatusBadge><StatusBadge tone={confidenceTone(finding.confidence)}>{humanize(finding.confidence)}</StatusBadge></div>
               </div>
               <div className="mt-6 border-t border-[var(--rift-border)] pt-5">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--rift-text-muted)]">Minimal tested trigger</p>
                 {Object.keys(retained).length ? (
                   <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
                     {Object.entries(retained).slice(0, 6).map(([key, value]) => (
-                      <div className="flex items-start justify-between gap-4 border-b border-[var(--rift-border)] pb-2.5" key={key}>
+                      <div className="flex items-start justify-between gap-4 border-b border-l-2 border-b-[var(--rift-border)] border-l-[var(--status-fail-border)] pb-2.5 pl-3" key={key}>
                         <dt className="text-xs text-[var(--rift-text-muted)]">{formatConditionKey(key)}</dt>
                         <dd className="text-right text-xs font-medium text-[var(--rift-text)]">{formatConditionValue(key, value)}</dd>
                       </div>
@@ -162,11 +164,11 @@ function FailureBoundary({ boundary }: { boundary: ReturnType<typeof failureBoun
       {passing !== undefined || failing !== undefined ? (
         <>
           <div className="mt-6 grid grid-cols-[auto_minmax(40px,1fr)_auto_minmax(40px,1fr)_auto] items-center gap-3 text-xs">
-            <BoundaryPoint label="Stable" value={passing !== undefined ? `${passing.toLocaleString()} ms` : 'Not established'} />
+            <BoundaryPoint label="Stable" tone="pass" value={passing !== undefined ? `${passing.toLocaleString()} ms` : 'Not established'} />
             <span className="h-px bg-[var(--rift-border-strong)]" />
-            <BoundaryPoint label="Untested" value={passing !== undefined && failing !== undefined ? `${Math.max(0, failing - passing).toLocaleString()} ms interval` : 'Open interval'} />
+            <BoundaryPoint label="Untested" tone="pending" value={passing !== undefined && failing !== undefined ? `${Math.max(0, failing - passing).toLocaleString()} ms interval` : 'Open interval'} />
             <span className="h-px bg-[var(--rift-border-strong)]" />
-            <BoundaryPoint label="Failure" value={failing !== undefined ? `${failing.toLocaleString()} ms` : 'Not established'} />
+            <BoundaryPoint label="Failure" tone="fail" value={failing !== undefined ? `${failing.toLocaleString()} ms` : 'Not established'} />
           </div>
           <p className="mt-5 text-sm leading-6 text-[var(--rift-text-secondary)]">
             {passing !== undefined && failing !== undefined
@@ -181,10 +183,11 @@ function FailureBoundary({ boundary }: { boundary: ReturnType<typeof failureBoun
   );
 }
 
-function BoundaryPoint({ label, value }: { label: string; value: string }) {
+function BoundaryPoint({ label, value, tone }: { label: string; value: string; tone: SemanticStatusTone }) {
+  const color = tone === 'pass' ? 'bg-[var(--status-pass)]' : tone === 'pending' ? 'bg-[var(--status-pending)]' : 'bg-[var(--status-fail)]';
   return (
     <div className="min-w-0 text-center">
-      <span className="mx-auto block size-2 rounded-full bg-white" />
+      <span className={`mx-auto block size-2 rounded-full ${color}`} />
       <span className="mt-2 block font-medium text-[var(--rift-text)]">{value}</span>
       <span className="mt-0.5 block uppercase tracking-[0.12em] text-[var(--rift-text-muted)]">{label}</span>
     </div>
@@ -201,17 +204,13 @@ function ReportAction({ title, description, href, label, icon }: { title: string
   );
 }
 
-function ReportMetric({ label, value }: { label: string; value: string }) {
+function ReportMetric({ label, value, tone }: { label: string; value: string; tone?: SemanticStatusTone }) {
   return (
     <div className="border-b border-r border-[var(--rift-border)] p-4 last:border-b-0 even:border-r-0 lg:border-r-0">
       <dt className="text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--rift-text-muted)]">{label}</dt>
-      <dd className="mt-1.5 text-lg font-semibold tracking-[-0.025em] text-[var(--rift-text)]">{value}</dd>
+      <dd className="mt-1.5 text-lg font-semibold tracking-[-0.025em] text-[var(--rift-text)]">{tone ? <StatusBadge tone={tone}>{value}</StatusBadge> : value}</dd>
     </div>
   );
-}
-
-function ReportStatus({ children }: { children: ReactNode }) {
-  return <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--rift-border-strong)] bg-[var(--rift-surface-raised)] px-2.5 py-1 text-xs font-medium text-[var(--rift-text)]"><Check aria-hidden="true" size={11} />{children}</span>;
 }
 
 function SectionLabel({ children }: { children: ReactNode }) {

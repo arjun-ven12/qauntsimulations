@@ -23,9 +23,25 @@ describe('Rift monochrome design foundation', () => {
       '--rift-pass: #34c98f',
       '--rift-warning: #f59e0b',
       '--rift-fail: #ef4444',
+      '--status-pass: #34d399',
+      '--status-pass-bg: rgba(52, 211, 153, 0.09)',
+      '--status-pass-border: rgba(52, 211, 153, 0.28)',
+      '--status-running: #60a5fa',
+      '--status-running-bg: rgba(96, 165, 250, 0.09)',
+      '--status-running-border: rgba(96, 165, 250, 0.28)',
+      '--status-pending: #fbbf24',
+      '--status-pending-bg: rgba(251, 191, 36, 0.09)',
+      '--status-pending-border: rgba(251, 191, 36, 0.28)',
+      '--status-fail: #fb7185',
+      '--status-fail-bg: rgba(251, 113, 133, 0.09)',
+      '--status-fail-border: rgba(251, 113, 133, 0.28)',
+      '--status-neutral: #a1a1aa',
+      '--status-neutral-bg: rgba(161, 161, 170, 0.08)',
+      '--status-neutral-border: rgba(161, 161, 170, 0.24)',
       '.rift-button-primary',
       '.rift-button-secondary',
       '.rift-status',
+      '.rift-semantic-status',
     ]) {
       expect(styles).toContain(token);
     }
@@ -36,5 +52,21 @@ describe('Rift monochrome design foundation', () => {
     expect(layout).toContain('bg-[var(--rift-sidebar)]');
     expect(layout).toContain('rift-surface-raised');
     expect(layout).toContain('<ContextualNavigation />');
+  });
+
+  it('gives editable controls a visible resting boundary and keyboard focus treatment', () => {
+    const styles = source('apps/web/src/styles/index.css');
+    for (const affordance of [
+      "input:not([type='checkbox']):not([type='radio']):not([type='hidden'])",
+      'border: 1px solid #303030',
+      'border-radius: 8px',
+      'background: #0b0b0b',
+      ':focus-visible',
+      '.rift-choice-control',
+      '.rift-editable-row',
+      'input:-webkit-autofill',
+    ]) {
+      expect(styles).toContain(affordance);
+    }
   });
 });

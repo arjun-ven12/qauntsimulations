@@ -122,7 +122,10 @@ export function LiveWorldLabPage() {
             </PanelState>
           ) : null}
           <WorldTable worlds={worlds.data ?? []} experiments={experiments.data ?? []} workers={workers.data ?? []} evidence={evidence.data ?? []} />
-          <WorldMatrix worlds={worlds.data ?? []} experiments={experiments.data ?? []} workers={workers.data ?? []} evidence={evidence.data ?? []} />
+          <details className="rounded-xl border border-[var(--rift-border)] bg-[var(--rift-surface)]">
+            <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold text-[var(--rift-text)] marker:hidden">Outcome matrix</summary>
+            <div className="border-t border-[var(--rift-border)] p-5"><WorldMatrix worlds={worlds.data ?? []} experiments={experiments.data ?? []} workers={workers.data ?? []} evidence={evidence.data ?? []} /></div>
+          </details>
         </div>
       ) : liveView ? (
         <div className="grid gap-5">

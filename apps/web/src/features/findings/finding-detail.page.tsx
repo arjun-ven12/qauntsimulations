@@ -6,6 +6,7 @@ import { useFindingDetail, useInvestigationEvidence, useInvestigationExperiments
 import { useAuthStore } from '../../stores/auth.store.js';
 import { isActiveRepairVerification } from '../repair-verification/repair-verification-api.js';
 import { useRepairVerifications } from '../repair-verification/use-repair-verification.js';
+import { executionStatusTone, repairVerificationTone } from '../runtime/semantic-status.js';
 
 export function FindingDetailPage() {
   const { investigationId, findingId } = useParams();
@@ -36,38 +37,38 @@ export function FindingDetailPage() {
         eyebrow={finding.data.confidence}
         title={finding.data.title}
         description="Rift finding detail with minimisation, evidence, and final report metadata."
-        action={<Link className="rounded-lg bg-cyan px-4 py-2 font-bold text-ink" to={`/investigations/${investigationId}/findings`}>Back to findings</Link>}
+        action={<Link className="rift-button-secondary" to={`/investigations/${investigationId}/findings`}>Back to findings</Link>}
       />
       <RuntimeNav investigationId={investigationId} />
       <section className="card mb-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div><h2 className="font-bold">Repair Verification</h2><p className="mt-1 text-sm text-slate-400">Replay the bounded persisted repair plan against an authorised target Environment.</p></div>
-          {editable ? <Link className="rounded-lg bg-cyan px-4 py-2 text-sm font-bold text-ink" to={`/investigations/${investigationId}/findings/${findingId}/repair-verifications/new`}>Verify repair</Link> : <span className="text-sm text-slate-400">Edit access required</span>}
+          <div><h2 className="font-bold">Repair Verification</h2><p className="mt-1 text-sm text-[var(--rift-text-secondary)]">Replay the bounded persisted repair plan against an authorised target Environment.</p></div>
+          {editable ? <Link className="rift-button-primary" to={`/investigations/${investigationId}/findings/${findingId}/repair-verifications/new`}>Verify repair</Link> : <span className="text-sm text-[var(--rift-text-secondary)]">Edit access required</span>}
         </div>
-        {repairVerifications.data?.[0] ? <div className="mt-4 flex flex-wrap items-center gap-3 text-sm"><StatusBadge tone={repairVerifications.data[0].executionStatus === 'COMPLETED' ? 'green' : repairVerifications.data[0].executionStatus === 'FAILED' ? 'red' : 'slate'}>{repairVerifications.data[0].executionStatus}</StatusBadge><span>{repairVerifications.data[0].verificationResult?.replaceAll('_', ' ') ?? (isActiveRepairVerification(repairVerifications.data[0].executionStatus) ? 'Verification in progress' : 'No conclusive result')}</span><Link className="text-cyan underline" to={`/investigations/${investigationId}/findings/${findingId}/repair-verifications/${repairVerifications.data[0].repairVerificationId}`}>Open verification</Link></div> : null}
-        {repairVerifications.isError ? <p className="mt-3 text-sm text-slate-400">Repair Verification history is unavailable right now.</p> : null}
+        {repairVerifications.data?.[0] ? <div className="mt-4 flex flex-wrap items-center gap-3 text-sm"><StatusBadge tone={repairVerificationTone(repairVerifications.data[0].executionStatus, repairVerifications.data[0].verificationResult)}>{repairVerifications.data[0].executionStatus}</StatusBadge><span>{repairVerifications.data[0].verificationResult?.replaceAll('_', ' ') ?? (isActiveRepairVerification(repairVerifications.data[0].executionStatus) ? 'Verification in progress' : 'No conclusive result')}</span><Link className="font-medium text-[var(--rift-text)] underline decoration-[var(--rift-border-strong)] underline-offset-4" to={`/investigations/${investigationId}/findings/${findingId}/repair-verifications/${repairVerifications.data[0].repairVerificationId}`}>Open verification</Link></div> : null}
+        {repairVerifications.isError ? <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">Repair Verification history is unavailable right now.</p> : null}
       </section>
       <div className="mb-5 grid gap-4 lg:grid-cols-4">
-        <div className="card"><div className="text-xs text-slate-500">Investigation</div><div className="mt-1 font-mono text-sm" title={investigationId}>{shortId(investigationId, 12)}</div></div>
-        <div className="card"><div className="text-xs text-slate-500">Status</div><div className="mt-1"><StatusBadge tone={progress.data?.status === 'COMPLETED' ? 'green' : 'slate'}>{progress.data?.status ?? 'Unknown'}</StatusBadge></div></div>
-        <div className="card"><div className="text-xs text-slate-500">First observed</div><div className="mt-1 text-sm">{formatDate(finding.data.createdAt)}</div></div>
-        <div className="card"><div className="text-xs text-slate-500">Bounded range</div><div className="mt-1 text-sm">{formatValue(range.knownPassingDelayMs ?? range.lowerPassingBoundMs)} → {formatValue(range.knownFailingDelayMs ?? range.upperFailingBoundMs)} ms</div></div>
+        <div className="card"><div className="text-xs text-[var(--rift-text-muted)]">Investigation</div><div className="mt-1 font-mono text-sm" title={investigationId}>{shortId(investigationId, 12)}</div></div>
+        <div className="card"><div className="text-xs text-[var(--rift-text-muted)]">Status</div><div className="mt-1"><StatusBadge tone={executionStatusTone(progress.data?.status)}>{progress.data?.status ?? 'Unknown'}</StatusBadge></div></div>
+        <div className="card"><div className="text-xs text-[var(--rift-text-muted)]">First observed</div><div className="mt-1 text-sm">{formatDate(finding.data.createdAt)}</div></div>
+        <div className="card"><div className="text-xs text-[var(--rift-text-muted)]">Bounded range</div><div className="mt-1 text-sm">{formatValue(range.knownPassingDelayMs ?? range.lowerPassingBoundMs)} → {formatValue(range.knownFailingDelayMs ?? range.upperFailingBoundMs)} ms</div></div>
       </div>
       <section className="card mb-5">
         <h2 className="font-bold">Source observation</h2>
         <dl className="mt-4 grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl bg-slate-950 p-3"><dt className="text-xs text-slate-500">Source world</dt><dd className="mt-1 font-mono text-sm">{formatValue(sourceWorld)}</dd></div>
-          <div className="rounded-xl bg-slate-950 p-3"><dt className="text-xs text-slate-500">Source experiment</dt><dd className="mt-1 font-mono text-sm">{formatValue(sourceExperiment)}</dd></div>
-          <div className="rounded-xl bg-slate-950 p-3"><dt className="text-xs text-slate-500">Failed invariants</dt><dd className="mt-1 text-sm">{Array.isArray(conditions.failedInvariantIds) ? conditions.failedInvariantIds.map(String).join(', ') : 'Not recorded'}</dd></div>
+          <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3"><dt className="text-xs text-[var(--rift-text-muted)]">Source world</dt><dd className="mt-1 font-mono text-sm">{formatValue(sourceWorld)}</dd></div>
+          <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3"><dt className="text-xs text-[var(--rift-text-muted)]">Source experiment</dt><dd className="mt-1 font-mono text-sm">{formatValue(sourceExperiment)}</dd></div>
+          <div className="rounded-xl bg-[var(--rift-surface-raised)] p-3"><dt className="text-xs text-[var(--rift-text-muted)]">Failed invariants</dt><dd className="mt-1 text-sm">{Array.isArray(conditions.failedInvariantIds) ? conditions.failedInvariantIds.map(String).join(', ') : 'Not recorded'}</dd></div>
         </dl>
       </section>
       <section className="card mb-5">
         <h2 className="font-bold">Reproduction</h2>
-        <p className="mt-3 text-sm text-slate-400">
+        <p className="mt-3 text-sm text-[var(--rift-text-secondary)]">
           {finding.data.reproductions.filter((run) => run.reproduced).length} reproduced runs and {finding.data.reproductions.filter((run) => !run.reproduced).length} contradictory/control runs are linked to this finding.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {finding.data.reproductions.map((run) => <StatusBadge key={run.id} tone={run.reproduced ? 'red' : 'green'}>{humanize(run.reproduced ? 'reproduced' : 'did_not_reproduce')}</StatusBadge>)}
+          {finding.data.reproductions.map((run) => <StatusBadge key={run.id} tone={run.reproduced ? 'fail' : 'pass'}>{humanize(run.reproduced ? 'reproduced' : 'did_not_reproduce')}</StatusBadge>)}
         </div>
       </section>
       {worlds.isError ? <PanelState title="World history unavailable" retry={() => void worlds.refetch()}>Finding detail loaded, but world history could not be loaded.</PanelState> : null}
