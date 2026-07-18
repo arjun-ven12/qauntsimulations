@@ -5,9 +5,14 @@ import type {
   EndpointReference,
   ProjectSetupInput,
 } from '../../services/project-api.js';
+import {
+  TemplateManager,
+  builtInTemplate,
+  projectTemplatePayloadSchema,
+} from '../templates/index.js';
 import { Field, primaryButton, secondaryButton } from './project-ui.js';
 
-interface ProjectFormValue extends ProjectSetupInput {
+export interface ProjectFormValue extends ProjectSetupInput {
   credentialReferences: CredentialReference[];
 }
 
@@ -110,6 +115,44 @@ export function ProjectForm({
     setStep((current) => Math.min(current + 1, 2));
   }
 
+  const templateManager = (
+    <TemplateManager
+      builtIns={[
+        builtInTemplate(
+          'PROJECT',
+          'project-built-in-web-application',
+          'Web application',
+          'A clean authorised web application configuration.',
+          emptyProject(),
+        ),
+      ]}
+      category="PROJECT"
+      onApply={(payload) => {
+        setValue(payload);
+        setErrors({});
+        setDirty(true);
+      }}
+      payloadSchema={projectTemplatePayloadSchema}
+      preview={(payload) => (
+        <TemplateSummary
+          items={[
+            ['Project', payload.name || 'Untitled'],
+            ['Application', projectHostname(payload.applicationUrl)],
+            [
+              'Access references',
+              String(
+                payload.credentialReferences.length +
+                  payload.apiEndpoints.length +
+                  payload.webhookEndpoints.length,
+              ),
+            ],
+          ]}
+        />
+      )}
+      value={value}
+    />
+  );
+
   if (guided) {
     const host = projectHostname(value.applicationUrl);
     const accessCount =
@@ -125,6 +168,7 @@ export function ProjectForm({
         noValidate
         onSubmit={(event) => void submit(event)}
       >
+        <div className="xl:col-span-2">{templateManager}</div>
         <div className="min-w-0">
           <ol
             aria-label="Project setup progress"
@@ -400,6 +444,7 @@ export function ProjectForm({
 
   return (
     <form className="space-y-6" noValidate onSubmit={(event) => void submit(event)}>
+      {templateManager}
       <FormSection
         description="Name the application and explain why Rift will investigate it."
         title="Basic details"
@@ -768,4 +813,19 @@ function isHttpUrl(value: string) {
 function projectHostname(value: string) {
   if (!isHttpUrl(value)) return 'Incomplete';
   return new URL(value).hostname;
+}
+
+function TemplateSummary({ items }: { items: Array<[string, string]> }) {
+  return (
+    <dl className="grid gap-3 text-sm sm:grid-cols-3">
+      {items.map(([label, value]) => (
+        <div className="min-w-0" key={label}>
+          <dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt>
+          <dd className="mt-1 truncate font-medium" title={value}>
+            {value}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }

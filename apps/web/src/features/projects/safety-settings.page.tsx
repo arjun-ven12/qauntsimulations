@@ -5,6 +5,11 @@ import { useParams } from 'react-router-dom';
 import { PageHeading } from '../../components/page-heading.js';
 import { ProjectApiError, projectApi, type SafetyPolicy } from '../../services/project-api.js';
 import { useAuthStore } from '../../stores/auth.store.js';
+import {
+  TemplateManager,
+  builtInTemplate,
+  projectSafetyTemplatePayloadSchema,
+} from '../templates/index.js';
 import { primaryButton, ProjectLoading, ProjectMessage, secondaryButton } from './project-ui.js';
 
 const methods = ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'] as const;
@@ -20,6 +25,16 @@ const restrictions = [
   'Infrastructure changes denied',
   'Cross-organisation access denied',
 ];
+
+type SafetyTemplatePayload = Pick<
+  SafetyPolicy,
+  | 'domainAllowlist'
+  | 'prohibitedActions'
+  | 'allowedHttpMethods'
+  | 'permitCheckoutSubmission'
+  | 'permitMockPayment'
+  | 'permitTestOrderCreation'
+>;
 
 export function SafetySettingsPage() {
   const { projectId = '' } = useParams();
@@ -204,6 +219,53 @@ export function SafetySettingsPage() {
         <p className="mb-4 text-sm font-bold text-amber-300" role="status">
           Unsaved changes
         </p>
+      ) : null}
+      {canManage ? (
+        <div className="mt-6">
+          <TemplateManager
+            builtIns={[
+              builtInTemplate(
+                'PROJECT_SAFETY',
+                'project-safety-built-in-fail-closed',
+                'Fail-closed controls',
+                'Keep the current host boundary while disabling privileged actions.',
+                {
+                  domainAllowlist: [...value.domainAllowlist],
+                  prohibitedActions: [],
+                  allowedHttpMethods: ['GET'],
+                  permitCheckoutSubmission: false,
+                  permitMockPayment: false,
+                  permitTestOrderCreation: false,
+                } satisfies SafetyTemplatePayload,
+              ),
+            ]}
+            category="PROJECT_SAFETY"
+            onApply={(payload) => {
+              setValue({ ...value, ...structuredClone(payload) });
+              setAcknowledged(false);
+              setHostErrors({});
+              setActionErrors({});
+            }}
+            payloadSchema={projectSafetyTemplatePayloadSchema}
+            preview={(payload) => (
+              <dl className="grid gap-3 text-sm sm:grid-cols-3">
+                <SafetyTemplatePreview
+                  label="Allowed hosts"
+                  value={String(payload.domainAllowlist.length)}
+                />
+                <SafetyTemplatePreview
+                  label="HTTP methods"
+                  value={payload.allowedHttpMethods.join(', ') || 'None'}
+                />
+                <SafetyTemplatePreview
+                  label="Prohibited actions"
+                  value={String(payload.prohibitedActions.length)}
+                />
+              </dl>
+            )}
+            value={safetyTemplatePayload(value)}
+          />
+        </div>
       ) : null}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <section className="card min-w-0">
@@ -472,6 +534,28 @@ function SafetyToggle({
       />
       {label}
     </label>
+  );
+}
+
+function safetyTemplatePayload(policy: SafetyPolicy): SafetyTemplatePayload {
+  return {
+    domainAllowlist: [...policy.domainAllowlist],
+    prohibitedActions: [...policy.prohibitedActions],
+    allowedHttpMethods: [...policy.allowedHttpMethods],
+    permitCheckoutSubmission: policy.permitCheckoutSubmission,
+    permitMockPayment: policy.permitMockPayment,
+    permitTestOrderCreation: policy.permitTestOrderCreation,
+  };
+}
+
+function SafetyTemplatePreview({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt>
+      <dd className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </dd>
+    </div>
   );
 }
 

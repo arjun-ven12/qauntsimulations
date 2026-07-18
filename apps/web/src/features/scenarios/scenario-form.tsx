@@ -3,6 +3,11 @@ import type { Environment } from '../../services/environment-api.js';
 import type { Invariant, InvariantType } from '../invariants/invariant-api.js';
 import type { Journey } from '../journeys/journey-api.js';
 import { Field, primaryButton, secondaryButton } from '../projects/project-ui.js';
+import {
+  TemplateManager,
+  builtInTemplate,
+  scenarioTemplatePayloadSchema,
+} from '../templates/index.js';
 import type { ScenarioLaunchInput, ScenarioPreflightResult } from './scenario-api.js';
 import { ScenarioConfigurationReview } from './scenario-configuration-review.js';
 import { ScenarioControlsEditor } from './scenario-controls.js';
@@ -16,23 +21,12 @@ import {
   toScenarioLaunchInput,
   type ScenarioFormValue,
 } from './scenario-form.model.js';
-import { ScenarioPresetSelector } from './scenario-preset-selector.js';
-import {
-  applyScenarioPreset,
-  defaultScenarioPresetId,
-  isScenarioPresetCustomised,
-  scenarioPresets,
-} from './scenario-presets.js';
+import { applyScenarioPreset, scenarioPresets } from './scenario-presets.js';
 import { ScenarioPreflightResults } from './scenario-preflight-results.js';
 
 interface ReadyPreflight {
   payload: ScenarioLaunchInput;
   result: ScenarioPreflightResult;
-}
-
-interface AppliedPreset {
-  id: string;
-  payload: ScenarioLaunchInput;
 }
 
 export function ScenarioForm({
@@ -60,8 +54,6 @@ export function ScenarioForm({
   const [preflightError, setPreflightError] = useState<Error | null>(null);
   const [readyPreflight, setReadyPreflight] = useState<ReadyPreflight | null>(null);
   const [localLaunchPending, setLocalLaunchPending] = useState(false);
-  const [selectedPresetId, setSelectedPresetId] = useState(defaultScenarioPresetId);
-  const [appliedPreset, setAppliedPreset] = useState<AppliedPreset | null>(null);
   const [unavailableInvariantTypes, setUnavailableInvariantTypes] = useState<InvariantType[]>([]);
   const preflightInFlight = useRef(createRequestLock());
   const launchInFlight = useRef(createRequestLock());
@@ -71,23 +63,11 @@ export function ScenarioForm({
     readyPreflight?.payload ?? null,
     currentPayload,
   );
-  const customised = Boolean(
-    appliedPreset && isScenarioPresetCustomised(appliedPreset.payload, currentPayload),
-  );
 
   const change = (next: ScenarioFormValue) => {
     setValue(next);
     setReadyPreflight(null);
     setPreflightError(null);
-  };
-
-  const useSelectedPreset = () => {
-    const preset = scenarioPresets.find((candidate) => candidate.id === selectedPresetId);
-    if (!preset) return;
-    const applied = applyScenarioPreset(value, preset, invariants);
-    change(applied.value);
-    setAppliedPreset({ id: preset.id, payload: toScenarioLaunchInput(applied.value) });
-    setUnavailableInvariantTypes(applied.unavailableInvariantTypes);
   };
 
   const runPreflight = async () => {
@@ -122,22 +102,55 @@ export function ScenarioForm({
 
   return (
     <div className="mt-6 space-y-6">
-      <FormSection
-        description="Start from a tested checkout configuration, then customise any populated value."
-        title="Scenario Presets"
-      >
-        <ScenarioPresetSelector
-          appliedPresetId={appliedPreset?.id ?? null}
-          customised={customised}
-          onApply={useSelectedPreset}
-          onSelect={(preset) => {
-            setSelectedPresetId(preset.id);
+      <TemplateManager
+        builtIns={scenarioPresets.map((preset) =>
+          builtInTemplate(
+            'SCENARIO',
+            `scenario-built-in-${preset.id}`,
+            preset.name,
+            preset.description,
+            applyScenarioPreset(value, preset, invariants).value,
+          ),
+        )}
+        category="SCENARIO"
+        onApply={(payload, template) => {
+          const preset = scenarioPresets.find(
+            (candidate) => `scenario-built-in-${candidate.id}` === template.id,
+          );
+          if (preset) {
+            const applied = applyScenarioPreset(value, preset, invariants);
+            change(applied.value);
+            setUnavailableInvariantTypes(applied.unavailableInvariantTypes);
+          } else {
+            change(payload);
             setUnavailableInvariantTypes([]);
-          }}
-          selectedPresetId={selectedPresetId}
-          unavailableInvariantTypes={unavailableInvariantTypes}
-        />
-      </FormSection>
+          }
+        }}
+        payloadSchema={scenarioTemplatePayloadSchema}
+        preview={(payload) => (
+          <dl className="grid gap-3 text-sm sm:grid-cols-3">
+            <TemplatePreview
+              label="Worlds"
+              value={String(payload.scenario.controls.maximumWorlds)}
+            />
+            <TemplatePreview
+              label="Viewports"
+              value={String(payload.scenario.controls.viewports.length)}
+            />
+            <TemplatePreview label="Invariants" value={String(payload.invariantIds.length)} />
+          </dl>
+        )}
+        value={value}
+      />
+      {unavailableInvariantTypes.length ? (
+        <p
+          className="rounded-lg border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] px-4 py-3 text-sm text-[var(--status-pending)]"
+          role="status"
+        >
+          Template applied. Unavailable recommended Invariants were left unselected:{' '}
+          {unavailableInvariantTypes.join(', ')}.
+        </p>
+      ) : null}
 
       <FormSection
         description="Choose one persisted Environment. Non-READY Environments remain visible but unavailable."
@@ -382,5 +395,16 @@ function InlineError({ message }: { message: string }) {
     <p className="text-sm text-red-300" role="alert">
       {message}
     </p>
+  );
+}
+
+function TemplatePreview({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt>
+      <dd className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </dd>
+    </div>
   );
 }

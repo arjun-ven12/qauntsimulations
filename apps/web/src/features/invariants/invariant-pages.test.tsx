@@ -58,6 +58,7 @@ describe('Invariant frontend pages', () => {
     setRole('OWNER');
     const html = renderPage(<NewInvariantPage />, '/projects/project-1/invariants/new');
     expect(html).toContain('New Invariant');
+    expect(html).toContain('Templates');
     expect(html).toContain('No duplicate payment');
     expect(html).toContain('NO_DUPLICATE_PAYMENT');
     expect(html).toContain('No duplicate order');
@@ -100,16 +101,19 @@ describe('Invariant frontend pages', () => {
     expect(settingsHtml).not.toContain('Save Invariant');
   });
 
-  it.each(['PASSED', 'WARNING', 'FAILED'] as const)('renders %s validation checks and messages', (status) => {
-    const result: InvariantValidationResult = {
-      status: status === 'FAILED' ? 'INVALID' : 'READY',
-      checks: [{ key: 'configuration', status, message: `${status} returned message` }],
-      invariant: invariant(),
-    };
-    const html = renderToStaticMarkup(<InvariantValidationPanel result={result} />);
-    expect(html).toContain(status);
-    expect(html).toContain(`${status} returned message`);
-  });
+  it.each(['PASSED', 'WARNING', 'FAILED'] as const)(
+    'renders %s validation checks and messages',
+    (status) => {
+      const result: InvariantValidationResult = {
+        status: status === 'FAILED' ? 'INVALID' : 'READY',
+        checks: [{ key: 'configuration', status, message: `${status} returned message` }],
+        invariant: invariant(),
+      };
+      const html = renderToStaticMarkup(<InvariantValidationPanel result={result} />);
+      expect(html).toContain(status);
+      expect(html).toContain(`${status} returned message`);
+    },
+  );
 
   it('uses responsive wrapping and stacked template structures without fixed-width controls', () => {
     const html = renderToStaticMarkup(
@@ -121,7 +125,7 @@ describe('Invariant frontend pages', () => {
     );
     expect(html).toContain('min-w-0');
     expect(html).toContain('md:grid-cols-2');
-    expect(html).toContain('lg:grid-cols-2');
+    expect(html).toContain('lg:grid-cols-[minmax(220px,0.75fr)_minmax(0,1.25fr)]');
     expect(html).toContain('flex-wrap');
     expect(html).not.toMatch(/min-w-\[[0-9]/);
   });
@@ -134,10 +138,7 @@ function renderPage(element: React.ReactNode, location: string, client = queryCl
         <Routes>
           <Route path="/projects/:projectId/invariants" element={element} />
           <Route path="/projects/:projectId/invariants/new" element={element} />
-          <Route
-            path="/projects/:projectId/invariants/:invariantId/settings"
-            element={element}
-          />
+          <Route path="/projects/:projectId/invariants/:invariantId/settings" element={element} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

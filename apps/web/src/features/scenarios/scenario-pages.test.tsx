@@ -39,16 +39,16 @@ describe('Scenario frontend', () => {
     expect(html).not.toContain('JSON editor');
   });
 
-  it('renders four catalogue-style presets with delayed payment marked recommended', () => {
+  it('renders four Scenario built-ins through the shared Templates system', () => {
     const html = renderForm();
-    expect(html).toContain('Scenario Presets');
+    expect(html).toContain('Templates');
     expect(html).toContain('Healthy Checkout Baseline');
     expect(html).toContain('Delayed Payment Double Submission');
     expect(html).toContain('Mobile Checkout Under Slow Network');
     expect(html).toContain('Payment Timeout and Retry');
-    expect(html.match(/Recommended/g)).toHaveLength(1);
-    expect(html.match(/2 recommended/g)).toHaveLength(4);
-    expect(html).toContain('Use preset');
+    expect(html).toContain('Built-in');
+    expect(html).toContain('Apply template');
+    expect(html).toContain('Save current');
   });
 
   it('renders unavailable recommended Invariants as a non-blocking status message', () => {
@@ -118,7 +118,9 @@ describe('Scenario frontend', () => {
   it('displays blocking failures with the exact backend code and message', () => {
     const html = renderToStaticMarkup(
       <ScenarioPreflightResults
-        error={new ScenarioApiError('Journey must be enabled before launch', 422, 'JOURNEY_DISABLED')}
+        error={
+          new ScenarioApiError('Journey must be enabled before launch', 422, 'JOURNEY_DISABLED')
+        }
         result={null}
       />,
     );
@@ -149,10 +151,12 @@ describe('Scenario frontend', () => {
   );
 });
 
-function renderForm(extraInvariants = [
-  invariant('invariant-payment', 'NO_DUPLICATE_PAYMENT'),
-  invariant('invariant-order', 'NO_DUPLICATE_ORDER'),
-]) {
+function renderForm(
+  extraInvariants = [
+    invariant('invariant-payment', 'NO_DUPLICATE_PAYMENT'),
+    invariant('invariant-order', 'NO_DUPLICATE_ORDER'),
+  ],
+) {
   return renderToStaticMarkup(
     <ScenarioForm
       environments={[environment()]}
@@ -183,10 +187,7 @@ function renderPage(client: QueryClient) {
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={['/projects/project-1/investigations/new']}>
         <Routes>
-          <Route
-            path="/projects/:projectId/investigations/new"
-            element={<ScenarioCreatePage />}
-          />
+          <Route path="/projects/:projectId/investigations/new" element={<ScenarioCreatePage />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -201,9 +202,10 @@ function configuredClient() {
   const client = queryClient();
   client.setQueryData(['environments', 'project-1'], [environment()]);
   client.setQueryData(['journeys', 'project-1'], [journey()]);
-  client.setQueryData(['invariants', 'project-1'], [
-    invariant('invariant-payment', 'NO_DUPLICATE_PAYMENT'),
-  ]);
+  client.setQueryData(
+    ['invariants', 'project-1'],
+    [invariant('invariant-payment', 'NO_DUPLICATE_PAYMENT')],
+  );
   return client;
 }
 

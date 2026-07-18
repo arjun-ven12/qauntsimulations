@@ -36,6 +36,7 @@ describe('Journey frontend pages', () => {
     client.setQueryData(['environments', 'project-1'], [environment()]);
     const html = renderPage(<NewJourneyPage />, '/projects/project-1/journeys/new', client);
     expect(html).toContain('New Journey');
+    expect(html).toContain('Templates');
     expect(html).toContain('Ordered steps');
     expect(html).toContain('Completion condition');
     expect(html).toContain('Execution path');

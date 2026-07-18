@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Field, primaryButton, secondaryButton } from '../projects/project-ui.js';
+import {
+  TemplateManager,
+  builtInTemplate,
+  invariantTemplatePayloadSchema,
+} from '../templates/index.js';
 import type { InvariantInput, InvariantValidationResult } from './invariant-api.js';
 import {
   invariantFormErrors,
@@ -14,7 +19,6 @@ import {
   InvariantStructuredPreview,
   InvariantValidationPanel,
 } from './invariant-structured-preview.js';
-import { InvariantTemplatePicker } from './invariant-template-picker.js';
 
 const methods = ['POST', 'PUT', 'PATCH'] as const;
 const severities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const;
@@ -119,18 +123,35 @@ export function InvariantForm({
         </p>
       ) : null}
 
-      <fieldset className="space-y-6" disabled={readOnly}>
-        <FormSection
-          description="Choose one of the evaluator definitions supported by the runtime."
-          title="Suggested templates"
-        >
-          <InvariantTemplatePicker
-            disabled={readOnly}
-            onSelect={(template) => change(templateValue(template))}
-            selectedType={value.type}
-          />
-        </FormSection>
+      {!readOnly ? (
+        <TemplateManager
+          builtIns={invariantTemplates.map((template) =>
+            builtInTemplate(
+              'INVARIANT',
+              `invariant-built-in-${template.id}`,
+              template.displayName,
+              template.description,
+              templateValue(template),
+            ),
+          )}
+          category="INVARIANT"
+          onApply={(payload) => change(structuredClone(payload))}
+          payloadSchema={invariantTemplatePayloadSchema}
+          preview={(payload) => (
+            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+              <TemplatePreview label="Evaluator" value={payload.type} />
+              <TemplatePreview label="Severity" value={payload.severity} />
+              <TemplatePreview
+                label="Request paths"
+                value={String(payload.configuration.requestPatterns.length)}
+              />
+            </dl>
+          )}
+          value={value}
+        />
+      ) : null}
 
+      <fieldset className="space-y-6" disabled={readOnly}>
         <FormSection
           description="The business rule is descriptive context. It is never executed."
           title="Basic details"
@@ -381,6 +402,17 @@ function ReviewItem({
 
 function friendlySeverity(severity: (typeof severities)[number]) {
   return `${severity.charAt(0)}${severity.slice(1).toLowerCase()} (${severity})`;
+}
+
+function TemplatePreview({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt>
+      <dd className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </dd>
+    </div>
+  );
 }
 
 function runtimeCompatibility(

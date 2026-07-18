@@ -3,6 +3,11 @@ import { ArrowDown, ArrowUp, Copy, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { environmentApi } from '../../services/environment-api.js';
 import { Field, primaryButton, secondaryButton } from '../projects/project-ui.js';
+import {
+  TemplateManager,
+  builtInTemplate,
+  journeyTemplatePayloadSchema,
+} from '../templates/index.js';
 import type { JourneyInput, JourneyValidationResult } from './journey-api.js';
 import {
   addStep,
@@ -111,6 +116,31 @@ export function JourneyForm({
         <p className="text-sm font-bold text-emerald-300" role="status">
           {successMessage}
         </p>
+      ) : null}
+
+      {!readOnly ? (
+        <TemplateManager
+          builtIns={[
+            builtInTemplate(
+              'JOURNEY',
+              'journey-built-in-checkout',
+              'Controlled checkout',
+              'A complete mock checkout with visible evidence checkpoints.',
+              checkoutTemplate(value.environmentId),
+            ),
+          ]}
+          category="JOURNEY"
+          onApply={(payload) => change(structuredClone(payload))}
+          payloadSchema={journeyTemplatePayloadSchema}
+          preview={(payload) => (
+            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+              <PreviewItem label="Entry" value={payload.startPath} />
+              <PreviewItem label="Steps" value={String(payload.steps.length)} />
+              <PreviewItem label="State" value={payload.state} />
+            </dl>
+          )}
+          value={value}
+        />
       ) : null}
 
       <fieldset className="space-y-6" disabled={readOnly}>
@@ -763,6 +793,17 @@ function ReviewItem({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 rounded-lg border border-slate-800 p-3">
       <dt className="text-xs uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className="mt-1 break-words font-bold text-slate-200">{value}</dd>
+    </div>
+  );
+}
+
+function PreviewItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt>
+      <dd className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </dd>
     </div>
   );
 }

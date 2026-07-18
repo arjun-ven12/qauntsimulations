@@ -9,6 +9,11 @@ import {
 } from '../../services/environment-api.js';
 import { projectApi } from '../../services/project-api.js';
 import { primaryButton, secondaryButton } from '../projects/project-ui.js';
+import {
+  TemplateManager,
+  builtInTemplate,
+  environmentTemplatePayloadSchema,
+} from '../templates/index.js';
 
 const HTTP_METHODS: HttpMethod[] = ['GET', 'POST', 'OPTIONS', 'PUT', 'PATCH', 'DELETE'];
 const ENVIRONMENT_TYPES: EnvironmentInput['type'][] = [
@@ -139,6 +144,34 @@ export function EnvironmentForm({
 
   return (
     <form className="mx-auto mt-6 max-w-[1050px] space-y-6" onSubmit={submit}>
+      <TemplateManager
+        builtIns={[
+          builtInTemplate(
+            'ENVIRONMENT',
+            'environment-built-in-local',
+            'Local development',
+            'Local application, API, mock payment, and isolated test-data defaults.',
+            environmentDefaults(),
+          ),
+        ]}
+        category="ENVIRONMENT"
+        onApply={(payload) => {
+          setValue(initialise(payload));
+          setAuthorised(false);
+        }}
+        payloadSchema={environmentTemplatePayloadSchema}
+        preview={(payload) => (
+          <dl className="grid gap-3 text-sm sm:grid-cols-3">
+            <TemplatePreviewItem label="Type" value={payload.type} />
+            <TemplatePreviewItem label="Base URL" value={payload.baseUrl} />
+            <TemplatePreviewItem
+              label="Allowed actions"
+              value={String(payload.configuration.allowedActions.length)}
+            />
+          </dl>
+        )}
+        value={value}
+      />
       <FormSection
         description="Name this test target and describe how it is used."
         number="01"
@@ -971,6 +1004,17 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
     <div className="min-w-0 rounded-xl border border-slate-800 p-3">
       <dt className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</dt>
       <dd className="mt-1 break-words text-sm text-slate-200">{value}</dd>
+    </div>
+  );
+}
+
+function TemplatePreviewItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-[var(--rift-text-muted)]">{label}</dt>
+      <dd className="mt-1 truncate font-medium" title={value}>
+        {value}
+      </dd>
     </div>
   );
 }
