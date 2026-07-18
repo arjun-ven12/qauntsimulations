@@ -2,7 +2,7 @@
 
 ## Role and boundary
 
-Kimi is an optional provider for TaskOS's initial experiment plan only. Persisted Scenario, Environment, Journey, Invariant, control, and Project Safety context is converted to the existing provider-neutral `PlannerRequest`. Kimi does not evaluate invariants, confirm findings, control adaptive reproduction or minimisation, execute workers, automate browsers, or determine report truth. Runtime evidence remains authoritative.
+Kimi is an optional provider for Rift's initial experiment plan only. Persisted Scenario, Environment, Journey, Invariant, control, and Project Safety context is converted to the existing provider-neutral `PlannerRequest`. Kimi does not evaluate invariants, confirm findings, control adaptive reproduction or minimisation, execute workers, automate browsers, or determine report truth. Runtime evidence remains authoritative.
 
 ## Configuration
 
@@ -50,6 +50,6 @@ Run the mock tests first. A real planner-only check is permitted only when both 
 
 ## Known limitations
 
-- The installed OpenAI Node SDK does not name provider extensions `extra_body`; it serializes additional POST parameters directly. TaskOS supplies only Kimi's `thinking` extension through a narrow local type and keeps temperature at its provider-defined value.
-- Kimi JSON Schema structured outputs are not assumed; TaskOS uses JSON-object mode followed by its own authoritative Zod validation.
+- The installed OpenAI Node SDK does not name provider extensions `extra_body`; it serializes additional POST parameters directly. Rift supplies only Kimi's `thinking` extension through a narrow local type and keeps temperature at its provider-defined value.
+- Kimi JSON Schema structured outputs are not assumed; Rift uses JSON-object mode followed by its own authoritative Zod validation.
 - Availability, sponsor model access, and rate limits remain provider-account concerns.

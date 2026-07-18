@@ -74,7 +74,7 @@ export function ProjectSettingsPage() {
       setError(
         requestError instanceof ProjectApiError
           ? requestError.message
-          : 'WorldLab could not save project settings.',
+          : 'Rift could not save project settings.',
       );
       return false;
     } finally {

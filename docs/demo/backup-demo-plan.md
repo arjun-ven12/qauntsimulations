@@ -1,4 +1,4 @@
-# TaskOS backup demo plan
+# Rift backup demo plan
 
 Use the strongest existing evidence-backed checkout Investigation. Do not start a new Daytona run, Kimi planning request, hosted repair verification, or deployment as a fallback.
 

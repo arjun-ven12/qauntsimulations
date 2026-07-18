@@ -45,11 +45,11 @@ describe('Dashboard Product data adapter', () => {
   it('does not mark another commerce demo as the primary seeded demo', async () => {
     const result = await loadDashboardData(
       organisation,
-      sourceFixture({ projects: [project('project-commerce', 'TaskOS Demo Commerce')] }),
+      sourceFixture({ projects: [project('project-commerce', 'Rift Demo Commerce')] }),
     );
 
     expect(result.data.projects[0]).toMatchObject({
-      name: 'TaskOS Demo Commerce',
+      name: 'Rift Demo Commerce',
       isPrimaryDemo: false,
     });
   });

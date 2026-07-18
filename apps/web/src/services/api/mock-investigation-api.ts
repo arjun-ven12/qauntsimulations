@@ -46,7 +46,7 @@ export class MockInvestigationApi implements InvestigationApi {
     {
       id: 'project_demo_checkout',
       organisationId: 'organisation_demo_taskos',
-      name: 'TaskOS Demo Commerce',
+      name: 'Rift Demo Commerce',
       description: 'A controlled commerce reliability target.',
       repositoryUrl: null,
       createdAt: FIXED_TIME,

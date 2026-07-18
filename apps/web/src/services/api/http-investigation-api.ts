@@ -35,7 +35,7 @@ export class HttpInvestigationApi implements InvestigationApi {
         error instanceof DOMException &&
         error.name === 'TimeoutError';
       throw new InvestigationApiError(
-        'WorldLab could not reach the investigation API.',
+        'Rift could not reach the investigation API.',
         0,
         timedOut ? 'TIMEOUT' : 'NETWORK',
         error,
@@ -45,7 +45,7 @@ export class HttpInvestigationApi implements InvestigationApi {
     try {
       payload = (await response.json()) as unknown;
     } catch (error) {
-      throw new InvestigationApiError('WorldLab received invalid JSON.', response.status, 'INVALID_JSON', error);
+      throw new InvestigationApiError('Rift received invalid JSON.', response.status, 'INVALID_JSON', error);
     }
     if (!response.ok) {
       const errorCode = (payload as { error?: { code?: string } }).error?.code;
@@ -68,7 +68,7 @@ export class HttpInvestigationApi implements InvestigationApi {
     try {
       return schema.parse(payload);
     } catch (error) {
-      throw new InvestigationApiError('WorldLab received an unexpected response shape.', 0, 'SCHEMA_MISMATCH', error);
+      throw new InvestigationApiError('Rift received an unexpected response shape.', 0, 'SCHEMA_MISMATCH', error);
     }
   }
 

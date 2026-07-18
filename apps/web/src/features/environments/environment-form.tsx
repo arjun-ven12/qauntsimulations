@@ -186,7 +186,7 @@ export function EnvironmentForm({
       </FormSection>
 
       <FormSection
-        description="Define the application endpoints TaskOS may connect to."
+        description="Define the application endpoints Rift may connect to."
         number="02"
         title="Application connection"
       >
@@ -437,7 +437,7 @@ export function EnvironmentForm({
       </FormSection>
 
       <FormSection
-        description="Describe how TaskOS restores state around each world."
+        description="Describe how Rift restores state around each world."
         number="05"
         title="Reset procedure"
       >
@@ -619,7 +619,7 @@ export function EnvironmentForm({
                 <TextField
                   label="Reference"
                   onChange={(reference) => updateCredential(index, { ...credential, reference })}
-                  placeholder="1password://TaskOS/test-user"
+                placeholder="1password://TaskOS/test-user"
                   required
                   value={credential.reference}
                 />
@@ -667,7 +667,7 @@ export function EnvironmentForm({
       </FormSection>
 
       <FormSection
-        description="Choose the exact capabilities TaskOS may exercise in this environment."
+        description="Choose the exact capabilities Rift may exercise in this environment."
         number="08"
         title="Allowed actions"
       >

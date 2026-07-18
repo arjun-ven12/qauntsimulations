@@ -45,7 +45,7 @@ test('invitation link shows a safe preview and login preserves the raw-link rout
   await page.getByRole('link', { name: 'Log in' }).click();
   await page.getByLabel('Email address').fill('mira.member@taskos.test');
   await page.getByLabel('Password', { exact: true }).fill('test-password-value');
-  await page.getByRole('button', { name: 'Continue to WorldLab' }).click();
+  await page.getByRole('button', { name: 'Continue to Rift' }).click();
   await expect(page).toHaveURL(new RegExp(`/invitations/accept\\?token=${rawToken}$`));
 });
 

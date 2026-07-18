@@ -1,4 +1,4 @@
-# TaskOS release checklist and code freeze
+# Rift release checklist and code freeze
 
 ## Product readiness
 
@@ -11,7 +11,7 @@
 ## Evidence and demo truthfulness
 
 - [x] Existing completed checkout evidence is used as the primary demonstration proof.
-- [x] Public Render fixture and Daytona sandbox lifecycle are described separately from TaskOS evidence execution.
+- [x] Public Render fixture and Daytona sandbox lifecycle are described separately from Rift evidence execution.
 - [x] Daytona-to-Render is labelled as an external organisation-level outbound-network block.
 - [x] No hosted Investigation, hosted Finding, hosted Repair Verification, or repair outcome is claimed without immutable evidence.
 - [x] The backup plan does not require a paid runtime execution, planning request, reset, deployment, or fabricated data.

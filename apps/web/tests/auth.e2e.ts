@@ -281,7 +281,7 @@ test('login submits the backend payload and redirects', async ({ page }) => {
   });
   await page.goto('/login');
   await fillLogin(page);
-  await page.getByRole('button', { name: 'Continue to WorldLab' }).click();
+  await page.getByRole('button', { name: 'Continue to Rift' }).click();
   await expect(page).toHaveURL(/\/projects$/);
   expect(payload).toEqual({
     email: 'person@taskos.dev',
@@ -316,7 +316,7 @@ test('protected routes wait for restoration and redirect without protected-conte
   });
 
   const navigation = page.goto('/projects');
-  await expect(page.getByText('Restoring WorldLab…')).toBeVisible();
+  await expect(page.getByText('Restoring Rift…')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Projects' })).toHaveCount(0);
   resolveMe();
   await navigation;
@@ -348,7 +348,7 @@ test('login returns to the originally requested protected route', async ({ page 
   await page.goto('/settings/organisation');
   await expect(page).toHaveURL(/\/login$/);
   await fillLogin(page);
-  await page.getByRole('button', { name: 'Continue to WorldLab' }).click();
+  await page.getByRole('button', { name: 'Continue to Rift' }).click();
   await expect(page).toHaveURL(/\/settings\/organisation$/);
   await expect(page.getByRole('heading', { name: 'World Reliability' }).first()).toBeVisible();
 });
@@ -480,7 +480,7 @@ test('pending state prevents duplicate login requests', async ({ page }) => {
   await page.goto('/login');
   await fillLogin(page);
   await page
-    .getByRole('button', { name: 'Continue to WorldLab' })
+    .getByRole('button', { name: 'Continue to Rift' })
     .evaluate((button: HTMLButtonElement) => {
       button.click();
       button.click();
@@ -502,21 +502,21 @@ test('backend errors are presented without losing entered values', async ({ page
   });
   await page.goto('/login');
   await fillLogin(page);
-  await page.getByRole('button', { name: 'Continue to WorldLab' }).click();
+  await page.getByRole('button', { name: 'Continue to Rift' }).click();
   await expect(page.getByRole('alert')).toHaveText('Email or password is incorrect');
   await expect(page.getByLabel('Email address')).toHaveValue('person@taskos.dev');
-  await expect(page.getByRole('button', { name: 'Continue to WorldLab' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Continue to Rift' })).toBeEnabled();
 });
 
 test('network errors are presented and allow retrying', async ({ page }) => {
   await page.route('**/api/auth/login', async (route) => route.abort('failed'));
   await page.goto('/login');
   await fillLogin(page);
-  await page.getByRole('button', { name: 'Continue to WorldLab' }).click();
+  await page.getByRole('button', { name: 'Continue to Rift' }).click();
   await expect(page.getByRole('alert')).toHaveText(
-    'WorldLab could not be reached. Check your connection and try again.',
+    'Rift could not be reached. Check your connection and try again.',
   );
-  await expect(page.getByRole('button', { name: 'Continue to WorldLab' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Continue to Rift' })).toBeEnabled();
 });
 
 test('password visibility control has an accessible changing label', async ({ page }) => {

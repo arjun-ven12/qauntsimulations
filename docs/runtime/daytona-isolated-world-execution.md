@@ -41,7 +41,7 @@ The only environment variables sent to the sandbox are `NODE_ENV`, `TASKOS_WORKE
 
 ## Portable bundles and layout
 
-The demo upload contains its built `dist/` tree plus a minimal package manifest. It does not contain source, the API, `.env`, or the repository. The worker build uses esbuild to produce a single ESM `worker.mjs` containing TaskOS contracts and Zod, plus a minimal package manifest with the exact Playwright runtime dependency. Browser binaries are installed inside each fresh sandbox.
+The demo upload contains its built `dist/` tree plus a minimal package manifest. It does not contain source, the API, `.env`, or the repository. The worker build uses esbuild to produce a single ESM `worker.mjs` containing Rift contracts and Zod, plus a minimal package manifest with the exact Playwright runtime dependency. Browser binaries are installed inside each fresh sandbox.
 
 ```text
 /home/daytona/taskos/

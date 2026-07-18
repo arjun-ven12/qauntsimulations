@@ -64,7 +64,7 @@ Cancellation is best effort. The fleet stops admitting new work, interrupts retr
 
 Each executor attempt still deletes its sandbox in `finally` after pass, invariant violation, setup failure, timeout, cancellation, evidence download failure, invalid output, or unexpected error. Cleanup failure preserves valid results/evidence, emits `sandbox_cleanup_failed`, records provider metadata, and increments fleet diagnostics.
 
-`DaytonaOrphanCleanupService` can list TaskOS-owned sandboxes with:
+`DaytonaOrphanCleanupService` can list sandboxes carrying the legacy `taskos-worldlab` tag with:
 
 ```text
 project=taskos-worldlab
@@ -111,7 +111,7 @@ RUN_DAYTONA_FLEET_INTEGRATION_TESTS=true \
 pnpm exec vitest run apps/api/src/modules/execution/__tests__/daytona-fleet.integration.test.ts
 ```
 
-The test must query TaskOS-labelled sandboxes afterward. Expected final TaskOS sandbox count is zero.
+The test must query the legacy `taskos`-labelled sandboxes afterward. Expected final tagged sandbox count is zero.
 
 ## Adaptive reproduction
 

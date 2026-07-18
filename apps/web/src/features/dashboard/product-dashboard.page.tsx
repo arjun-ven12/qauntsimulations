@@ -27,7 +27,7 @@ export function ProductDashboardPage() {
         message={
           query.error instanceof Error
             ? query.error.message
-            : 'TaskOS could not load the Product Dashboard.'
+            : 'Rift could not load the Product Dashboard.'
         }
         onRetry={() => void query.refetch()}
       />

@@ -53,7 +53,7 @@ describe('routed Product Dashboard page', () => {
     expect(html).toContain('Current Organisation');
     expect(html).toContain('Current Project');
     expect(html).toContain('Recent Investigations unavailable');
-    expect(html).not.toContain('TaskOS Demo');
+    expect(html).not.toContain('Rift Demo');
     expect(html).not.toContain('project_demo_checkout');
   });
 

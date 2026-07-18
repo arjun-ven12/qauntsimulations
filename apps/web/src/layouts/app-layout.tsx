@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Activity, Boxes, FlaskConical, Gauge, LogOut, Mail, ShieldCheck, Users } from 'lucide-react';
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { ContextualNavigation } from '../components/contextual-navigation.js';
 import { invitationApi } from '../services/invitation-api.js';
 import { useAuthStore } from '../stores/auth.store.js';
 
@@ -10,7 +11,7 @@ const runtimeInvestigationId = import.meta.env.VITE_DEMO_INVESTIGATION_ID ?? 'cm
 export const appNavigation = [
   { to: '/dashboard', label: 'Dashboard', icon: Gauge },
   { to: '/projects', label: 'Projects', icon: Boxes },
-  { to: `/investigations/${runtimeInvestigationId}`, label: 'Live WorldLab', icon: Activity },
+  { to: `/investigations/${runtimeInvestigationId}`, label: 'Live Investigation', icon: Activity },
   {
     to: `/investigations/${runtimeInvestigationId}/findings`,
     label: 'Findings',
@@ -51,7 +52,7 @@ export function AppLayout() {
       navigate('/dashboard');
     } catch (error) {
       setSwitchError(
-        error instanceof Error ? error.message : 'WorldLab could not switch organisations.',
+        error instanceof Error ? error.message : 'Rift could not switch organisations.',
       );
     } finally {
       setSwitching(false);
@@ -66,8 +67,8 @@ export function AppLayout() {
             <FlaskConical size={22} />
           </span>
           <div>
-            <div className="font-black tracking-tight">TaskOS</div>
-            <div className="text-xs text-slate-500">WORLDLAB</div>
+            <div className="font-black tracking-tight">Rift</div>
+            <div className="text-xs text-slate-500">RELIABILITY</div>
           </div>
         </div>
         {organisation ? (
@@ -106,7 +107,7 @@ export function AppLayout() {
             ) : null}
           </div>
         ) : null}
-        <nav aria-label="WorldLab" className="space-y-2">
+        <nav aria-label="Rift navigation" className="space-y-2">
           {appNavigation.map(({ to, label, icon: Icon }) => (
             <NavLink
               className={({ isActive }) =>
@@ -139,6 +140,7 @@ export function AppLayout() {
         </button>
       </aside>
       <main className="min-w-0 p-6 lg:p-10">
+        <ContextualNavigation />
         <Outlet />
       </main>
     </div>

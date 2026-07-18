@@ -40,7 +40,7 @@ export function NewProjectPage() {
       setError(
         requestError instanceof ProjectApiError
           ? requestError.message
-          : 'WorldLab could not create the project.',
+          : 'Rift could not create the project.',
       );
       return false;
     } finally {

@@ -8,7 +8,7 @@ import type { DashboardData } from './dashboard.types.js';
 describe('isolated Product Dashboard', () => {
   it('renders organisation, primary demo Project, readiness, onboarding, and Product actions', () => {
     const html = render(seededDemoDashboardData);
-    expect(html).toContain('TaskOS Demo');
+    expect(html).toContain('Rift Demo');
     expect(html).toContain('OWNER');
     expect(html).toContain('Checkout Reliability Lab');
     expect(html).toContain('Primary demo');
@@ -86,14 +86,14 @@ describe('isolated Product Dashboard', () => {
     expect(html).toContain('/projects/new');
   });
 
-  it('does not give TaskOS Demo Commerce seeded primary-demo treatment', () => {
+  it('does not give Rift Demo Commerce seeded primary-demo treatment', () => {
     const html = render({
       ...seededDemoDashboardData,
       projects: [
         {
           ...seededDemoDashboardData.projects[0]!,
           id: 'project-commerce',
-          name: 'TaskOS Demo Commerce',
+          name: 'Rift Demo Commerce',
           isPrimaryDemo: false,
         },
       ],

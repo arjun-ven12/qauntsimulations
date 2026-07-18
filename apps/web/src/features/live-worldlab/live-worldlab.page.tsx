@@ -85,7 +85,7 @@ export function LiveWorldLabPage() {
 
   if (progress.isLoading) return <PanelState title="Loading investigation">Loading investigation header, progress, and runtime status…</PanelState>;
   if (progress.error || !progress.data) {
-    return <PanelState title="Investigation unavailable" retry={() => void progress.refetch()}>{progress.error instanceof Error ? progress.error.message : 'WorldLab could not load this investigation.'}</PanelState>;
+    return <PanelState title="Investigation unavailable" retry={() => void progress.refetch()}>{progress.error instanceof Error ? progress.error.message : 'Rift could not load this investigation.'}</PanelState>;
   }
 
   const workerProvider = workers.data?.[0]?.provider;

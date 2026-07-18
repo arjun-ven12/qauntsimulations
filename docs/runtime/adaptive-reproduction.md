@@ -156,7 +156,7 @@ RUN_DAYTONA_ADAPTIVE_INTEGRATION_TESTS=true \
 pnpm exec vitest run apps/api/src/modules/execution/__tests__/daytona-adaptive.integration.test.ts
 ```
 
-It verifies that initial worlds and adaptive worlds run in isolated Daytona sandboxes, evidence is downloaded, the finding is updated, and TaskOS-labelled sandboxes are deleted.
+It verifies that initial worlds and adaptive worlds run in isolated Daytona sandboxes, evidence is downloaded, the finding is updated, and legacy `taskos`-labelled sandboxes are deleted.
 
 ## Prompt 7 handoff
 

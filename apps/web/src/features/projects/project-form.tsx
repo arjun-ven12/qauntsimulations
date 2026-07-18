@@ -87,7 +87,7 @@ export function ProjectForm({
   return (
     <form className="space-y-6" noValidate onSubmit={(event) => void submit(event)}>
       <FormSection
-        description="Name the application and explain why WorldLab will investigate it."
+        description="Name the application and explain why Rift will investigate it."
         title="Basic details"
       >
         <Field error={errors.name} label="Project name">
@@ -149,7 +149,7 @@ export function ProjectForm({
       </FormSection>
 
       <ReferenceSection
-        description="Store a reference to a test credential managed outside TaskOS. Do not paste passwords or secret keys here."
+        description="Store a reference to a test credential managed outside Rift. Do not paste passwords or secret keys here."
         emptyLabel="No credential references configured."
         items={value.credentialReferences}
         kind="credential"
@@ -165,7 +165,7 @@ export function ProjectForm({
         title="API endpoints"
       />
       <ReferenceSection
-        description="Optional authorised webhook endpoints. WorldLab will not call them during setup."
+        description="Optional authorised webhook endpoints. Rift will not call them during setup."
         emptyLabel="No webhook endpoints configured."
         items={value.webhookEndpoints}
         kind="endpoint"

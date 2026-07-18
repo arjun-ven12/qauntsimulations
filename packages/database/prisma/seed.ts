@@ -24,8 +24,8 @@ async function seed(): Promise<void> {
     const ids = demoProductFixtureIds;
     await transaction.organisation.upsert({
       where: { id: ids.organisation },
-      update: { name: 'TaskOS Demo', slug: 'taskos-demo', deletedAt: null },
-      create: { id: ids.organisation, name: 'TaskOS Demo', slug: 'taskos-demo' },
+      update: { name: 'Rift Demo', slug: 'taskos-demo', deletedAt: null },
+      create: { id: ids.organisation, name: 'Rift Demo', slug: 'taskos-demo' },
     });
 
     await transaction.project.upsert({

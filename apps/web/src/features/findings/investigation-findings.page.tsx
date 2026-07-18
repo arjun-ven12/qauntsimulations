@@ -21,7 +21,7 @@ export function InvestigationFindingsPage() {
       />
       <RuntimeNav investigationId={investigationId} />
       {findings.isLoading ? <PanelState title="Loading findings">Loading evidence-backed findings…</PanelState> : null}
-      {findings.error ? <PanelState title="Findings unavailable" retry={() => void findings.refetch()}>{findings.error instanceof Error ? findings.error.message : 'WorldLab could not load findings.'}</PanelState> : null}
+      {findings.error ? <PanelState title="Findings unavailable" retry={() => void findings.refetch()}>{findings.error instanceof Error ? findings.error.message : 'Rift could not load findings.'}</PanelState> : null}
       {!findings.isLoading && !findings.error ? <FindingsList investigationId={investigationId} findings={findings.data ?? []} /> : null}
     </>
   );

@@ -106,7 +106,7 @@ class HttpScenarioApi {
       });
     } catch {
       throw new ScenarioApiError(
-        'WorldLab could not reach the Investigation service.',
+        'Rift could not reach the Investigation service.',
         0,
         'NETWORK_ERROR',
       );

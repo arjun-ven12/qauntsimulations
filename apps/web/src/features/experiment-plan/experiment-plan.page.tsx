@@ -22,7 +22,7 @@ export function ExperimentPlanPage() {
       />
       <RuntimeNav investigationId={investigationId} />
       {plan.isLoading ? <PanelState title="Loading plan">Loading planner output…</PanelState> : null}
-      {plan.error ? <PanelState title="Plan unavailable" retry={() => void plan.refetch()}>{plan.error instanceof Error ? plan.error.message : 'WorldLab could not load the experiment plan.'}</PanelState> : null}
+      {plan.error ? <PanelState title="Plan unavailable" retry={() => void plan.refetch()}>{plan.error instanceof Error ? plan.error.message : 'Rift could not load the experiment plan.'}</PanelState> : null}
       {!plan.isLoading && !plan.error ? <ExperimentPlanPanel plan={plan.data ?? null} /> : null}
       <section className="card mt-5">
         <h2 className="font-bold">Planner provenance</h2>

@@ -21,12 +21,12 @@ export function ProjectsPage() {
             </Link>
           ) : undefined
         }
-        description="Define the applications, integration references and safety boundaries WorldLab may use."
+        description="Define the applications, integration references and safety boundaries Rift may use."
         eyebrow="Workspace"
         title="Projects"
       />
       <span className="sr-only" id="projects-heading">
-        TaskOS projects
+        Rift projects
       </span>
       {projects.isPending ? (
         <ProjectLoading label="Loading projects…" />
@@ -45,7 +45,7 @@ export function ProjectsPage() {
           <h2 className="mt-4 text-xl font-bold">Define your first safe target</h2>
           <p className="mx-auto mt-2 max-w-xl text-sm text-slate-400">
             A project records the application, external credential references, integration URLs and
-            boundaries TaskOS must obey. It does not run experiments by itself.
+            boundaries Rift must obey. It does not run experiments by itself.
           </p>
           {canCreate ? (
             <Link className={`${primaryButton} mt-6`} to="/projects/new">
@@ -114,5 +114,5 @@ function hostname(value: string | null) {
 function projectErrorMessage(error: unknown) {
   return error instanceof ProjectApiError
     ? error.message
-    : 'WorldLab could not load projects. Try again in a moment.';
+    : 'Rift could not load projects. Try again in a moment.';
 }

@@ -104,7 +104,7 @@ class HttpInvitationApi {
       });
     } catch {
       throw new InvitationApiError(
-        'WorldLab could not reach the invitation service.',
+        'Rift could not reach the invitation service.',
         0,
         'NETWORK_ERROR',
       );

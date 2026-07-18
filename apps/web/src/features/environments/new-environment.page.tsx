@@ -23,7 +23,7 @@ export function NewEnvironmentPage() {
   return (
     <section className="mx-auto max-w-[1050px]">
       <PageHeading
-        description="Define an authorised test target and the exact behavior TaskOS may use."
+        description="Define an authorised test target and the exact behavior Rift may use."
         eyebrow="Project setup"
         title="Create Environment"
       />

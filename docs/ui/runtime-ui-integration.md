@@ -1,6 +1,6 @@
 # Runtime UI integration
 
-Prompt 9 connects the existing TaskOS web app to the real runtime investigation API.
+Prompt 9 connects the existing Rift web app to the real runtime investigation API.
 
 ## Pages integrated
 

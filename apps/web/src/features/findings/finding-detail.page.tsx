@@ -22,7 +22,7 @@ export function FindingDetailPage() {
 
   if (finding.isLoading) return <PanelState title="Loading finding">Loading finding detail, minimisation metadata, and linked evidence…</PanelState>;
   if (finding.error || !finding.data) {
-    return <PanelState title="Finding unavailable" retry={() => void finding.refetch()}>{finding.error instanceof Error ? finding.error.message : 'WorldLab could not load this finding.'}</PanelState>;
+    return <PanelState title="Finding unavailable" retry={() => void finding.refetch()}>{finding.error instanceof Error ? finding.error.message : 'Rift could not load this finding.'}</PanelState>;
   }
 
   const conditions = causalConditions(finding.data);
@@ -35,7 +35,7 @@ export function FindingDetailPage() {
       <PageHeading
         eyebrow={finding.data.confidence}
         title={finding.data.title}
-        description="Runtime-backed finding detail with minimisation, evidence, and final report metadata."
+        description="Rift finding detail with minimisation, evidence, and final report metadata."
         action={<Link className="rounded-lg bg-cyan px-4 py-2 font-bold text-ink" to={`/investigations/${investigationId}/findings`}>Back to findings</Link>}
       />
       <RuntimeNav investigationId={investigationId} />
